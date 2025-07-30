@@ -7,7 +7,7 @@ const ChatBotSchema = new mongoose.Schema(
     description: String,
     is_voice_enabled: { type: Boolean, default: false },
     is_auto_translate: { type: Boolean, default: false },
-    supported_languages: { type: String, default: "English" },
+    supported_languages: { type: [String], default: ["English"] },
     primary_purpose: String,
     specialisation_area: String,
     conversation_tone: { type: String, default: "Professional" },
