@@ -1,4 +1,6 @@
 const ChatBot = require("../models/ChatBot");
+const QAHistory = require("../models/QAHistory");
+const Customization = require("../models/Customisation");
 
 exports.getAllChatBots = async (req, res) => {
   try {
@@ -18,5 +20,37 @@ exports.getBotById = async (req, res) => {
     res.json(bot);
   } catch (err) {
     res.status(500).json({ message: "Server error" });
+  }
+};
+
+exports.deleteBot = async (req, res) => {
+  const { botId } = req.params;
+
+  try {
+    const bot = await ChatBot.findById(botId);
+    if (!bot) {
+      return res.status(404).json({ success: false, message: "Bot not found" });
+    }
+
+    // Delete related customization
+    await Customization.findOneAndDelete({ botId });
+
+    // Delete related QA history
+    await QAHistory.deleteMany({ bot: botId });
+
+    // Delete the bot itself
+    await ChatBot.findByIdAndDelete(botId);
+
+    return res
+      .status(200)
+      .json({
+        success: true,
+        message: "Bot and associated data deleted successfully",
+      });
+  } catch (error) {
+    console.error("Error deleting bot:", error);
+    return res
+      .status(500)
+      .json({ success: false, message: "Internal server error" });
   }
 };
