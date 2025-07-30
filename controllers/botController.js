@@ -29,15 +29,23 @@ exports.createBot = async (req, res) => {
       });
     }
 
+    let parsedLanguages;
+    try {
+      parsedLanguages = JSON.parse(supported_languages);
+      if (!Array.isArray(parsedLanguages)) throw new Error("Not an array");
+    } catch {
+      parsedLanguages = supported_languages
+        ?.split(",")
+        .map((lang) => lang.trim());
+    }
+
     const bot = await ChatBot.create({
       name,
       website_url,
       description,
       is_voice_enabled: is_voice_enabled === "true",
       is_auto_translate: is_auto_translate === "true",
-      supported_languages: Array.isArray(supported_languages)
-    ? supported_languages
-    : supported_languages?.split(",").map(lang => lang.trim()),
+      supported_languages: parsedLanguages,
       primary_purpose,
       specialisation_area,
       conversation_tone,
