@@ -41,14 +41,44 @@ exports.deleteBot = async (req, res) => {
     // Delete the bot itself
     await ChatBot.findByIdAndDelete(botId);
 
-    return res
-      .status(200)
-      .json({
-        success: true,
-        message: "Bot and associated data deleted successfully",
-      });
+    return res.status(200).json({
+      success: true,
+      message: "Bot and associated data deleted successfully",
+    });
   } catch (error) {
     console.error("Error deleting bot:", error);
+    return res
+      .status(500)
+      .json({ success: false, message: "Internal server error" });
+  }
+};
+
+exports.updateBot = async (req, res) => {
+  const { botId } = req.params;
+  const updateData = req.body;
+
+  try {
+    const bot = await ChatBot.findById(botId);
+    if (!bot) {
+      return res.status(404).json({ success: false, message: "Bot not found" });
+    }
+
+    // Update allowed fields
+    Object.keys(updateData).forEach((key) => {
+      if (key in bot) {
+        bot[key] = updateData[key];
+      }
+    });
+
+    await bot.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Bot updated successfully",
+      bot,
+    });
+  } catch (error) {
+    console.error("Error updating bot:", error);
     return res
       .status(500)
       .json({ success: false, message: "Internal server error" });
