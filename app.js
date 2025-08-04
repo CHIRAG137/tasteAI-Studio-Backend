@@ -8,6 +8,7 @@ const chatBotRoutes = require("./routes/chatBotRoutes");
 const customizationRoutes = require("./routes/customisationRoutes");
 const publicBotRoutes = require("./routes/publicBotRoutes");
 const crawlRoutes = require("./routes/crawlRoutes");
+const slackRoutes = require("./routes/slackRoutes");
 require("dotenv").config();
 
 const app = express();
@@ -34,6 +35,7 @@ app.use("/api/bots", botRoutes);
 app.use("/api/public", publicBotRoutes);
 app.use("/api/customizations", customizationRoutes);
 app.use("/api/scrape", crawlRoutes);
+app.use("/api/slack", slackRoutes);
 app.use("/api/", chatBotRoutes);
 app.get("/widget.js", (req, res) => {
   res.sendFile(path.join(__dirname, "public/widget.js"));
