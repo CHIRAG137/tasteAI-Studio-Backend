@@ -40,6 +40,7 @@ exports.createBot = async (req, res) => {
     }
 
     const bot = await ChatBot.create({
+      user: req.user.id,
       name,
       website_url,
       description,
@@ -56,13 +57,10 @@ exports.createBot = async (req, res) => {
       custom_instructions,
     });
 
-    // Trigger background scraping (placeholder)
     console.log(`Scraping website: ${website_url} for bot ${bot._id}`);
 
-    // Handle uploaded file (if any)
     if (req.file) {
       const text = await extractTextFromPDF(req.file.path);
-
       if (text && text.trim()) {
         const chunks = text.match(/.{1,3000}/g);
         for (const chunk of chunks) {

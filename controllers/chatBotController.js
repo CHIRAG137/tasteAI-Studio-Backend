@@ -4,7 +4,7 @@ const Customization = require("../models/Customisation");
 
 exports.getAllChatBots = async (req, res) => {
   try {
-    const bots = await ChatBot.find();
+    const bots = await ChatBot.find({ user: req.user.id });
     res.status(200).json({ success: true, bots });
   } catch (error) {
     res
@@ -15,7 +15,10 @@ exports.getAllChatBots = async (req, res) => {
 
 exports.getBotById = async (req, res) => {
   try {
-    const bot = await ChatBot.findById(req.params.botId);
+    const bot = await ChatBot.findById({
+      _id: req.params.botId,
+      user: req.user.id,
+    });
     if (!bot) return res.status(404).json({ message: "Bot not found" });
     res.json(bot);
   } catch (err) {
@@ -27,7 +30,7 @@ exports.deleteBot = async (req, res) => {
   const { botId } = req.params;
 
   try {
-    const bot = await ChatBot.findById(botId);
+    const bot = await ChatBot.findById({ _id: botId, user: req.user.id });
     if (!bot) {
       return res.status(404).json({ success: false, message: "Bot not found" });
     }
@@ -57,7 +60,7 @@ exports.updateBot = async (req, res) => {
   const { botId } = req.params;
 
   try {
-    const bot = await ChatBot.findById(botId);
+    const bot = await ChatBot.findById({ _id: botId, user: req.user.id });
     if (!bot) {
       return res.status(404).json({ success: false, message: "Bot not found" });
     }
