@@ -2,15 +2,15 @@ const express = require("express");
 const router = express.Router();
 const multer = require("multer");
 const chatBotController = require("../controllers/chatBotController");
-const { verifyToken } = require("../middlewares/authMiddleware");
+const { authMiddleware } = require("../middlewares/authMiddleware");
 const upload = multer();
 
-router.get("/bots", verifyToken, chatBotController.getAllChatBots);
-router.get("/bots/:botId", verifyToken, chatBotController.getBotById);
-router.delete("/bots/:botId", verifyToken, chatBotController.deleteBot);
+router.get("/bots", authMiddleware, chatBotController.getAllChatBots);
+router.get("/bots/:botId", authMiddleware, chatBotController.getBotById);
+router.delete("/bots/:botId", authMiddleware, chatBotController.deleteBot);
 router.put(
   "/bots/:botId",
-  verifyToken,
+  authMiddleware,
   upload.single("file"),
   chatBotController.updateBot
 );
