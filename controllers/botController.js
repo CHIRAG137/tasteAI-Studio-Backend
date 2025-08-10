@@ -21,6 +21,9 @@ exports.createBot = async (req, res) => {
       key_topics,
       keywords,
       custom_instructions,
+      is_slack_enabled,
+      slack_command,
+      slack_channel_id
     } = req.body;
 
     if (!name || !website_url || !description) {
@@ -46,6 +49,9 @@ exports.createBot = async (req, res) => {
       description,
       is_voice_enabled: is_voice_enabled === "true",
       is_auto_translate: is_auto_translate === "true",
+      is_slack_enabled: is_slack_enabled === "true",
+      slack_command,
+      slack_channel_id,
       supported_languages: parsedLanguages,
       primary_purpose,
       specialisation_area,

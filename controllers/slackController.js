@@ -1,5 +1,7 @@
 const axios = require("axios");
 const SlackIntegration = require("../models/SlackIntegration");
+const ChatBot = require("../models/ChatBot");
+const botController = require("./botController");
 
 exports.initiateSlackOAuth = (req, res) => {
   if (!req.user) {
@@ -65,4 +67,58 @@ exports.handleSlackOAuthCallback = async (req, res) => {
     console.error("OAuth error:", error);
     res.status(500).send("Internal Server Error");
   }
+};
+
+exports.handleCommand = async (req, res) => {
+  const { type, challenge, event } = req.body;
+
+  // Slack verification challenge
+  if (type === "url_verification") {
+    return res.send({ challenge });
+  }
+
+  // Handle message events
+  if (event && event.type === "message" && !event.bot_id) {
+    try {
+      const bot = await ChatBot.findOne({ slack_channel_id: event.channel });
+      if (!bot) {
+        return res.status(200).send(); // no bot for this channel
+      }
+
+      // Get Slack token for this user/team
+      const slackIntegration = await SlackIntegration.findOne({
+        slackTeamId: req.body.team_id,
+      });
+
+      if (!slackIntegration) {
+        return res.status(200).send();
+      }
+
+      // Ask bot
+      const fakeReq = { body: { question: event.text, botId: bot._id } };
+      const fakeRes = {
+        json: async (data) => {
+          // Send reply to Slack
+          await axios.post(
+            "https://slack.com/api/chat.postMessage",
+            {
+              channel: event.channel,
+              text: data.answer || data.message,
+            },
+            {
+              headers: {
+                Authorization: `Bearer ${slackIntegration.slackAccessToken}`,
+                "Content-Type": "application/json",
+              },
+            }
+          );
+        },
+      };
+      await botController.askBot(fakeReq, fakeRes);
+    } catch (err) {
+      console.error("Slack event error:", err);
+    }
+  }
+  // Respond quickly to Slack
+  res.status(200).send();
 };
