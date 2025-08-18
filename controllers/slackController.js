@@ -71,7 +71,7 @@ exports.handleSlackOAuthCallback = async (req, res) => {
 
 exports.handleCommand = async (req, res) => {
   const { type, challenge, event } = req.body;
-
+  
   // Slack verification challenge
   if (type === "url_verification") {
     return res.send({ challenge });
@@ -95,7 +95,7 @@ exports.handleCommand = async (req, res) => {
       }
 
       // Ask bot
-      const fakeReq = { body: { question: event.text, botId: bot._id } };
+      const fakeReq = { body: { question: event.text, botId: bot._id.toString() } };
       const fakeRes = {
         json: async (data) => {
           // Send reply to Slack
