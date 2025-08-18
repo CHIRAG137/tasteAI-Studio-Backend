@@ -1,3 +1,5 @@
+const axios = require("axios");
+const SlackIntegration = require("../models/SlackIntegration");
 const ChatBot = require("../models/ChatBot");
 const QAHistory = require("../models/QAHistory");
 const { extractTextFromPDF } = require("../utils/textExtractor");
@@ -21,6 +23,9 @@ exports.createBot = async (req, res) => {
       key_topics,
       keywords,
       custom_instructions,
+      is_slack_enabled,
+      slack_command,
+      slack_channel_id,
     } = req.body;
 
     if (!name || !website_url || !description) {
@@ -40,11 +45,15 @@ exports.createBot = async (req, res) => {
     }
 
     const bot = await ChatBot.create({
+      user: req.user.id,
       name,
       website_url,
       description,
       is_voice_enabled: is_voice_enabled === "true",
       is_auto_translate: is_auto_translate === "true",
+      is_slack_enabled: is_slack_enabled === "true",
+      slack_command,
+      slack_channel_id,
       supported_languages: parsedLanguages,
       primary_purpose,
       specialisation_area,
@@ -56,13 +65,44 @@ exports.createBot = async (req, res) => {
       custom_instructions,
     });
 
-    // Trigger background scraping (placeholder)
     console.log(`Scraping website: ${website_url} for bot ${bot._id}`);
 
-    // Handle uploaded file (if any)
+    // 🔹 Auto-join Slack channel if enabled
+    if (is_slack_enabled === "true" && slack_channel_id) {
+      const slackIntegration = await SlackIntegration.findOne({
+        userId: req.user.id,
+      });
+
+      if (slackIntegration?.slackAccessToken) {
+        try {
+          // Join the channel
+          await axios.post(
+            "https://slack.com/api/conversations.join",
+            { channel: slack_channel_id },
+            {
+              headers: {
+                Authorization: `Bearer ${slackIntegration.slackAccessToken}`,
+                "Content-Type": "application/json",
+              },
+            }
+          );
+          console.log(`Bot joined Slack channel ${slack_channel_id}`);
+        } catch (err) {
+          console.error(
+            "Error joining Slack channel:",
+            err.response?.data || err.message
+          );
+        }
+      } else {
+        console.warn(
+          "Slack integration not found for user. Bot not added to channel."
+        );
+      }
+    }
+
+    // 🔹 Process PDF if uploaded
     if (req.file) {
       const text = await extractTextFromPDF(req.file.path);
-
       if (text && text.trim()) {
         const chunks = text.match(/.{1,3000}/g);
         for (const chunk of chunks) {
@@ -85,10 +125,11 @@ exports.createBot = async (req, res) => {
 
     res.json({
       bot_id: bot._id,
-      message: "Bot created successfully with GPT-generated QAs.",
+      message:
+        "Bot created successfully with GPT-generated QAs and added to Slack channel (if enabled).",
     });
   } catch (error) {
-    console.error("Create bot error:", error);
+    console.error("Create bot error:", error.response?.data || error.message);
     res.status(500).json({ error: "Internal server error" });
   }
 };
