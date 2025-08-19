@@ -93,7 +93,7 @@ exports.getScrapeResult = async (req, res) => {
     const { status, data } = response.data;
 
     // You can customize this further
-    if (status === "in_progress") {
+    if (status === "in_progress" || status === "scraping") {
       return res.status(202).json({ message: "Job is still in progress." });
     }
 
