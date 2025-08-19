@@ -6,7 +6,7 @@ const { authMiddleware } = require("../middlewares/authMiddleware");
 const upload = multer();
 
 router.get("/bots", authMiddleware, chatBotController.getAllChatBots);
-router.get("/bots/:botId", authMiddleware, chatBotController.getBotById);
+router.get("/bots/:botId", chatBotController.getBotById);
 router.delete("/bots/:botId", authMiddleware, chatBotController.deleteBot);
 router.put(
   "/bots/:botId",
