@@ -9,7 +9,7 @@ exports.initiateSlackOAuth = (req, res) => {
   }
 
   const state = encodeURIComponent(JSON.stringify({ userId: req.user._id }));
-  const slackAuthUrl = `https://slack.com/oauth/v2/authorize?client_id=${process.env.SLACK_CLIENT_ID}&scope=chat:write,commands,users:read,channels:read&user_scope=&redirect_uri=${process.env.SLACK_REDIRECT_URI}&state=${state}`;
+  const slackAuthUrl = `https://slack.com/oauth/v2/authorize?client_id=${process.env.SLACK_CLIENT_ID}&scope=chat:write,commands,users:read,channels:read,channels:join,groups:write&user_scope=&redirect_uri=${process.env.SLACK_REDIRECT_URI}&state=${state}`;
 
   res.redirect(slackAuthUrl);
 };
@@ -71,7 +71,7 @@ exports.handleSlackOAuthCallback = async (req, res) => {
 
 exports.handleCommand = async (req, res) => {
   const { type, challenge, event } = req.body;
-  
+
   // Slack verification challenge
   if (type === "url_verification") {
     return res.send({ challenge });
@@ -95,7 +95,9 @@ exports.handleCommand = async (req, res) => {
       }
 
       // Ask bot
-      const fakeReq = { body: { question: event.text, botId: bot._id.toString() } };
+      const fakeReq = {
+        body: { question: event.text, botId: bot._id.toString() },
+      };
       const fakeRes = {
         json: async (data) => {
           // Send reply to Slack
