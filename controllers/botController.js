@@ -28,9 +28,9 @@ exports.createBot = async (req, res) => {
       slack_channel_id,
     } = req.body;
 
-    if (!name || !website_url || !description) {
+    if (!name || !description) {
       return res.status(400).json({
-        error: "Missing required fields: name, website_url, or description",
+        error: "Missing required fields: name, or description",
       });
     }
 
