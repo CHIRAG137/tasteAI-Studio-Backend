@@ -26,6 +26,7 @@ exports.createBot = async (req, res) => {
       is_slack_enabled,
       slack_command,
       slack_channel_id,
+      conversationFlow,
     } = req.body;
 
     if (!name || !description) {
@@ -63,6 +64,7 @@ exports.createBot = async (req, res) => {
       key_topics,
       keywords,
       custom_instructions,
+      conversationFlow: conversationFlow || { nodes: [], edges: [] },
     });
 
     console.log(`Scraping website: ${website_url} for bot ${bot._id}`);
@@ -135,51 +137,54 @@ exports.createBot = async (req, res) => {
 };
 
 exports.askBot = async (req, res) => {
-  try {
-    const { question, botId } = req.body;
-    if (!question || !botId)
-      return res.status(400).json({ message: "Missing question or botId" });
+  const { question, botId } = req.body;
 
-    const inputEmbedding = await getEmbedding(question); // Float32Array
-    const qas = await QAHistory.find({ bot: botId });
+  const bot = await ChatBot.findById(botId);
+  if (!bot) return res.status(404).json({ message: "Bot not found" });
 
-    let bestMatch = null;
-    let bestScore = -1;
+  // 1️⃣ Check conversation flow first
+  const { nodes, edges } = bot.conversationFlow || { nodes: [], edges: [] };
 
-    for (let qa of qas) {
-      const storedEmbedding = new Float32Array(qa.embedding.buffer); // Assuming stored as Buffer
-      const score = cosineSimilarity(inputEmbedding, storedEmbedding);
-
-      if (score > bestScore) {
-        bestScore = score;
-        bestMatch = qa;
-      }
-    }
-
-    // If a good match is found, return and store the new Q/A
-    if (bestScore > 0.85 && bestMatch) {
-      // Save the new question-answer pair with its embedding
-      const newQA = new QAHistory({
-        bot: botId,
-        question: question,
-        answer: bestMatch.answer,
-        embedding: Buffer.from(inputEmbedding.buffer), // Convert to Buffer for Mongo
-      });
-      await newQA.save();
-
+  if (nodes.length > 0) {
+    // For now, return the first message node as demo
+    const startNode = nodes.find((n) => n.type === "message");
+    if (startNode) {
       return res.json({
-        answer: bestMatch.answer,
-        score: bestScore,
-        message: "Answer found and logged to history.",
+        answer: startNode.data?.message || "Flow active but no message set.",
+        source: "flow",
       });
     }
+  }
+
+  // 2️⃣ Otherwise fallback to QA history (your existing logic)
+  const inputEmbedding = await getEmbedding(question);
+  const qas = await QAHistory.find({ bot: botId });
+
+  let bestMatch = null,
+    bestScore = -1;
+  for (let qa of qas) {
+    const storedEmbedding = new Float32Array(qa.embedding.buffer);
+    const score = cosineSimilarity(inputEmbedding, storedEmbedding);
+    if (score > bestScore) {
+      bestScore = score;
+      bestMatch = qa;
+    }
+  }
+
+  if (bestScore > 0.85 && bestMatch) {
+    await QAHistory.create({
+      bot: botId,
+      question,
+      answer: bestMatch.answer,
+      embedding: Buffer.from(inputEmbedding.buffer),
+    });
 
     return res.json({
-      message: "No similar question found.",
+      answer: bestMatch.answer,
       score: bestScore,
+      source: "qa",
     });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Server error" });
   }
+
+  return res.json({ message: "No match found.", score: bestScore });
 };
