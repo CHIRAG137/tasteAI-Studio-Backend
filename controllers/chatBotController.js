@@ -16,8 +16,7 @@ exports.getAllChatBots = async (req, res) => {
 exports.getBotById = async (req, res) => {
   try {
     const bot = await ChatBot.findById({
-      _id: req.params.botId,
-      user: req.user.id,
+      _id: req.params.botId
     });
     if (!bot) return res.status(404).json({ message: "Bot not found" });
     res.json(bot);
