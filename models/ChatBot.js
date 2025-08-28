@@ -25,8 +25,8 @@ const ChatBotSchema = new mongoose.Schema(
     keywords: String,
     custom_instructions: String,
     conversationFlow: {
-      nodes: { type: Array, default: [] },
-      edges: { type: Array, default: [] },
+      type: mongoose.Schema.Types.Mixed,
+      default: { nodes: [], edges: [] },
     },
   },
   { timestamps: true }

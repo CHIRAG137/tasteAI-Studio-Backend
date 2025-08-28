@@ -45,6 +45,15 @@ exports.createBot = async (req, res) => {
         .map((lang) => lang.trim());
     }
 
+    let parsedConversationFlow = conversationFlow;
+    if (typeof conversationFlow === "string") {
+      try {
+        parsedConversationFlow = JSON.parse(conversationFlow);
+      } catch (e) {
+        parsedConversationFlow = { nodes: [], edges: [] };
+      }
+    }
+
     const bot = await ChatBot.create({
       user: req.user.id,
       name,
@@ -64,7 +73,7 @@ exports.createBot = async (req, res) => {
       key_topics,
       keywords,
       custom_instructions,
-      conversationFlow: conversationFlow || { nodes: [], edges: [] },
+      conversationFlow: parsedConversationFlow,
     });
 
     console.log(`Scraping website: ${website_url} for bot ${bot._id}`);
@@ -142,21 +151,6 @@ exports.askBot = async (req, res) => {
   const bot = await ChatBot.findById(botId);
   if (!bot) return res.status(404).json({ message: "Bot not found" });
 
-  // 1️⃣ Check conversation flow first
-  const { nodes, edges } = bot.conversationFlow || { nodes: [], edges: [] };
-
-  if (nodes.length > 0) {
-    // For now, return the first message node as demo
-    const startNode = nodes.find((n) => n.type === "message");
-    if (startNode) {
-      return res.json({
-        answer: startNode.data?.message || "Flow active but no message set.",
-        source: "flow",
-      });
-    }
-  }
-
-  // 2️⃣ Otherwise fallback to QA history (your existing logic)
   const inputEmbedding = await getEmbedding(question);
   const qas = await QAHistory.find({ bot: botId });
 
