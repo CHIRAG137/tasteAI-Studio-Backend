@@ -166,6 +166,9 @@ exports.updateBot = async (req, res) => {
 
     // 🔹 Process uploaded PDF (if present)
     if (req.file) {
+      // First delete all previous QAs for this bot
+      await QAHistory.deleteMany({ bot: bot._id });
+
       const text = await extractTextFromPDF(req.file.path);
       if (text && text.trim()) {
         const chunks = text.match(/.{1,3000}/g);
@@ -192,7 +195,7 @@ exports.updateBot = async (req, res) => {
     return res.status(200).json({
       success: true,
       message:
-        "Bot updated successfully with GPT-generated QAs and added to Slack channel (if enabled).",
+        "Bot updated successfully. Previous QAs replaced with new ones (if file uploaded) and added to Slack channel (if enabled).",
       bot,
     });
   } catch (error) {
