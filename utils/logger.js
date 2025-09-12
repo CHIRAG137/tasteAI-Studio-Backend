@@ -2,18 +2,27 @@ function getTimeStamp() {
   return new Date().toISOString();
 }
 
-function logger(level, message, meta = null) {
-  const entry = {
+function formatLog(level, message, meta) {
+  return JSON.stringify({
     time: getTimeStamp(),
     level: level.toUpperCase(),
     message,
     ...(meta ? { meta } : {}),
-  };
-
-  console.log(JSON.stringify(entry));
+  });
 }
 
-exports.info = (message, meta) => logger("info", message, meta);
-exports.warn = (message, meta) => logger("warn", message, meta);
-exports.error = (message, meta) => logger("error", message, meta);
-exports.debug = (message, meta) => logger("debug", message, meta);
+function log(level, message, meta) {
+  const line = formatLog(level, message, meta);
+  if (level === "error") {
+    console.error(line);
+  } else if (level === "warn") {
+    console.warn(line);
+  } else {
+    console.log(line);
+  }
+}
+
+exports.info = (message, meta) => log("info", message, meta);
+exports.warn = (message, meta) => log("warn", message, meta);
+exports.error = (message, meta) => log("error", message, meta);
+exports.debug = (message, meta) => log("debug", message, meta);
