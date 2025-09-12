@@ -4,7 +4,6 @@ const bodyParser = require("body-parser");
 const cors = require("cors");
 const path = require("path");
 const botRoutes = require("./routes/botRoutes");
-const chatBotRoutes = require("./routes/chatBotRoutes");
 const customizationRoutes = require("./routes/customisationRoutes");
 const publicBotRoutes = require("./routes/publicBotRoutes");
 const crawlRoutes = require("./routes/crawlRoutes");
@@ -38,7 +37,6 @@ app.use("/api/customizations", customizationRoutes);
 app.use("/api/scrape", crawlRoutes);
 app.use("/api/slack", slackRoutes);
 app.use("/api/auth", authRoutes);
-app.use("/api/", chatBotRoutes);
 app.get("/widget.js", (req, res) => {
   res.sendFile(path.join(__dirname, "public/widget.js"));
 });
