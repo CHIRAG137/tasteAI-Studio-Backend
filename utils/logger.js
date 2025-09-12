@@ -1,8 +1,3 @@
-const fs = require("fs");
-const path = require("path");
-
-const logFile = path.join(__dirname, "app.log");
-
 function getTimeStamp() {
   return new Date().toISOString();
 }
@@ -15,9 +10,7 @@ function logger(level, message, meta = null) {
     ...(meta ? { meta } : {}),
   };
 
-  const line = JSON.stringify(entry);
-  console.log(line);
-  fs.appendFileSync(logFile, line + "\n");
+  console.log(JSON.stringify(entry));
 }
 
 exports.info = (message, meta) => logger("info", message, meta);
