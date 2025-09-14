@@ -4,7 +4,6 @@ const bodyParser = require("body-parser");
 const cors = require("cors");
 const path = require("path");
 const botRoutes = require("./routes/botRoutes");
-const publicBotRoutes = require("./routes/publicBotRoutes");
 const crawlRoutes = require("./routes/crawlRoutes");
 const slackRoutes = require("./routes/slackRoutes");
 const authRoutes = require("./routes/authRoutes");
@@ -31,7 +30,6 @@ mongoose
   .catch((err) => console.error("MongoDB error:", err));
 
 app.use("/api/bots", botRoutes);
-app.use("/api/public", publicBotRoutes);
 app.use("/api/scrape", crawlRoutes);
 app.use("/api/slack", slackRoutes);
 app.use("/api/auth", authRoutes);
