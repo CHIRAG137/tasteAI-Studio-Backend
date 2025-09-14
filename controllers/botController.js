@@ -33,7 +33,7 @@ exports.getAllChatBots = async (req, res) => {
     const bots = await botService.getAllChatBots(userId);
 
     logger.info("Fetched all chat bots", { userId, count: bots.length });
-    return responseBuilder.success(res, { bots }, "Chat bots fetched successfully");
+    return responseBuilder.ok(res, { bots }, "Chat bots fetched successfully");
   } catch (error) {
     logger.error("Error fetching all chat bots", { error: error.message });
     return responseBuilder.internalError(res, "Failed to fetch bots");
