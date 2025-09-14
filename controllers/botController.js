@@ -91,3 +91,33 @@ exports.updateBot = async (req, res) => {
     return responseBuilder.internalError(res, "Failed to update bot");
   }
 };
+
+exports.getCustomization = async (req, res) => {
+  try {
+    const { botId } = req.params;
+    logger.info("Fetching customization", { botId, userId: req.user?.id });
+
+    const customization = await botService.getCustomization(botId);
+
+    logger.info("Customization fetched successfully", { botId, userId: req.user?.id });
+    return responseBuilder.ok(res, customization, "Customization fetched successfully");
+  } catch (error) {
+    logger.error("Error fetching customization", { error: error.message, botId: req.params.botId, userId: req.user?.id });
+    return responseBuilder.internalError(res, null, "Failed to fetch customization");
+  }
+};
+
+exports.saveCustomization = async (req, res) => {
+  try {
+    const { botId } = req.params;
+    logger.info("Saving customization", { botId, userId: req.user?.id, body: req.body });
+
+    const customization = await botService.saveCustomization(botId, req.body);
+
+    logger.info("Customization saved successfully", { botId, userId: req.user?.id });
+    return responseBuilder.ok(res, customization, "Customization saved successfully");
+  } catch (error) {
+    logger.error("Error saving customization", { error: error.message, botId: req.params.botId, userId: req.user?.id });
+    return responseBuilder.internalError(res, null, "Failed to save customization");
+  }
+};
