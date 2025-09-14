@@ -345,3 +345,40 @@ exports.updateBot = async (botId, userId, body, file) => {
 
   return bot;
 };
+
+exports.getCustomization = async (botId) => {
+  if (!botId) {
+    logger.error("Get customization failed: Bot ID missing");
+    throw new Error("Bot ID is required");
+  }
+
+  logger.info("Fetching customization", { botId });
+
+  const customization = await Customization.findOne({ botId });
+
+  if (customization) {
+    logger.info("Customization fetched successfully", { botId });
+  } else {
+    logger.warn("No customization found", { botId });
+  }
+
+  return customization;
+};
+
+exports.saveCustomization = async (botId, data) => {
+  if (!botId) {
+    logger.error("Save customization failed: Bot ID missing");
+    throw new Error("Bot ID is required");
+  }
+
+  logger.info("Saving customization", { botId, data });
+
+  const customization = await Customization.findOneAndUpdate(
+    { botId },
+    { ...data, botId },
+    { new: true, upsert: true }
+  );
+
+  logger.info("Customization saved successfully", { botId });
+  return customization;
+};
