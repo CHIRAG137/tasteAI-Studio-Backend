@@ -1,14 +1,10 @@
 const express = require("express");
-const {
-  crawlWebsite,
-  scrapeUrls,
-  getScrapeResult,
-} = require("../controllers/crawlController");
+const crawlController = require("../controllers/crawlController");
 
 const router = express.Router();
 
-router.post("/search-urls", crawlWebsite);
-router.post("/urls", scrapeUrls);
-router.get("/result/:jobId", getScrapeResult);
+router.post("/search-urls", crawlController.crawlWebsite);
+router.post("/urls", crawlController.scrapeUrls);
+router.get("/result/:jobId", crawlController.getScrapeResult);
 
 module.exports = router;
