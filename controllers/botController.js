@@ -20,7 +20,7 @@ exports.askBot = async (req, res) => {
     const result = await botService.askBot(question, botId);
 
     logger.info("Bot answered question", { botId, question });
-    return responseBuilder.success(res, result, "Bot responded successfully");
+    return responseBuilder.ok(res, result, "Bot responded successfully");
   } catch (error) {
     logger.error("Ask bot error", { error: error.message, stack: error.stack });
     return responseBuilder.error(res, "Failed to get bot response");
@@ -51,7 +51,7 @@ exports.getBotById = async (req, res) => {
     }
 
     logger.info("Fetched bot by ID", { botId });
-    return responseBuilder.success(res, bot, "Bot fetched successfully");
+    return responseBuilder.ok(res, bot, "Bot fetched successfully");
   } catch (error) {
     logger.error("Error fetching bot by ID", { error: error.message, botId: req.params.botId });
     return responseBuilder.internalError(res, "Server error");
@@ -65,7 +65,7 @@ exports.deleteBot = async (req, res) => {
     await botService.deleteBot(botId, userId);
 
     logger.info("Bot deleted successfully", { botId, userId });
-    return responseBuilder.success(res, null, "Bot and associated data deleted successfully");
+    return responseBuilder.ok(res, null, "Bot and associated data deleted successfully");
   } catch (error) {
     logger.error("Error deleting bot", { error: error.message, botId: req.params.botId, userId: req.user.id });
     return responseBuilder.internalError(res, "Failed to delete bot");
@@ -81,7 +81,7 @@ exports.updateBot = async (req, res) => {
     const updatedBot = await botService.updateBot(botId, userId, req.body, file);
 
     logger.info("Bot updated successfully", { botId, userId });
-    return responseBuilder.success(
+    return responseBuilder.ok(
       res,
       updatedBot,
       "Bot updated successfully. Previous QAs replaced with new ones (if file uploaded) and added to Slack channel (if enabled)."
