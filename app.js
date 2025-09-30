@@ -7,6 +7,7 @@ const botRoutes = require("./routes/botRoutes");
 const crawlRoutes = require("./routes/crawlRoutes");
 const slackRoutes = require("./routes/slackRoutes");
 const authRoutes = require("./routes/authRoutes");
+const flowRoutes = require("./routes/flowRoutes");
 require("dotenv").config();
 
 const app = express();
@@ -33,6 +34,7 @@ app.use("/api/bots", botRoutes);
 app.use("/api/scrape", crawlRoutes);
 app.use("/api/slack", slackRoutes);
 app.use("/api/auth", authRoutes);
+app.use("/api/flow", flowRoutes);
 app.get("/widget.js", (req, res) => {
   res.sendFile(path.join(__dirname, "public/widget.js"));
 });
