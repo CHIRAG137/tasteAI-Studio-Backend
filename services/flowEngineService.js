@@ -1,3 +1,6 @@
+const axios = require('axios');
+const vm = require('vm');
+
 exports.buildNodeMap = (flow) => {
   const nodeMap = {};
   for (const n of flow.nodes || []) {
@@ -48,6 +51,103 @@ exports.findBranchOptionNode = (nodeMap, branchNode, optionIndexOrLabel) => {
     }
   }
   return null;
+};
+
+/**
+ * Execute code node with sandboxed environment
+ */
+exports.executeCodeNode = async (codeNode, session) => {
+  try {
+    const code = codeNode.data?.code || '';
+    const timeout = codeNode.data?.timeout || 5000;
+    
+    if (!code.trim()) {
+      return {
+        success: false,
+        result: null,
+        error: 'No code provided',
+      };
+    }
+    
+    // Create a mutable variables object
+    const variablesProxy = { ...session.variables };
+    
+    // Create a sandbox with available utilities and session variables
+    const sandbox = {
+      // Session variables - direct access
+      variables: variablesProxy,
+      
+      // HTTP client
+      axios: axios,
+      
+      // Console for logging
+      console: {
+        log: (...args) => console.log('[Code Node]', ...args),
+        error: (...args) => console.error('[Code Node]', ...args),
+        warn: (...args) => console.warn('[Code Node]', ...args),
+      },
+      
+      // Result storage
+      result: null,
+      error: null,
+      
+      // Helper functions - using arrow functions to maintain context
+      setVariable: (key, value) => {
+        variablesProxy[key] = value;
+      },
+      
+      getVariable: (key) => {
+        return variablesProxy[key];
+      },
+      
+      // Global objects that might be needed
+      JSON: JSON,
+      Math: Math,
+      Date: Date,
+      Promise: Promise,
+      setTimeout: setTimeout,
+      setInterval: setInterval,
+      clearTimeout: clearTimeout,
+      clearInterval: clearInterval,
+    };
+
+    const context = vm.createContext(sandbox);
+    
+    // Wrap code in async IIFE to support await
+    const wrappedCode = `
+      (async () => {
+        try {
+          ${code}
+        } catch (err) {
+          error = err.message;
+          throw err;
+        }
+      })();
+    `;
+
+    const script = new vm.Script(wrappedCode);
+    await script.runInContext(context, {
+      timeout: timeout,
+      displayErrors: true,
+    });
+
+    // Update session variables with any changes from the proxy
+    Object.assign(session.variables, variablesProxy);
+
+    return {
+      success: true,
+      result: sandbox.result,
+      variables: variablesProxy,
+      error: sandbox.error,
+    };
+  } catch (error) {
+    console.error('Code execution error:', error);
+    return {
+      success: false,
+      result: null,
+      error: error.message || 'Code execution failed',
+    };
+  }
 };
 
 exports.runFrom = async (flow, session, nodeId, userInputIfAny = null) => {
@@ -173,6 +273,66 @@ exports.runFrom = async (flow, session, nodeId, userInputIfAny = null) => {
         break;
       }
       current = exports.getNode(nodeMap, outs[0].target);
+      continue;
+    }
+
+    // Code Node Handler
+    if (type === "code") {
+      console.log('[Flow Engine] Executing code node:', current.id);
+      console.log('[Flow Engine] Session variables before:', session.variables);
+      
+      const execution = await exports.executeCodeNode(current, session);
+      
+      console.log('[Flow Engine] Code execution result:', execution);
+      console.log('[Flow Engine] Session variables after:', session.variables);
+      
+      if (!execution.success) {
+        outputs.push({
+          nodeId: current.id,
+          type: "code",
+          content: {
+            error: execution.error,
+            success: false,
+            timestamp: new Date(),
+          },
+        });
+        
+        // Check if there's an error handle
+        const errorEdge = exports.findEdgeByHandle(edges, current.id, "error");
+        if (errorEdge) {
+          current = exports.getNode(nodeMap, errorEdge.target);
+          continue;
+        } else {
+          // No error handler, end the flow
+          session.isFinished = true;
+          break;
+        }
+      }
+      
+      outputs.push({
+        nodeId: current.id,
+        type: "code",
+        content: {
+          result: execution.result,
+          success: true,
+          timestamp: new Date(),
+        },
+      });
+      
+      // Continue to next node via success handle or default edge
+      const successEdge = exports.findEdgeByHandle(edges, current.id, "success");
+      if (successEdge) {
+        current = exports.getNode(nodeMap, successEdge.target);
+      } else {
+        const outs = exports.outgoingEdges(edges, current.id);
+        if (outs.length > 0) {
+          current = exports.getNode(nodeMap, outs[0].target);
+        } else {
+          session.currentNodeId = null;
+          session.isFinished = true;
+          break;
+        }
+      }
       continue;
     }
 
