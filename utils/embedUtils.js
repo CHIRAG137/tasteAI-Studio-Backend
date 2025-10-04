@@ -53,7 +53,7 @@ exports.embedText = async (text) => {
     const trimmed = text.trim();
     if (!trimmed) throw new Error("Empty input for embedding.");
 
-    const model = genAI.getGenerativeModel({ model: "textembedding-gecko" });
+    const model = genAI.getGenerativeModel({ model: "gemini-embedding-001" });
 
     const result = await model.embedContent(trimmed);
 

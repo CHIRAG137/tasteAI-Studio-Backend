@@ -80,19 +80,18 @@ Return only a list of 10–15 questions and answers in JSON format like this:
   { "question": "...", "answer": "..." },
   ...
 ]
-    `;
+`;
 
     const userPrompt = `Here is a chunk of the document:\n\n${textChunk}\n\nGenerate Q&A pairs now.`;
 
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
-    const result = await model.generateContent([
-      { role: "user", parts: [{ text: `${systemPrompt}\n${userPrompt}` }] },
-    ]);
+    const prompt = `${systemPrompt}\n\n${userPrompt}`;
+
+    const result = await model.generateContent(prompt);
 
     const responseText = result.response.text();
 
-    // Attempt to extract JSON content
     const jsonMatch = responseText.match(/\[[\s\S]*\]/);
     const qas = jsonMatch ? JSON.parse(jsonMatch[0]) : [];
 
@@ -110,7 +109,7 @@ Return only a list of 10–15 questions and answers in JSON format like this:
  */
 exports.getEmbedding = async (text) => {
   try {
-    const model = genAI.getGenerativeModel({ model: "textembedding-gecko" });
+    const model = genAI.getGenerativeModel({ model: "gemini-embedding-001" });
     const result = await model.embedContent(text);
     return new Float32Array(result.embedding.values);
   } catch (error) {
