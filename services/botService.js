@@ -415,12 +415,34 @@ exports.getChatHistoryBySession = async (botId, sessionId) => {
     throw new Error("Chat history not found");
   }
 
-  logger.info("Service: Successfully retrieved chat history", { botId, sessionId });
+  // Clean history: remove system “echo” or duplicate entries
+  const cleanedHistory = [];
+  const history = session.history || [];
+
+  for (let i = 0; i < history.length; i++) {
+    const entry = history[i];
+    const next = history[i + 1];
+
+    // Skip “echo” entries: question/confirmation that come right after a user_input
+    const isEcho =
+      entry.type === "question" || entry.type === "confirmation"
+        ? next &&
+          next.type === entry.type &&
+          next.fromUser === false &&
+          history[i - 1]?.type === "user_input"
+        : false;
+
+    if (!isEcho) {
+      cleanedHistory.push(entry);
+    }
+  }
+
+  logger.info("Service: Successfully retrieved and cleaned chat history", { botId, sessionId, totalMessages: cleanedHistory.length });
 
   return {
     botId,
     sessionId,
-    history: session.history,
+    history: cleanedHistory,
     currentNodeId: session.currentNodeId,
     isFinished: session.isFinished,
     createdAt: session.createdAt,
