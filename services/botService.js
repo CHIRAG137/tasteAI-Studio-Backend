@@ -7,6 +7,7 @@ const { extractTextFromPDF } = require("../utils/textExtractor");
 const { generateQAsViaGPT, getEmbedding } = require("../utils/gptUtils");
 const { embedText, cosineSimilarity } = require("../utils/embedUtils");
 const logger = require("../utils/logger");
+const FlowSession = require("../models/FlowSession");
 
 exports.createBot = async (req) => {
   const {
@@ -381,4 +382,48 @@ exports.saveCustomization = async (botId, data) => {
 
   logger.info("Customization saved successfully", { botId });
   return customization;
+};
+
+exports.getAllChatHistories = async(botId) => {
+  logger.info("Service: Retrieving all chat histories", { botId });
+
+  const bot = await ChatBot.findById(botId);
+  if (!bot) {
+    logger.warn("Bot not found while fetching histories", { botId });
+    throw new Error("Bot not found");
+  }
+
+  const sessions = await FlowSession.find({ bot: botId }).sort({ createdAt: -1 });
+
+  logger.info("Service: Successfully retrieved chat histories", { botId, totalSessions: sessions.length });
+
+  return { botId, totalSessions: sessions.length, sessions };
+};
+
+exports.getChatHistoryBySession = async (botId, sessionId) => {
+  logger.info("Service: Retrieving specific chat history", { botId, sessionId });
+
+  const bot = await ChatBot.findById(botId);
+  if (!bot) {
+    logger.warn("Bot not found while fetching specific history", { botId, sessionId });
+    throw new Error("Bot not found");
+  }
+
+  const session = await FlowSession.findOne({ _id: sessionId, bot: botId });
+  if (!session) {
+    logger.warn("Chat session not found", { botId, sessionId });
+    throw new Error("Chat history not found");
+  }
+
+  logger.info("Service: Successfully retrieved chat history", { botId, sessionId });
+
+  return {
+    botId,
+    sessionId,
+    history: session.history,
+    currentNodeId: session.currentNodeId,
+    isFinished: session.isFinished,
+    createdAt: session.createdAt,
+    lastUpdatedAt: session.lastUpdatedAt,
+  };
 };
