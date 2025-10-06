@@ -121,3 +121,37 @@ exports.saveCustomization = async (req, res) => {
     return responseBuilder.internalError(res, null, "Failed to save customization");
   }
 };
+
+exports.getAllChatHistories = async (req, res) => {
+  const { botId } = req.params;
+  try {
+    logger.info("Fetching all chat histories", { botId, userId: req.user?.id });
+
+    const result = await botService.getAllChatHistories(botId);
+
+    logger.info("Fetched all chat histories successfully", { botId, userId: req.user?.id, totalSessions: result.totalSessions });
+
+    return responseBuilder.ok(res, result, "Chat histories fetched successfully");
+  } catch (error) {
+    logger.error("Error fetching all chat histories", { error: error.message, botId, userId: req.user?.id });
+
+    return responseBuilder.internalError(res, null, "Failed to fetch chat histories");
+  }
+};
+
+exports.getChatHistoryBySession = async (req, res) => {
+  const { botId, sessionId } = req.params;
+  try {
+    logger.info("Fetching specific chat history", { botId, sessionId, userId: req.user?.id });
+
+    const result = await botService.getChatHistoryBySession(botId, sessionId);
+
+    logger.info("Fetched specific chat history successfully", { botId, sessionId, userId: req.user?.id });
+
+    return responseBuilder.ok(res, result, "Chat history fetched successfully");
+  } catch (error) {
+    logger.error("Error fetching specific chat history", { error: error.message, botId, sessionId, userId: req.user?.id });
+
+    return responseBuilder.internalError(res, null, "Failed to fetch chat history");
+  }
+};

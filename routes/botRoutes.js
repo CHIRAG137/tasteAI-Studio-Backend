@@ -12,6 +12,8 @@ router.get("/:botId", botController.getBotById);
 router.delete("/:botId", authMiddleware, botController.deleteBot);
 router.put( "/:botId", authMiddleware, upload.single("file"), botController.updateBot);
 router.get("/customisation/:botId", botController.getCustomization);
-router.post("/customisation/:botId", botController.saveCustomization);
+router.post("/customisation/:botId", authMiddleware, botController.saveCustomization);
+router.get("/:botId/history", authMiddleware, botController.getAllChatHistories);
+router.get("/:botId/history/:sessionId", authMiddleware, botController.getChatHistoryBySession);
 
 module.exports = router;
