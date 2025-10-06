@@ -415,29 +415,30 @@ exports.getChatHistoryBySession = async (botId, sessionId) => {
     throw new Error("Chat history not found");
   }
 
-  // Clean history: remove system “echo” or duplicate entries
-  const cleanedHistory = [];
   const history = session.history || [];
 
-  for (let i = 0; i < history.length; i++) {
-    const entry = history[i];
-    const next = history[i + 1];
+  // ✅ Filter out unwanted "extra" entries:
+  // - type = question/confirmation
+  // - content is object (not string)
+  // - immediately follows a user_input of the same node
+  const cleanedHistory = history.filter((entry, index) => {
+    const prev = history[index - 1];
 
-    // Skip “echo” entries: question/confirmation that come right after a user_input
-    const isEcho =
-      entry.type === "question" || entry.type === "confirmation"
-        ? next &&
-          next.type === entry.type &&
-          next.fromUser === false &&
-          history[i - 1]?.type === "user_input"
-        : false;
+    const isExtra =
+      (entry.type === "question" || entry.type === "confirmation") &&
+      typeof entry.content === "object" &&
+      prev?.type === "user_input" &&
+      prev?.nodeId === entry.nodeId;
 
-    if (!isEcho) {
-      cleanedHistory.push(entry);
-    }
-  }
+    return !isExtra;
+  });
 
-  logger.info("Service: Successfully retrieved and cleaned chat history", { botId, sessionId, totalMessages: cleanedHistory.length });
+  logger.info("Service: Successfully retrieved and cleaned chat history", {
+    botId,
+    sessionId,
+    originalLength: history.length,
+    cleanedLength: cleanedHistory.length,
+  });
 
   return {
     botId,
