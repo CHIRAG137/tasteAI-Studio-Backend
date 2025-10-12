@@ -9,6 +9,139 @@ const { embedText, cosineSimilarity } = require("../utils/embedUtils");
 const logger = require("../utils/logger");
 const FlowSession = require("../models/FlowSession");
 
+// Helper function to process a single chunk
+async function processChunk(chunk, botId, name, description, source, index) {
+  try {
+    const qas = await generateQAsViaGPT(chunk, name, description);
+    
+    // Process all Q&As in parallel
+    const qaPromises = qas.map(async (qa) => {
+      const { question, answer } = qa;
+      
+      if (question && answer) {
+        const embedding = await embedText(question);
+        
+        await QAHistory.create({
+          bot: botId,
+          question,
+          answer,
+          embedding: Buffer.from(embedding.buffer),
+        });
+        
+        return { success: true, question: question.substring(0, 50) + "..." };
+      }
+      return { success: false };
+    });
+    
+    const results = await Promise.allSettled(qaPromises);
+    const successful = results.filter(r => r.status === 'fulfilled' && r.value.success).length;
+    
+    logger.debug(`Processed ${source} chunk`, { 
+      botId, 
+      index,
+      successful,
+      total: qas.length
+    });
+    
+    return { success: true, qaCount: successful };
+  } catch (err) {
+    logger.error(`Error processing ${source} chunk`, { 
+      botId, 
+      index,
+      error: err.message 
+    });
+    return { success: false, error: err.message };
+  }
+}
+
+// Helper function to process markdown content
+async function processMarkdownContent(markdownArray, botId, name, description) {
+  if (!markdownArray || markdownArray.length === 0) return 0;
+  
+  logger.info("Processing scraped markdown content for bot", { 
+    botId, 
+    pageCount: markdownArray.length 
+  });
+
+  // Process all markdown pages in parallel
+  const pagePromises = markdownArray.map(async (markdown, i) => {
+    if (!markdown || !markdown.trim()) {
+      logger.warn("Skipping empty markdown content", { botId, index: i });
+      return { pageIndex: i, qaCount: 0 };
+    }
+
+    logger.debug("Processing markdown page", { 
+      botId, 
+      pageIndex: i + 1, 
+      contentLength: markdown.length 
+    });
+
+    // Split markdown into chunks
+    const chunks = markdown.match(/.{1,3000}/g) || [];
+    
+    // Process all chunks of this page in parallel
+    const chunkPromises = chunks.map((chunk, j) => 
+      processChunk(chunk, botId, name, description, `markdown page ${i + 1}`, j + 1)
+    );
+    
+    const chunkResults = await Promise.allSettled(chunkPromises);
+    const qaCount = chunkResults
+      .filter(r => r.status === 'fulfilled' && r.value.success)
+      .reduce((sum, r) => sum + r.value.qaCount, 0);
+    
+    return { pageIndex: i, qaCount };
+  });
+
+  const results = await Promise.allSettled(pagePromises);
+  const totalQAs = results
+    .filter(r => r.status === 'fulfilled')
+    .reduce((sum, r) => sum + r.value.qaCount, 0);
+
+  logger.info("Completed processing scraped markdown content", { 
+    botId, 
+    pagesProcessed: markdownArray.length,
+    totalQAs
+  });
+  
+  return totalQAs;
+}
+
+// Helper function to process PDF content
+async function processPDFContent(file, botId, name, description) {
+  if (!file) return 0;
+  
+  logger.info("Processing uploaded PDF for bot", { 
+    botId, 
+    file: file.originalname 
+  });
+
+  const text = await extractTextFromPDF(file.path);
+  
+  if (!text || !text.trim()) {
+    logger.warn("PDF extraction resulted in empty text", { botId });
+    return 0;
+  }
+
+  const chunks = text.match(/.{1,3000}/g) || [];
+  
+  // Process all PDF chunks in parallel
+  const chunkPromises = chunks.map((chunk, i) => 
+    processChunk(chunk, botId, name, description, "PDF", i + 1)
+  );
+  
+  const results = await Promise.allSettled(chunkPromises);
+  const totalQAs = results
+    .filter(r => r.status === 'fulfilled' && r.value.success)
+    .reduce((sum, r) => sum + r.value.qaCount, 0);
+
+  logger.info("Completed processing PDF content", { 
+    botId,
+    totalQAs
+  });
+  
+  return totalQAs;
+}
+
 exports.createBot = async (req) => {
   const {
     name,
@@ -29,6 +162,7 @@ exports.createBot = async (req) => {
     slack_command,
     slack_channel_id,
     conversationFlow,
+    scraped_content,
   } = req.body;
 
   if (!name || !description) {
@@ -42,7 +176,7 @@ exports.createBot = async (req) => {
     parsedLanguages = JSON.parse(supported_languages);
     if (!Array.isArray(parsedLanguages)) throw new Error("Not an array");
   } catch {
-    parsedLanguages = supported_languages ?.split(",").map((lang) => lang.trim());
+    parsedLanguages = supported_languages?.split(",").map((lang) => lang.trim());
   }
 
   // Parse conversation flow
@@ -52,6 +186,23 @@ exports.createBot = async (req) => {
       parsedConversationFlow = JSON.parse(conversationFlow);
     } catch {
       parsedConversationFlow = { nodes: [], edges: [] };
+    }
+  }
+
+  // Parse scraped content
+  let parsedScrapedContent = [];
+  if (scraped_content) {
+    try {
+      parsedScrapedContent = typeof scraped_content === "string" 
+        ? JSON.parse(scraped_content) 
+        : scraped_content;
+      
+      if (!Array.isArray(parsedScrapedContent)) {
+        parsedScrapedContent = [parsedScrapedContent];
+      }
+    } catch (err) {
+      logger.warn("Failed to parse scraped_content", { error: err.message });
+      parsedScrapedContent = [];
     }
   }
 
@@ -80,63 +231,137 @@ exports.createBot = async (req) => {
 
   logger.info("Bot created", { botId: bot._id, userId: req.user.id, name });
 
-  // Scraping website log
-  if (website_url) {
-    logger.info("Scraping website for bot", { website_url, botId: bot._id });
+  // Start parallel processing
+  const processingPromises = [];
+
+  // 1. Process scraped markdown content (parallel)
+  if (parsedScrapedContent.length > 0) {
+    processingPromises.push(
+      processMarkdownContent(parsedScrapedContent, bot._id, name, description)
+        .catch(err => {
+          logger.error("Error in markdown processing", { botId: bot._id, error: err.message });
+          return 0;
+        })
+    );
   }
 
-  // Slack auto-join
-  if (is_slack_enabled === "true" && slack_channel_id) {
-    const slackIntegration = await SlackIntegration.findOne({ userId: req.user.id });
-
-    if (slackIntegration?.slackAccessToken) {
-      try {
-        await axios.post(
-          "https://slack.com/api/conversations.join",
-          { channel: slack_channel_id },
-          {
-            headers: {
-              Authorization: `Bearer ${slackIntegration.slackAccessToken}`,
-              "Content-Type": "application/json",
-            },
-          }
-        );
-        logger.info("Bot joined Slack channel", { botId: bot._id, slack_channel_id });
-      } catch (err) {
-        logger.error("Error joining Slack channel", { botId: bot._id, slack_channel_id, error: err.response?.data || err.message });
-      }
-    } else {
-      logger.warn("Slack integration not found, bot not added to channel", { botId: bot._id, userId: req.user.id });
-    }
-  }
-
-  // Process uploaded PDF
+  // 2. Process PDF content (parallel)
   if (req.file) {
-    logger.info("Processing uploaded PDF for bot", { botId: bot._id, file: req.file.originalname });
-
-    const text = await extractTextFromPDF(req.file.path);
-    if (text && text.trim()) {
-      const chunks = text.match(/.{1,3000}/g);
-      for (const chunk of chunks) {
-        const qas = await generateQAsViaGPT(chunk, name, description);
-        for (const qa of qas) {
-          const { question, answer } = qa;
-          if (question && answer) {
-            const embedding = await embedText(question);
-            await QAHistory.create({
-              bot: bot._id,
-              question,
-              answer,
-              embedding: Buffer.from(embedding.buffer),
-            });
-            logger.debug("QA added from PDF chunk", { botId: bot._id, question });
-          }
-        }
-      }
-    }
+    processingPromises.push(
+      processPDFContent(req.file, bot._id, name, description)
+        .catch(err => {
+          logger.error("Error in PDF processing", { botId: bot._id, error: err.message });
+          return 0;
+        })
+    );
   }
 
-  return { bot_id: bot._id, message: "Bot created successfully with GPT-generated QAs and added to Slack channel (if enabled)." };
+  // 3. Slack integration (parallel - independent of content processing)
+  if (is_slack_enabled === "true" && slack_channel_id) {
+    processingPromises.push(
+      (async () => {
+        const slackIntegration = await SlackIntegration.findOne({ userId: req.user.id });
+
+        if (slackIntegration?.slackAccessToken) {
+          try {
+            await axios.post(
+              "https://slack.com/api/conversations.join",
+              { channel: slack_channel_id },
+              {
+                headers: {
+                  Authorization: `Bearer ${slackIntegration.slackAccessToken}`,
+                  "Content-Type": "application/json",
+                },
+              }
+            );
+            logger.info("Bot joined Slack channel", { botId: bot._id, slack_channel_id });
+            return { slack: true };
+          } catch (err) {
+            logger.error("Error joining Slack channel", { 
+              botId: bot._id, 
+              slack_channel_id, 
+              error: err.response?.data || err.message 
+            });
+            return { slack: false };
+          }
+        } else {
+          logger.warn("Slack integration not found, bot not added to channel", { 
+            botId: bot._id, 
+            userId: req.user.id 
+          });
+          return { slack: false };
+        }
+      })().catch(err => {
+        logger.error("Error in Slack integration", { botId: bot._id, error: err.message });
+        return { slack: false };
+      })
+    );
+  }
+
+  // Wait for all parallel operations to complete
+  const results = await Promise.allSettled(processingPromises);
+  
+  // Calculate total QAs processed
+  let markdownQAs = 0;
+  let pdfQAs = 0;
+  let slackJoined = false;
+  
+  results.forEach((result, index) => {
+    if (result.status === 'fulfilled') {
+      if (typeof result.value === 'number') {
+        if (parsedScrapedContent.length > 0 && index === 0) {
+          markdownQAs = result.value;
+        } else if (req.file && (parsedScrapedContent.length > 0 ? index === 1 : index === 0)) {
+          pdfQAs = result.value;
+        }
+      } else if (result.value?.slack !== undefined) {
+        slackJoined = result.value.slack;
+      }
+    }
+  });
+
+  // Build success message
+  let message = "Bot created successfully";
+  const processedSources = [];
+  
+  if (markdownQAs > 0) {
+    processedSources.push(`${parsedScrapedContent.length} scraped pages (${markdownQAs} Q&As)`);
+  }
+  
+  if (pdfQAs > 0) {
+    processedSources.push(`uploaded PDF (${pdfQAs} Q&As)`);
+  }
+  
+  if (processedSources.length > 0) {
+    message += ` with GPT-generated Q&As from ${processedSources.join(" and ")}`;
+  }
+  
+  if (slackJoined) {
+    message += " and added to Slack channel";
+  }
+  
+  message += ".";
+
+  logger.info("Bot creation completed", {
+    botId: bot._id,
+    markdownQAs,
+    pdfQAs,
+    totalQAs: markdownQAs + pdfQAs,
+    slackJoined
+  });
+
+  return { 
+    bot_id: bot._id, 
+    message,
+    sources_processed: {
+      scraped_pages: parsedScrapedContent.length,
+      markdown_qas: markdownQAs,
+      pdf_uploaded: !!req.file,
+      pdf_qas: pdfQAs,
+      total_qas: markdownQAs + pdfQAs,
+      slack_integrated: slackJoined
+    }
+  };
 };
 
 exports.askBot = async (question, botId) => {
