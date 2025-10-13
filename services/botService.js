@@ -519,6 +519,8 @@ exports.updateBot = async (botId, userId, body, file) => {
     slack_command,
     slack_channel_id,
     conversationFlow,
+    scraped_content,
+    scraped_urls,
   } = body;
 
   if (!name || !description) {
@@ -552,6 +554,43 @@ exports.updateBot = async (botId, userId, body, file) => {
     }
   }
 
+  // Parse scraped content
+  let parsedScrapedContent = [];
+  if (scraped_content) {
+    try {
+      parsedScrapedContent =
+        typeof scraped_content === "string"
+          ? JSON.parse(scraped_content)
+          : scraped_content;
+
+      if (!Array.isArray(parsedScrapedContent)) {
+        parsedScrapedContent = [parsedScrapedContent];
+      }
+    } catch (err) {
+      logger.warn("Failed to parse scraped_content", { error: err.message });
+      parsedScrapedContent = [];
+    }
+  }
+
+  // Parse scraped URLs
+  let parsedScrapedUrls = [];
+  if (scraped_urls) {
+    try {
+      parsedScrapedUrls = JSON.parse(scraped_urls);
+      if (!Array.isArray(parsedScrapedUrls)) {
+        parsedScrapedUrls = [scraped_urls];
+      }
+    } catch {
+      parsedScrapedUrls = [scraped_urls];
+    }
+  }
+
+  // Detect URL changes
+  const prevUrls = Array.isArray(bot.scraped_urls) ? bot.scraped_urls.sort() : [];
+  const newUrls = Array.isArray(parsedScrapedUrls) ? parsedScrapedUrls.sort() : [];
+  const urlsChanged =
+    JSON.stringify(prevUrls) !== JSON.stringify(newUrls);
+
   // Update bot fields
   Object.assign(bot, {
     name: name || bot.name,
@@ -572,6 +611,7 @@ exports.updateBot = async (botId, userId, body, file) => {
     keywords: keywords || bot.keywords,
     custom_instructions: custom_instructions || bot.custom_instructions,
     conversationFlow: parsedConversationFlow || bot.conversationFlow,
+    scraped_urls: parsedScrapedUrls || bot.scraped_urls,
   });
 
   logger.info("Bot fields updated locally", { botId, userId });
@@ -607,35 +647,53 @@ exports.updateBot = async (botId, userId, body, file) => {
     }
   }
 
-  // Process PDF if uploaded
-  if (file) {
+  // Handle QA regeneration
+  if (file || urlsChanged) {
     await QAHistory.deleteMany({ bot: bot._id });
-    logger.info("Deleted previous QAs before updating bot", { botId });
+    logger.info("Deleted previous QAs before regeneration", { botId });
 
-    const text = await extractTextFromPDF(file.path);
-    if (text && text.trim()) {
-      const chunks = text.match(/.{1,3000}/g);
-      for (const chunk of chunks) {
-        const qas = await generateQAsViaGPT(chunk, name, description);
-        for (const qa of qas) {
-          const { question, answer } = qa;
-          if (question && answer) {
-            const embedding = await embedText(question);
-            await QAHistory.create({
-              bot: bot._id,
-              question,
-              answer,
-              embedding: Buffer.from(embedding.buffer),
-            });
-            logger.debug("QA added from PDF chunk", { botId, question });
-          }
-        }
-      }
+    const processingPromises = [];
+
+    // 1. If new scraped content (and URLs changed)
+    if (urlsChanged && parsedScrapedContent.length > 0) {
+      processingPromises.push(
+        processMarkdownContent(
+          parsedScrapedContent,
+          bot._id,
+          name,
+          description
+        ).catch((err) => {
+          logger.error("Error in markdown reprocessing", {
+            botId,
+            error: err.message,
+          });
+          return 0;
+        })
+      );
     }
+
+    // 2. If new PDF uploaded
+    if (file) {
+      processingPromises.push(
+        processPDFContent(file, bot._id, name, description).catch((err) => {
+          logger.error("Error in PDF reprocessing", {
+            botId,
+            error: err.message,
+          });
+          return 0;
+        })
+      );
+    }
+
+    await Promise.allSettled(processingPromises);
   }
 
   await bot.save();
-  logger.info("Bot updated and saved successfully", { botId, userId });
+  logger.info("Bot updated and saved successfully", {
+    botId,
+    userId,
+    urlsChanged,
+  });
 
   return bot;
 };
