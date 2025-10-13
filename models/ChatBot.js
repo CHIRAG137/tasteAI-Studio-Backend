@@ -28,6 +28,10 @@ const ChatBotSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.Mixed,
       default: { nodes: [], edges: [] },
     },
+    scraped_urls: {
+      type: [String],
+      default: [],
+    },
   },
   { timestamps: true }
 );
