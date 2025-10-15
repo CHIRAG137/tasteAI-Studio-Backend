@@ -39,5 +39,14 @@ app.get("/widget.js", (req, res) => {
   res.sendFile(path.join(__dirname, "public/widget.js"));
 });
 
+// keep-alive endpoint
+app.get('/api/keep-alive', (req, res) => {
+  res.status(200).json({
+    status: 'alive',
+    timestamp: new Date().toISOString(),
+    uptime: Math.floor(process.uptime())
+  });
+});
+
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
