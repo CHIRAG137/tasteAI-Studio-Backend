@@ -7,7 +7,6 @@ const customizationSchema = new mongoose.Schema({
     required: true,
     unique: true,
   },
-  welcomeMessage: String,
   headerTitle: String,
   headerSubtitle: String,
   placeholder: String,
