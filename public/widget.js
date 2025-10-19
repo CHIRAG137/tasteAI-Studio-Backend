@@ -3,6 +3,7 @@ window.ChatBotWidget = {
   button: null,
   iframe: null,
   isInitialized: false,
+  customization: null,
 
   init: function (config) {
     // Prevent running inside iframe
@@ -17,13 +18,33 @@ window.ChatBotWidget = {
     // Store config
     this.config = config;
 
-    // Initial check and render
-    this.checkAndRender();
+    // Fetch customization from backend, then render
+    this.fetchCustomization();
 
     // Listen for route changes (for SPAs like React Router)
     this.setupRouteChangeListeners();
 
     this.isInitialized = true;
+  },
+
+  fetchCustomization: async function() {
+    try {
+      const response = await fetch(
+        `https://tastebot-studio-backend-gvvb.onrender.com/api/bots/customisation/${this.config.botId}`
+      );
+      const data = await response.json();
+      
+      this.customization = data.result || {};
+      console.log('ChatBotWidget: Customization loaded', this.customization);
+      
+      // Initial check and render after customization is loaded
+      this.checkAndRender();
+    } catch (error) {
+      console.error('ChatBotWidget: Error loading customization', error);
+      // Render with default settings if fetch fails
+      this.customization = {};
+      this.checkAndRender();
+    }
   },
 
   checkAndRender: function() {
@@ -61,15 +82,31 @@ window.ChatBotWidget = {
     }
   },
 
+  applyCustomStyles: function(element, customStyles, defaultStyles) {
+    // Apply default styles first
+    Object.assign(element.style, defaultStyles);
+    
+    // Then apply custom styles if provided (these will override defaults)
+    if (customStyles && typeof customStyles === 'object') {
+      Object.assign(element.style, customStyles);
+    }
+  },
+
   createWidget: function() {
     // Prevent duplication
     if (document.getElementById("chatbot-widget-button") || document.getElementById("chatbot-widget-iframe")) {
       return;
     }
 
+    // Get button customization from backend or use defaults
+    const buttonCustomization = this.customization || {};
+    const useButtonCustomCSS = buttonCustomization.useButtonCustomCSS || false;
+    
     // Create a style tag for button hover and animations
     const style = document.createElement("style");
-    style.innerHTML = `
+    
+    // Default CSS classes
+    let defaultCSS = `
       #chatbot-widget-button:hover {
         transform: scale(1.05);
         box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
@@ -79,6 +116,18 @@ window.ChatBotWidget = {
         to { opacity: 1; transform: scale(1); }
       }
     `;
+    
+    // If user provided custom button CSS from backend, append it
+    if (useButtonCustomCSS && buttonCustomization.buttonCustomCSS) {
+      defaultCSS += '\n' + buttonCustomization.buttonCustomCSS;
+    }
+    
+    // If user provided custom CSS via init config, append it (backward compatibility)
+    if (this.config.customCSS) {
+      defaultCSS += '\n' + this.config.customCSS;
+    }
+    
+    style.innerHTML = defaultCSS;
     document.head.appendChild(style);
 
     // Create the floating circular button
@@ -89,35 +138,74 @@ window.ChatBotWidget = {
         <path d="M2 2v20l4-4h14V2H2zm16 10H6v-2h12v2z"/>
       </svg>
     `;
-    Object.assign(this.button.style, {
+    
+    // Determine position from backend or config
+    const position = buttonCustomization.buttonPosition || this.config.position || "bottom-right";
+    const buttonSize = buttonCustomization.buttonSize || "56";
+    const buttonBorderRadius = buttonCustomization.buttonBorderRadius || "50";
+    const buttonBackground = buttonCustomization.buttonBackground || "linear-gradient(135deg, #9b5de5, #f15bb5)";
+    const buttonColor = buttonCustomization.buttonColor || "#ffffff";
+    const buttonBottom = buttonCustomization.buttonBottom || "20";
+    const buttonRight = buttonCustomization.buttonRight || "20";
+    const buttonLeft = buttonCustomization.buttonLeft || "20";
+    
+    // Update SVG fill color
+    if (buttonColor) {
+      this.button.querySelector('svg').setAttribute('fill', buttonColor);
+    }
+    
+    // Default button styles
+    const defaultButtonStyles = {
       position: "fixed",
-      bottom: this.config.position === "bottom-left" ? "20px" : "20px",
-      right: this.config.position === "bottom-left" ? "auto" : "20px",
-      left: this.config.position === "bottom-left" ? "20px" : "auto",
+      bottom: buttonBottom + "px",
+      right: position === "bottom-left" ? "auto" : buttonRight + "px",
+      left: position === "bottom-left" ? buttonLeft + "px" : "auto",
       zIndex: "9999",
-      background: "linear-gradient(135deg, #9b5de5, #f15bb5)",
-      color: "#fff",
+      background: buttonBackground,
+      color: buttonColor,
       border: "none",
-      borderRadius: "50%",
-      width: "56px",
-      height: "56px",
+      borderRadius: buttonBorderRadius + "%",
+      width: buttonSize + "px",
+      height: buttonSize + "px",
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
       boxShadow: "0 4px 10px rgba(0,0,0,0.3)",
       cursor: "pointer",
       transition: "transform 0.2s, box-shadow 0.2s",
-    });
+    };
+    
+    // If using custom button CSS, only apply positioning and display properties
+    if (useButtonCustomCSS) {
+      Object.assign(this.button.style, {
+        position: "fixed",
+        bottom: buttonBottom + "px",
+        right: position === "bottom-left" ? "auto" : buttonRight + "px",
+        left: position === "bottom-left" ? buttonLeft + "px" : "auto",
+        zIndex: "9999",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        cursor: "pointer",
+        border: "none",
+        transition: "transform 0.2s, box-shadow 0.2s",
+      });
+    } else {
+      // Apply default styles and custom button styles from config if provided
+      this.applyCustomStyles(this.button, this.config.buttonStyles, defaultButtonStyles);
+    }
 
     // Create the iframe (initially hidden)
     this.iframe = document.createElement("iframe");
     this.iframe.id = "chatbot-widget-iframe";
     this.iframe.src = `${this.config.apiUrl}/embed?botId=${this.config.botId}`;
-    Object.assign(this.iframe.style, {
+    
+    // Default iframe styles
+    const defaultIframeStyles = {
       position: "fixed",
       bottom: "90px",
-      right: this.config.position === "bottom-left" ? "auto" : "20px",
-      left: this.config.position === "bottom-left" ? "20px" : "auto",
+      right: position === "bottom-left" ? "auto" : buttonRight + "px",
+      left: position === "bottom-left" ? buttonLeft + "px" : "auto",
       width: "360px",
       height: "500px",
       border: "none",
@@ -126,7 +214,10 @@ window.ChatBotWidget = {
       display: "none",
       animation: "fadeIn 0.3s ease-out",
       boxShadow: "0 8px 24px rgba(0,0,0,0.25)",
-    });
+    };
+    
+    // Apply default styles and custom iframe styles if provided
+    this.applyCustomStyles(this.iframe, this.config.iframeStyles, defaultIframeStyles);
 
     // Toggle iframe visibility on button click
     const self = this;
