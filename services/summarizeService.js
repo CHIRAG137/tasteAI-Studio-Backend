@@ -16,7 +16,7 @@ exports.summarizeWithGemini = async (messages, botName) => {
     const prompt = `
 You are an AI summarizer. Summarize the following conversation between a user and a chatbot named ${botName}.
 Provide a clear, concise summary highlighting key points, decisions, and tone.
-Format it in bullet points if appropriate.
+Format it in 4 bullet points keeping bullet points concise and short.
 
 Conversation:
 ${conversationText}
