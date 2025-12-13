@@ -9,6 +9,9 @@ const slackRoutes = require("./routes/slackRoutes");
 const authRoutes = require("./routes/authRoutes");
 const flowRoutes = require("./routes/flowRoutes");
 const summarizeRoutes = require("./routes/summarizeRoutes");
+const elevenlabsRoutes = require("./routes/elevenlabsRoutes");
+const didRoutes = require("./routes/didRoutes");
+
 require("dotenv").config();
 
 const app = express();
@@ -37,6 +40,8 @@ app.use("/api/slack", slackRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/flow", flowRoutes);
 app.use("/api/summarize", summarizeRoutes);
+app.use("/api/elevenlabs", elevenlabsRoutes);
+app.use("/api/did", didRoutes);
 app.get("/widget.js", (req, res) => {
   res.sendFile(path.join(__dirname, "public/widget.js"));
 });
