@@ -1,4 +1,4 @@
-const summarizerService = require("../services/summarizeService");
+const summarizerService = require('../services/summarizeService');
 
 exports.summarizeConversation = async (req, res) => {
   try {
@@ -7,7 +7,7 @@ exports.summarizeConversation = async (req, res) => {
     if (!messages || !Array.isArray(messages) || messages.length === 0) {
       return res
         .status(400)
-        .json({ status: "error", message: "Messages array is required." });
+        .json({ status: 'error', message: 'Messages array is required.' });
     }
 
     const summary = await summarizerService.summarizeWithGemini(
@@ -16,14 +16,14 @@ exports.summarizeConversation = async (req, res) => {
     );
 
     res.json({
-      status: "success",
+      status: 'success',
       summary,
     });
   } catch (error) {
-    console.error("Error in summarizeConversation controller:", error);
+    console.error('Error in summarizeConversation controller:', error);
     res.status(500).json({
-      status: "error",
-      message: error.message || "Failed to summarize conversation.",
+      status: 'error',
+      message: error.message || 'Failed to summarize conversation.',
     });
   }
 };

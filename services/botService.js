@@ -1,13 +1,13 @@
-const axios = require("axios");
-const SlackIntegration = require("../models/SlackIntegration");
-const ChatBot = require("../models/ChatBot");
-const QAHistory = require("../models/QAHistory");
-const Customization = require("../models/Customisation");
-const { extractTextFromPDF } = require("../utils/textExtractor");
-const { generateQAsViaGPT, getEmbedding } = require("../utils/gptUtils");
-const { embedText, cosineSimilarity } = require("../utils/embedUtils");
-const logger = require("../utils/logger");
-const FlowSession = require("../models/FlowSession");
+const axios = require('axios');
+const SlackIntegration = require('../models/SlackIntegration');
+const ChatBot = require('../models/ChatBot');
+const QAHistory = require('../models/QAHistory');
+const Customization = require('../models/Customisation');
+const { extractTextFromPDF } = require('../utils/textExtractor');
+const { generateQAsViaGPT, getEmbedding } = require('../utils/gptUtils');
+const { embedText, cosineSimilarity } = require('../utils/embedUtils');
+const logger = require('../utils/logger');
+const FlowSession = require('../models/FlowSession');
 
 // Helper function to process a single chunk
 async function processChunk(chunk, botId, name, description, source, index) {
@@ -28,14 +28,14 @@ async function processChunk(chunk, botId, name, description, source, index) {
           embedding: Buffer.from(embedding.buffer),
         });
 
-        return { success: true, question: question.substring(0, 50) + "..." };
+        return { success: true, question: question.substring(0, 50) + '...' };
       }
       return { success: false };
     });
 
     const results = await Promise.allSettled(qaPromises);
     const successful = results.filter(
-      (r) => r.status === "fulfilled" && r.value.success
+      (r) => r.status === 'fulfilled' && r.value.success
     ).length;
 
     logger.debug(`Processed ${source} chunk`, {
@@ -58,9 +58,11 @@ async function processChunk(chunk, botId, name, description, source, index) {
 
 // Helper function to process markdown content
 async function processMarkdownContent(markdownArray, botId, name, description) {
-  if (!markdownArray || markdownArray.length === 0) return 0;
+  if (!markdownArray || markdownArray.length === 0) {
+    return 0;
+  }
 
-  logger.info("Processing scraped markdown content for bot", {
+  logger.info('Processing scraped markdown content for bot', {
     botId,
     pageCount: markdownArray.length,
   });
@@ -68,11 +70,11 @@ async function processMarkdownContent(markdownArray, botId, name, description) {
   // Process all markdown pages in parallel
   const pagePromises = markdownArray.map(async (markdown, i) => {
     if (!markdown || !markdown.trim()) {
-      logger.warn("Skipping empty markdown content", { botId, index: i });
+      logger.warn('Skipping empty markdown content', { botId, index: i });
       return { pageIndex: i, qaCount: 0 };
     }
 
-    logger.debug("Processing markdown page", {
+    logger.debug('Processing markdown page', {
       botId,
       pageIndex: i + 1,
       contentLength: markdown.length,
@@ -95,7 +97,7 @@ async function processMarkdownContent(markdownArray, botId, name, description) {
 
     const chunkResults = await Promise.allSettled(chunkPromises);
     const qaCount = chunkResults
-      .filter((r) => r.status === "fulfilled" && r.value.success)
+      .filter((r) => r.status === 'fulfilled' && r.value.success)
       .reduce((sum, r) => sum + r.value.qaCount, 0);
 
     return { pageIndex: i, qaCount };
@@ -103,10 +105,10 @@ async function processMarkdownContent(markdownArray, botId, name, description) {
 
   const results = await Promise.allSettled(pagePromises);
   const totalQAs = results
-    .filter((r) => r.status === "fulfilled")
+    .filter((r) => r.status === 'fulfilled')
     .reduce((sum, r) => sum + r.value.qaCount, 0);
 
-  logger.info("Completed processing scraped markdown content", {
+  logger.info('Completed processing scraped markdown content', {
     botId,
     pagesProcessed: markdownArray.length,
     totalQAs,
@@ -117,9 +119,11 @@ async function processMarkdownContent(markdownArray, botId, name, description) {
 
 // Helper function to process PDF content
 async function processPDFContent(file, botId, name, description) {
-  if (!file) return 0;
+  if (!file) {
+    return 0;
+  }
 
-  logger.info("Processing uploaded PDF for bot", {
+  logger.info('Processing uploaded PDF for bot', {
     botId,
     file: file.originalname,
   });
@@ -127,7 +131,7 @@ async function processPDFContent(file, botId, name, description) {
   const text = await extractTextFromPDF(file.path);
 
   if (!text || !text.trim()) {
-    logger.warn("PDF extraction resulted in empty text", { botId });
+    logger.warn('PDF extraction resulted in empty text', { botId });
     return 0;
   }
 
@@ -135,15 +139,15 @@ async function processPDFContent(file, botId, name, description) {
 
   // Process all PDF chunks in parallel
   const chunkPromises = chunks.map((chunk, i) =>
-    processChunk(chunk, botId, name, description, "PDF", i + 1)
+    processChunk(chunk, botId, name, description, 'PDF', i + 1)
   );
 
   const results = await Promise.allSettled(chunkPromises);
   const totalQAs = results
-    .filter((r) => r.status === "fulfilled" && r.value.success)
+    .filter((r) => r.status === 'fulfilled' && r.value.success)
     .reduce((sum, r) => sum + r.value.qaCount, 0);
 
-  logger.info("Completed processing PDF content", {
+  logger.info('Completed processing PDF content', {
     botId,
     totalQAs,
   });
@@ -176,27 +180,29 @@ exports.createBot = async (req) => {
   } = req.body;
 
   if (!name || !description) {
-    logger.error("Bot creation failed - missing required fields", {
+    logger.error('Bot creation failed - missing required fields', {
       name,
       description,
     });
-    throw new Error("Missing required fields: name, or description");
+    throw new Error('Missing required fields: name, or description');
   }
 
   // Parse supported_languages
   let parsedLanguages;
   try {
     parsedLanguages = JSON.parse(supported_languages);
-    if (!Array.isArray(parsedLanguages)) throw new Error("Not an array");
+    if (!Array.isArray(parsedLanguages)) {
+      throw new Error('Not an array');
+    }
   } catch {
     parsedLanguages = supported_languages
-      ?.split(",")
+      ?.split(',')
       .map((lang) => lang.trim());
   }
 
   // Parse conversation flow
   let parsedConversationFlow = conversationFlow;
-  if (typeof conversationFlow === "string") {
+  if (typeof conversationFlow === 'string') {
     try {
       parsedConversationFlow = JSON.parse(conversationFlow);
     } catch {
@@ -209,7 +215,7 @@ exports.createBot = async (req) => {
   if (scraped_content) {
     try {
       parsedScrapedContent =
-        typeof scraped_content === "string"
+        typeof scraped_content === 'string'
           ? JSON.parse(scraped_content)
           : scraped_content;
 
@@ -217,7 +223,7 @@ exports.createBot = async (req) => {
         parsedScrapedContent = [parsedScrapedContent];
       }
     } catch (err) {
-      logger.warn("Failed to parse scraped_content", { error: err.message });
+      logger.warn('Failed to parse scraped_content', { error: err.message });
       parsedScrapedContent = [];
     }
   }
@@ -241,9 +247,9 @@ exports.createBot = async (req) => {
     name,
     website_url,
     description,
-    is_voice_enabled: is_voice_enabled === "true",
-    is_auto_translate: is_auto_translate === "true",
-    is_slack_enabled: is_slack_enabled === "true",
+    is_voice_enabled: is_voice_enabled === 'true',
+    is_auto_translate: is_auto_translate === 'true',
+    is_slack_enabled: is_slack_enabled === 'true',
     slack_command,
     slack_channel_id,
     supported_languages: parsedLanguages,
@@ -259,7 +265,7 @@ exports.createBot = async (req) => {
     scraped_urls: parsedScrapedUrls,
   });
 
-  logger.info("Bot created", { botId: bot._id, userId: req.user.id, name });
+  logger.info('Bot created', { botId: bot._id, userId: req.user.id, name });
 
   // Start parallel processing
   const processingPromises = [];
@@ -273,7 +279,7 @@ exports.createBot = async (req) => {
         name,
         description
       ).catch((err) => {
-        logger.error("Error in markdown processing", {
+        logger.error('Error in markdown processing', {
           botId: bot._id,
           error: err.message,
         });
@@ -286,7 +292,7 @@ exports.createBot = async (req) => {
   if (req.file) {
     processingPromises.push(
       processPDFContent(req.file, bot._id, name, description).catch((err) => {
-        logger.error("Error in PDF processing", {
+        logger.error('Error in PDF processing', {
           botId: bot._id,
           error: err.message,
         });
@@ -296,7 +302,7 @@ exports.createBot = async (req) => {
   }
 
   // 3. Slack integration (parallel - independent of content processing)
-  if (is_slack_enabled === "true" && slack_channel_id) {
+  if (is_slack_enabled === 'true' && slack_channel_id) {
     processingPromises.push(
       (async () => {
         const slackIntegration = await SlackIntegration.findOne({
@@ -306,22 +312,22 @@ exports.createBot = async (req) => {
         if (slackIntegration?.slackAccessToken) {
           try {
             await axios.post(
-              "https://slack.com/api/conversations.join",
+              'https://slack.com/api/conversations.join',
               { channel: slack_channel_id },
               {
                 headers: {
                   Authorization: `Bearer ${slackIntegration.slackAccessToken}`,
-                  "Content-Type": "application/json",
+                  'Content-Type': 'application/json',
                 },
               }
             );
-            logger.info("Bot joined Slack channel", {
+            logger.info('Bot joined Slack channel', {
               botId: bot._id,
               slack_channel_id,
             });
             return { slack: true };
           } catch (err) {
-            logger.error("Error joining Slack channel", {
+            logger.error('Error joining Slack channel', {
               botId: bot._id,
               slack_channel_id,
               error: err.response?.data || err.message,
@@ -329,14 +335,14 @@ exports.createBot = async (req) => {
             return { slack: false };
           }
         } else {
-          logger.warn("Slack integration not found, bot not added to channel", {
+          logger.warn('Slack integration not found, bot not added to channel', {
             botId: bot._id,
             userId: req.user.id,
           });
           return { slack: false };
         }
       })().catch((err) => {
-        logger.error("Error in Slack integration", {
+        logger.error('Error in Slack integration', {
           botId: bot._id,
           error: err.message,
         });
@@ -354,8 +360,8 @@ exports.createBot = async (req) => {
   let slackJoined = false;
 
   results.forEach((result, index) => {
-    if (result.status === "fulfilled") {
-      if (typeof result.value === "number") {
+    if (result.status === 'fulfilled') {
+      if (typeof result.value === 'number') {
         if (parsedScrapedContent.length > 0 && index === 0) {
           markdownQAs = result.value;
         } else if (
@@ -371,7 +377,7 @@ exports.createBot = async (req) => {
   });
 
   // Build success message
-  let message = "Bot created successfully";
+  let message = 'Bot created successfully';
   const processedSources = [];
 
   if (markdownQAs > 0) {
@@ -386,17 +392,17 @@ exports.createBot = async (req) => {
 
   if (processedSources.length > 0) {
     message += ` with GPT-generated Q&As from ${processedSources.join(
-      " and "
+      ' and '
     )}`;
   }
 
   if (slackJoined) {
-    message += " and added to Slack channel";
+    message += ' and added to Slack channel';
   }
 
-  message += ".";
+  message += '.';
 
-  logger.info("Bot creation completed", {
+  logger.info('Bot creation completed', {
     botId: bot._id,
     markdownQAs,
     pdfQAs,
@@ -421,11 +427,11 @@ exports.createBot = async (req) => {
 exports.askBot = async (question, botId) => {
   const bot = await ChatBot.findById(botId);
   if (!bot) {
-    logger.error("Bot not found", { botId });
-    throw new Error("Bot not found");
+    logger.error('Bot not found', { botId });
+    throw new Error('Bot not found');
   }
 
-  logger.info("Bot asked a question", { botId, question });
+  logger.info('Bot asked a question', { botId, question });
 
   const inputEmbedding = await getEmbedding(question);
   const qas = await QAHistory.find({ bot: botId });
@@ -449,55 +455,55 @@ exports.askBot = async (question, botId) => {
       embedding: Buffer.from(inputEmbedding.buffer),
     });
 
-    logger.info("Best QA match found", { botId, score: bestScore, question });
+    logger.info('Best QA match found', { botId, score: bestScore, question });
 
-    return { answer: bestMatch.answer, score: bestScore, source: "qa" };
+    return { answer: bestMatch.answer, score: bestScore, source: 'qa' };
   }
 
-  logger.warn("No strong QA match found", {
+  logger.warn('No strong QA match found', {
     botId,
     score: bestScore,
     question,
   });
-  return { message: "No match found.", score: bestScore };
+  return { message: 'No match found.', score: bestScore };
 };
 
 exports.getAllChatBots = async (userId) => {
-  logger.info("Fetching all chat bots for user", { userId });
+  logger.info('Fetching all chat bots for user', { userId });
   const bots = await ChatBot.find({ user: userId });
-  logger.info("Fetched chat bots", { userId, count: bots.length });
+  logger.info('Fetched chat bots', { userId, count: bots.length });
   return bots;
 };
 
 exports.getBotById = async (botId) => {
   const bot = await ChatBot.findById(botId);
   if (!bot) {
-    logger.warn("Bot not found", { botId });
-    throw new Error("Bot not found");
+    logger.warn('Bot not found', { botId });
+    throw new Error('Bot not found');
   }
-  logger.info("Fetched bot by ID", { botId });
+  logger.info('Fetched bot by ID', { botId });
   return bot;
 };
 
 exports.deleteBot = async (botId, userId) => {
   const bot = await ChatBot.findOne({ _id: botId, user: userId });
   if (!bot) {
-    logger.warn("Bot not found for deletion", { botId, userId });
-    throw new Error("Bot not found");
+    logger.warn('Bot not found for deletion', { botId, userId });
+    throw new Error('Bot not found');
   }
 
   await Customization.findOneAndDelete({ botId });
   await QAHistory.deleteMany({ bot: botId });
   await ChatBot.findByIdAndDelete(botId);
 
-  logger.info("Bot and associated data deleted", { botId, userId });
+  logger.info('Bot and associated data deleted', { botId, userId });
 };
 
 exports.updateBot = async (botId, userId, body, file) => {
   const bot = await ChatBot.findOne({ _id: botId, user: userId });
   if (!bot) {
-    logger.warn("Bot not found for update", { botId, userId });
-    throw new Error("Bot not found");
+    logger.warn('Bot not found for update', { botId, userId });
+    throw new Error('Bot not found');
   }
 
   const {
@@ -524,29 +530,31 @@ exports.updateBot = async (botId, userId, body, file) => {
   } = body;
 
   if (!name || !description) {
-    logger.error("Missing required fields for bot update", {
+    logger.error('Missing required fields for bot update', {
       botId,
       userId,
       name,
       description,
     });
-    throw new Error("Missing required fields: name or description");
+    throw new Error('Missing required fields: name or description');
   }
 
   // Parse supported languages
   let parsedLanguages;
   try {
     parsedLanguages = JSON.parse(supported_languages);
-    if (!Array.isArray(parsedLanguages)) throw new Error("Not an array");
+    if (!Array.isArray(parsedLanguages)) {
+      throw new Error('Not an array');
+    }
   } catch {
     parsedLanguages = supported_languages
-      ?.split(",")
+      ?.split(',')
       .map((lang) => lang.trim());
   }
 
   // Parse conversation flow
   let parsedConversationFlow = conversationFlow;
-  if (typeof conversationFlow === "string") {
+  if (typeof conversationFlow === 'string') {
     try {
       parsedConversationFlow = JSON.parse(conversationFlow);
     } catch {
@@ -559,7 +567,7 @@ exports.updateBot = async (botId, userId, body, file) => {
   if (scraped_content) {
     try {
       parsedScrapedContent =
-        typeof scraped_content === "string"
+        typeof scraped_content === 'string'
           ? JSON.parse(scraped_content)
           : scraped_content;
 
@@ -567,7 +575,7 @@ exports.updateBot = async (botId, userId, body, file) => {
         parsedScrapedContent = [parsedScrapedContent];
       }
     } catch (err) {
-      logger.warn("Failed to parse scraped_content", { error: err.message });
+      logger.warn('Failed to parse scraped_content', { error: err.message });
       parsedScrapedContent = [];
     }
   }
@@ -586,19 +594,22 @@ exports.updateBot = async (botId, userId, body, file) => {
   }
 
   // Detect URL changes
-  const prevUrls = Array.isArray(bot.scraped_urls) ? bot.scraped_urls.sort() : [];
-  const newUrls = Array.isArray(parsedScrapedUrls) ? parsedScrapedUrls.sort() : [];
-  const urlsChanged =
-    JSON.stringify(prevUrls) !== JSON.stringify(newUrls);
+  const prevUrls = Array.isArray(bot.scraped_urls)
+    ? bot.scraped_urls.sort()
+    : [];
+  const newUrls = Array.isArray(parsedScrapedUrls)
+    ? parsedScrapedUrls.sort()
+    : [];
+  const urlsChanged = JSON.stringify(prevUrls) !== JSON.stringify(newUrls);
 
   // Update bot fields
   Object.assign(bot, {
     name: name || bot.name,
     website_url: website_url || bot.website_url,
     description: description || bot.description,
-    is_voice_enabled: is_voice_enabled === "true",
-    is_auto_translate: is_auto_translate === "true",
-    is_slack_enabled: is_slack_enabled === "true",
+    is_voice_enabled: is_voice_enabled === 'true',
+    is_auto_translate: is_auto_translate === 'true',
+    is_slack_enabled: is_slack_enabled === 'true',
     slack_command: slack_command || bot.slack_command,
     slack_channel_id: slack_channel_id || bot.slack_channel_id,
     supported_languages: parsedLanguages || bot.supported_languages,
@@ -614,33 +625,33 @@ exports.updateBot = async (botId, userId, body, file) => {
     scraped_urls: parsedScrapedUrls || bot.scraped_urls,
   });
 
-  logger.info("Bot fields updated locally", { botId, userId });
+  logger.info('Bot fields updated locally', { botId, userId });
 
   // Slack auto-join
-  if (is_slack_enabled === "true" && slack_channel_id) {
+  if (is_slack_enabled === 'true' && slack_channel_id) {
     const slackIntegration = await SlackIntegration.findOne({ userId });
     if (slackIntegration?.slackAccessToken) {
       try {
         await axios.post(
-          "https://slack.com/api/conversations.join",
+          'https://slack.com/api/conversations.join',
           { channel: slack_channel_id },
           {
             headers: {
               Authorization: `Bearer ${slackIntegration.slackAccessToken}`,
-              "Content-Type": "application/json",
+              'Content-Type': 'application/json',
             },
           }
         );
-        logger.info("Bot joined Slack channel", { botId, slack_channel_id });
+        logger.info('Bot joined Slack channel', { botId, slack_channel_id });
       } catch (err) {
-        logger.error("Error joining Slack channel", {
+        logger.error('Error joining Slack channel', {
           botId,
           slack_channel_id,
           error: err.response?.data || err.message,
         });
       }
     } else {
-      logger.warn("Slack integration not found, bot not added to channel", {
+      logger.warn('Slack integration not found, bot not added to channel', {
         botId,
         userId,
       });
@@ -650,7 +661,7 @@ exports.updateBot = async (botId, userId, body, file) => {
   // Handle QA regeneration
   if (file || urlsChanged) {
     await QAHistory.deleteMany({ bot: bot._id });
-    logger.info("Deleted previous QAs before regeneration", { botId });
+    logger.info('Deleted previous QAs before regeneration', { botId });
 
     const processingPromises = [];
 
@@ -663,7 +674,7 @@ exports.updateBot = async (botId, userId, body, file) => {
           name,
           description
         ).catch((err) => {
-          logger.error("Error in markdown reprocessing", {
+          logger.error('Error in markdown reprocessing', {
             botId,
             error: err.message,
           });
@@ -676,7 +687,7 @@ exports.updateBot = async (botId, userId, body, file) => {
     if (file) {
       processingPromises.push(
         processPDFContent(file, bot._id, name, description).catch((err) => {
-          logger.error("Error in PDF reprocessing", {
+          logger.error('Error in PDF reprocessing', {
             botId,
             error: err.message,
           });
@@ -689,7 +700,7 @@ exports.updateBot = async (botId, userId, body, file) => {
   }
 
   await bot.save();
-  logger.info("Bot updated and saved successfully", {
+  logger.info('Bot updated and saved successfully', {
     botId,
     userId,
     urlsChanged,
@@ -700,18 +711,18 @@ exports.updateBot = async (botId, userId, body, file) => {
 
 exports.getCustomization = async (botId) => {
   if (!botId) {
-    logger.error("Get customization failed: Bot ID missing");
-    throw new Error("Bot ID is required");
+    logger.error('Get customization failed: Bot ID missing');
+    throw new Error('Bot ID is required');
   }
 
-  logger.info("Fetching customization", { botId });
+  logger.info('Fetching customization', { botId });
 
   const customization = await Customization.findOne({ botId });
 
   if (customization) {
-    logger.info("Customization fetched successfully", { botId });
+    logger.info('Customization fetched successfully', { botId });
   } else {
-    logger.warn("No customization found", { botId });
+    logger.warn('No customization found', { botId });
   }
 
   return customization;
@@ -719,11 +730,11 @@ exports.getCustomization = async (botId) => {
 
 exports.saveCustomization = async (botId, data) => {
   if (!botId) {
-    logger.error("Save customization failed: Bot ID missing");
-    throw new Error("Bot ID is required");
+    logger.error('Save customization failed: Bot ID missing');
+    throw new Error('Bot ID is required');
   }
 
-  logger.info("Saving customization", { botId, data });
+  logger.info('Saving customization', { botId, data });
 
   const customization = await Customization.findOneAndUpdate(
     { botId },
@@ -731,24 +742,24 @@ exports.saveCustomization = async (botId, data) => {
     { new: true, upsert: true }
   );
 
-  logger.info("Customization saved successfully", { botId });
+  logger.info('Customization saved successfully', { botId });
   return customization;
 };
 
 exports.getAllChatHistories = async (botId) => {
-  logger.info("Service: Retrieving all chat histories", { botId });
+  logger.info('Service: Retrieving all chat histories', { botId });
 
   const bot = await ChatBot.findById(botId);
   if (!bot) {
-    logger.warn("Bot not found while fetching histories", { botId });
-    throw new Error("Bot not found");
+    logger.warn('Bot not found while fetching histories', { botId });
+    throw new Error('Bot not found');
   }
 
   const sessions = await FlowSession.find({ bot: botId }).sort({
     createdAt: -1,
   });
 
-  logger.info("Service: Successfully retrieved chat histories", {
+  logger.info('Service: Successfully retrieved chat histories', {
     botId,
     totalSessions: sessions.length,
   });
@@ -757,24 +768,24 @@ exports.getAllChatHistories = async (botId) => {
 };
 
 exports.getChatHistoryBySession = async (botId, sessionId) => {
-  logger.info("Service: Retrieving specific chat history", {
+  logger.info('Service: Retrieving specific chat history', {
     botId,
     sessionId,
   });
 
   const bot = await ChatBot.findById(botId);
   if (!bot) {
-    logger.warn("Bot not found while fetching specific history", {
+    logger.warn('Bot not found while fetching specific history', {
       botId,
       sessionId,
     });
-    throw new Error("Bot not found");
+    throw new Error('Bot not found');
   }
 
   const session = await FlowSession.findOne({ _id: sessionId, bot: botId });
   if (!session) {
-    logger.warn("Chat session not found", { botId, sessionId });
-    throw new Error("Chat history not found");
+    logger.warn('Chat session not found', { botId, sessionId });
+    throw new Error('Chat history not found');
   }
 
   const history = session.history || [];
@@ -787,15 +798,15 @@ exports.getChatHistoryBySession = async (botId, sessionId) => {
     const prev = history[index - 1];
 
     const isExtra =
-      (entry.type === "question" || entry.type === "confirmation") &&
-      typeof entry.content === "object" &&
-      prev?.type === "user_input" &&
+      (entry.type === 'question' || entry.type === 'confirmation') &&
+      typeof entry.content === 'object' &&
+      prev?.type === 'user_input' &&
       prev?.nodeId === entry.nodeId;
 
     return !isExtra;
   });
 
-  logger.info("Service: Successfully retrieved and cleaned chat history", {
+  logger.info('Service: Successfully retrieved and cleaned chat history', {
     botId,
     sessionId,
     originalLength: history.length,

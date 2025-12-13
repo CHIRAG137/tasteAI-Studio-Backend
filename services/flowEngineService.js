@@ -24,9 +24,13 @@ exports.findEdgeByHandle = (edges, nodeId, handleValue) => {
   let edge = outs.find(
     (o) => o.sourceHandle && String(o.sourceHandle).toLowerCase() === normalized
   );
-  if (edge) return edge;
+  if (edge) {
+    return edge;
+  }
 
-  if (outs.length === 1 && !outs[0].sourceHandle) return outs[0];
+  if (outs.length === 1 && !outs[0].sourceHandle) {
+    return outs[0];
+  }
   return null;
 };
 
@@ -36,16 +40,18 @@ exports.findBranchOptionNode = (nodeMap, branchNode, optionIndexOrLabel) => {
 
   if (!isNaN(idx) && options[idx] !== undefined) {
     for (const node of Object.values(nodeMap)) {
-      if (node.type === "branchOption" && node.data?.label === options[idx]) {
+      if (node.type === 'branchOption' && node.data?.label === options[idx]) {
         return node.id;
       }
     }
     const guessed = `${branchNode.id}-opt-${idx}`;
-    if (exports.getNode(nodeMap, guessed)) return guessed;
+    if (exports.getNode(nodeMap, guessed)) {
+      return guessed;
+    }
   } else {
     const label = String(optionIndexOrLabel);
     for (const node of Object.values(nodeMap)) {
-      if (node.type === "branchOption" && node.data?.label === label) {
+      if (node.type === 'branchOption' && node.data?.label === label) {
         return node.id;
       }
     }
@@ -60,7 +66,7 @@ exports.executeCodeNode = async (codeNode, session) => {
   try {
     const code = codeNode.data?.code || '';
     const timeout = codeNode.data?.timeout || 5000;
-    
+
     if (!code.trim()) {
       return {
         success: false,
@@ -68,38 +74,38 @@ exports.executeCodeNode = async (codeNode, session) => {
         error: 'No code provided',
       };
     }
-    
+
     // Create a mutable variables object
     const variablesProxy = { ...session.variables };
-    
+
     // Create a sandbox with available utilities and session variables
     const sandbox = {
       // Session variables - direct access
       variables: variablesProxy,
-      
+
       // HTTP client
       axios: axios,
-      
+
       // Console for logging
       console: {
         log: (...args) => console.log('[Code Node]', ...args),
         error: (...args) => console.error('[Code Node]', ...args),
         warn: (...args) => console.warn('[Code Node]', ...args),
       },
-      
+
       // Result storage
       result: null,
       error: null,
-      
+
       // Helper functions - using arrow functions to maintain context
       setVariable: (key, value) => {
         variablesProxy[key] = value;
       },
-      
+
       getVariable: (key) => {
         return variablesProxy[key];
       },
-      
+
       // Global objects that might be needed
       JSON: JSON,
       Math: Math,
@@ -112,7 +118,7 @@ exports.executeCodeNode = async (codeNode, session) => {
     };
 
     const context = vm.createContext(sandbox);
-    
+
     // Wrap code in async IIFE to support await
     const wrappedCode = `
       (async () => {
@@ -159,11 +165,11 @@ exports.runFrom = async (flow, session, nodeId, userInputIfAny = null) => {
   while (current && !session.isFinished) {
     const type = current.type;
 
-    if (type === "message") {
+    if (type === 'message') {
       outputs.push({
         nodeId: current.id,
-        type: "message",
-        content: current.data?.message || "",
+        type: 'message',
+        content: current.data?.message || '',
       });
       const outs = exports.outgoingEdges(edges, current.id);
       if (!outs.length) {
@@ -175,23 +181,23 @@ exports.runFrom = async (flow, session, nodeId, userInputIfAny = null) => {
       continue;
     }
 
-    if (type === "redirect") {
+    if (type === 'redirect') {
       outputs.push({
         nodeId: current.id,
-        type: "redirect",
-        content: current.data?.redirectUrl || "",
+        type: 'redirect',
+        content: current.data?.redirectUrl || '',
       });
       session.currentNodeId = null;
       session.isFinished = true;
       break;
     }
 
-    if (type === "question") {
+    if (type === 'question') {
       if (userInputIfAny === null) {
         return {
           outputs,
           pausedFor: {
-            type: "question",
+            type: 'question',
             nodeId: current.id,
             message: current.data?.message,
             variable: current.data?.variable,
@@ -199,11 +205,13 @@ exports.runFrom = async (flow, session, nodeId, userInputIfAny = null) => {
         };
       }
       const varName = current.data?.variable;
-      if (varName) session.variables[varName] = userInputIfAny;
+      if (varName) {
+        session.variables[varName] = userInputIfAny;
+      }
 
       outputs.push({
         nodeId: current.id,
-        type: "question",
+        type: 'question',
         content: {
           prompt: current.data?.message,
           answer: userInputIfAny,
@@ -222,12 +230,12 @@ exports.runFrom = async (flow, session, nodeId, userInputIfAny = null) => {
       continue;
     }
 
-    if (type === "confirmation") {
+    if (type === 'confirmation') {
       if (userInputIfAny === null) {
         return {
           outputs,
           pausedFor: {
-            type: "confirmation",
+            type: 'confirmation',
             nodeId: current.id,
             message: current.data?.message,
           },
@@ -237,7 +245,7 @@ exports.runFrom = async (flow, session, nodeId, userInputIfAny = null) => {
       const normalized = String(userInputIfAny).toLowerCase();
       outputs.push({
         nodeId: current.id,
-        type: "confirmation",
+        type: 'confirmation',
         content: {
           prompt: current.data?.message,
           answer: normalized,
@@ -254,11 +262,11 @@ exports.runFrom = async (flow, session, nodeId, userInputIfAny = null) => {
       continue;
     }
 
-    if (type === "branch") {
+    if (type === 'branch') {
       return {
         outputs,
         pausedFor: {
-          type: "branch",
+          type: 'branch',
           nodeId: current.id,
           message: current.data?.message,
           options: current.data?.options || [],
@@ -266,7 +274,7 @@ exports.runFrom = async (flow, session, nodeId, userInputIfAny = null) => {
       };
     }
 
-    if (type === "branchOption") {
+    if (type === 'branchOption') {
       const outs = exports.outgoingEdges(edges, current.id);
       if (!outs.length) {
         session.isFinished = true;
@@ -277,28 +285,28 @@ exports.runFrom = async (flow, session, nodeId, userInputIfAny = null) => {
     }
 
     // Code Node Handler
-    if (type === "code") {
+    if (type === 'code') {
       console.log('[Flow Engine] Executing code node:', current.id);
       console.log('[Flow Engine] Session variables before:', session.variables);
-      
+
       const execution = await exports.executeCodeNode(current, session);
-      
+
       console.log('[Flow Engine] Code execution result:', execution);
       console.log('[Flow Engine] Session variables after:', session.variables);
-      
+
       if (!execution.success) {
         outputs.push({
           nodeId: current.id,
-          type: "code",
+          type: 'code',
           content: {
             error: execution.error,
             success: false,
             timestamp: new Date(),
           },
         });
-        
+
         // Check if there's an error handle
-        const errorEdge = exports.findEdgeByHandle(edges, current.id, "error");
+        const errorEdge = exports.findEdgeByHandle(edges, current.id, 'error');
         if (errorEdge) {
           current = exports.getNode(nodeMap, errorEdge.target);
           continue;
@@ -308,19 +316,23 @@ exports.runFrom = async (flow, session, nodeId, userInputIfAny = null) => {
           break;
         }
       }
-      
+
       outputs.push({
         nodeId: current.id,
-        type: "code",
+        type: 'code',
         content: {
           result: execution.result,
           success: true,
           timestamp: new Date(),
         },
       });
-      
+
       // Continue to next node via success handle or default edge
-      const successEdge = exports.findEdgeByHandle(edges, current.id, "success");
+      const successEdge = exports.findEdgeByHandle(
+        edges,
+        current.id,
+        'success'
+      );
       if (successEdge) {
         current = exports.getNode(nodeMap, successEdge.target);
       } else {
@@ -338,7 +350,7 @@ exports.runFrom = async (flow, session, nodeId, userInputIfAny = null) => {
 
     outputs.push({
       nodeId: current.id,
-      type: "unknown",
+      type: 'unknown',
       content: current.data || {},
     });
     session.currentNodeId = null;
@@ -355,6 +367,8 @@ exports.runFrom = async (flow, session, nodeId, userInputIfAny = null) => {
 
 exports.findStartNode = (flow) => {
   const nodeMap = exports.buildNodeMap(flow);
-  if (exports.getNode(nodeMap, "1")) return exports.getNode(nodeMap, "1");
+  if (exports.getNode(nodeMap, '1')) {
+    return exports.getNode(nodeMap, '1');
+  }
   return (flow.nodes || [])[0] || null;
 };

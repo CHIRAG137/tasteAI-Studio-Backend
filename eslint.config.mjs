@@ -1,37 +1,37 @@
-import js from "@eslint/js";
-import globals from "globals";
-import prettier from "eslint-plugin-prettier";
-import node from "eslint-plugin-node";
+import js from '@eslint/js';
+import globals from 'globals';
+import prettier from 'eslint-plugin-prettier';
+import node from 'eslint-plugin-node';
 
 export default [
   js.configs.recommended,
 
   {
-    files: ["**/*.js"],
+    files: ['**/*.js'],
     languageOptions: {
       globals: {
-        ...globals.node
+        ...globals.node,
       },
-      ecmaVersion: "latest",
-      sourceType: "commonjs"
+      ecmaVersion: 'latest',
+      sourceType: 'commonjs',
     },
     plugins: {
       prettier,
-      node
+      node,
     },
     rules: {
       // Prettier as ESLint rule
-      "prettier/prettier": "error",
+      'prettier/prettier': 'error',
 
       // Code quality
-      "no-console": "warn",
-      "no-unused-vars": ["error", { argsIgnorePattern: "^_" }],
-      "eqeqeq": ["error", "always"],
-      "curly": ["error", "all"],
+      'no-console': 'warn',
+      'no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+      eqeqeq: ['error', 'always'],
+      curly: ['error', 'all'],
 
       // Node rules
-      "node/no-missing-require": "off",
-      "node/no-unpublished-require": "off"
-    }
-  }
+      'node/no-missing-require': 'off',
+      'node/no-unpublished-require': 'off',
+    },
+  },
 ];

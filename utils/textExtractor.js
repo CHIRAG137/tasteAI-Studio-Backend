@@ -1,5 +1,5 @@
-const fs = require("fs");
-const pdfParse = require("pdf-parse");
+const fs = require('fs');
+const pdfParse = require('pdf-parse');
 
 /**
  * Extracts plain text from a PDF file at the given file path.
@@ -12,11 +12,11 @@ exports.extractTextFromPDF = async (filePath) => {
     const data = await pdfParse(fileBuffer);
 
     // Clean and normalize extracted text
-    const cleanedText = data.text.replace(/\s+/g, " ").trim();
+    const cleanedText = data.text.replace(/\s+/g, ' ').trim();
 
     return cleanedText;
   } catch (err) {
-    console.error("Error extracting text from PDF:", err);
-    return "";
+    console.error('Error extracting text from PDF:', err);
+    return '';
   }
 };

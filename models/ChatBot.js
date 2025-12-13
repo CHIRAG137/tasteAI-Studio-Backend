@@ -1,10 +1,10 @@
-const mongoose = require("mongoose");
+const mongoose = require('mongoose');
 
 const ChatBotSchema = new mongoose.Schema(
   {
     user: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      ref: 'User',
       required: true,
     },
     name: String,
@@ -15,11 +15,11 @@ const ChatBotSchema = new mongoose.Schema(
     is_slack_enabled: { type: Boolean, default: false },
     slack_channel_id: String,
     slack_command: String,
-    supported_languages: { type: [String], default: ["English"] },
+    supported_languages: { type: [String], default: ['English'] },
     primary_purpose: String,
     specialisation_area: String,
-    conversation_tone: { type: String, default: "Professional" },
-    response_style: { type: String, default: "Helpful & Detailed" },
+    conversation_tone: { type: String, default: 'Professional' },
+    response_style: { type: String, default: 'Helpful & Detailed' },
     target_audience: String,
     key_topics: String,
     keywords: String,
@@ -36,4 +36,4 @@ const ChatBotSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-module.exports = mongoose.model("ChatBot", ChatBotSchema);
+module.exports = mongoose.model('ChatBot', ChatBotSchema);

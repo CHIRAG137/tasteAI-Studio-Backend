@@ -1,6 +1,6 @@
-const ChatBot = require("../models/ChatBot");
-const FlowSession = require("../models/FlowSession");
-const flowEngine = require("../services/flowEngineService");
+const ChatBot = require('../models/ChatBot');
+const FlowSession = require('../models/FlowSession');
+const flowEngine = require('../services/flowEngineService');
 
 /**
  * Format outputs into display-ready messages
@@ -10,20 +10,20 @@ const formatMessagesForDisplay = (outputs, pausedFor = null) => {
 
   // Add all outputs as messages
   outputs.forEach((output) => {
-    let content = "";
-    
-    if (typeof output.content === "string") {
+    let content = '';
+
+    if (typeof output.content === 'string') {
       content = output.content;
     } else if (output.content?.prompt) {
       content = output.content.prompt;
     } else if (output.content?.message) {
       content = output.content.message;
-    } else if (output.type === "redirect") {
+    } else if (output.type === 'redirect') {
       content = `Redirecting to: ${output.content}`;
     }
 
     // Only add messages, not questions/confirmations that were just answered
-    if (output.type === "message" || output.type === "redirect") {
+    if (output.type === 'message' || output.type === 'redirect') {
       messages.push({
         type: output.type,
         content: content,
@@ -37,7 +37,7 @@ const formatMessagesForDisplay = (outputs, pausedFor = null) => {
   if (pausedFor) {
     messages.push({
       type: pausedFor.type,
-      content: pausedFor.message || pausedFor.prompt || "Please respond",
+      content: pausedFor.message || pausedFor.prompt || 'Please respond',
       nodeId: pausedFor.nodeId,
       options: pausedFor.options || [],
       variable: pausedFor.variable,
@@ -53,11 +53,13 @@ const formatMessagesForDisplay = (outputs, pausedFor = null) => {
  */
 exports.startFlow = async (req, res) => {
   try {
-    console.log("Starting flow...");
+    console.log('Starting flow...');
     const { botId } = req.params;
-    
+
     const bot = await ChatBot.findById(botId);
-    if (!bot) return res.status(404).json({ error: "Bot not found" });
+    if (!bot) {
+      return res.status(404).json({ error: 'Bot not found' });
+    }
 
     const session = new FlowSession({
       bot: bot._id,
@@ -113,7 +115,9 @@ exports.startFlow = async (req, res) => {
       ? runResult.pausedFor.nodeId
       : runResult.nextNodeId;
 
-    if (!session.currentNodeId) session.isFinished = true;
+    if (!session.currentNodeId) {
+      session.isFinished = true;
+    }
 
     await session.save();
 
@@ -148,12 +152,14 @@ exports.startFlow = async (req, res) => {
  */
 exports.respondToFlow = async (req, res) => {
   try {
-    console.log("Responding to flow...");
+    console.log('Responding to flow...');
     const { sessionId } = req.params;
     const { input, optionIndexOrLabel } = req.body;
 
     const session = await FlowSession.findById(sessionId);
-    if (!session) return res.status(404).json({ error: "Session not found" });
+    if (!session) {
+      return res.status(404).json({ error: 'Session not found' });
+    }
 
     if (session.isFinished) {
       return res.json({
@@ -165,7 +171,9 @@ exports.respondToFlow = async (req, res) => {
     }
 
     const bot = await ChatBot.findById(session.bot);
-    if (!bot) return res.status(404).json({ error: "Bot for session not found" });
+    if (!bot) {
+      return res.status(404).json({ error: 'Bot for session not found' });
+    }
 
     const nodeMap = flowEngine.buildNodeMap(bot.conversationFlow);
 
@@ -189,7 +197,7 @@ exports.respondToFlow = async (req, res) => {
       session.isFinished = true;
       await session.save();
       return res.json({
-        error: "No node to respond to; session ended",
+        error: 'No node to respond to; session ended',
         messages: [],
         awaitingInput: null,
         finished: true,
@@ -199,30 +207,33 @@ exports.respondToFlow = async (req, res) => {
     let runResult = null;
 
     switch (waitingNode.type) {
-      case "branch":
+      case 'branch':
         if (
-          typeof optionIndexOrLabel === "undefined" &&
-          typeof input === "undefined"
+          typeof optionIndexOrLabel === 'undefined' &&
+          typeof input === 'undefined'
         ) {
           return res.status(400).json({
             error:
-              "Please provide optionIndexOrLabel (index or label) to select branch option.",
+              'Please provide optionIndexOrLabel (index or label) to select branch option.',
           });
         }
 
         const optNodeId = flowEngine.findBranchOptionNode(
           nodeMap,
           waitingNode,
-          typeof optionIndexOrLabel !== "undefined" ? optionIndexOrLabel : input
+          typeof optionIndexOrLabel !== 'undefined' ? optionIndexOrLabel : input
         );
 
-        if (!optNodeId)
-          return res.status(400).json({ error: "Branch option not recognized" });
+        if (!optNodeId) {
+          return res
+            .status(400)
+            .json({ error: 'Branch option not recognized' });
+        }
 
         // Save user choice
         session.history.push({
           nodeId: waitingNode.id,
-          type: "branch_select",
+          type: 'branch_select',
           content: {
             selectedOptionNodeId: optNodeId,
             selected: optionIndexOrLabel ?? input,
@@ -238,17 +249,18 @@ exports.respondToFlow = async (req, res) => {
         );
         break;
 
-      case "question":
-      case "confirmation":
-        if (typeof input === "undefined")
+      case 'question':
+      case 'confirmation':
+        if (typeof input === 'undefined') {
           return res
             .status(400)
-            .json({ error: "Please provide input for this node." });
+            .json({ error: 'Please provide input for this node.' });
+        }
 
         // Save user input
         session.history.push({
           nodeId: waitingNode.id,
-          type: "user_input",
+          type: 'user_input',
           content: input,
           timestamp: new Date(),
           fromUser: true,
@@ -301,7 +313,9 @@ exports.respondToFlow = async (req, res) => {
       ? runResult.pausedFor.nodeId
       : runResult.nextNodeId;
 
-    if (!session.currentNodeId) session.isFinished = true;
+    if (!session.currentNodeId) {
+      session.isFinished = true;
+    }
 
     await session.save();
 
