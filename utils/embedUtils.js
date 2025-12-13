@@ -39,7 +39,7 @@ exports.cosineSimilarity = (vecA, vecB) => {
   return dot / (Math.sqrt(normA) * Math.sqrt(normB));
 };
 
-const { GoogleGenerativeAI } = require("@google/generative-ai");
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
@@ -51,16 +51,18 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 exports.embedText = async (text) => {
   try {
     const trimmed = text.trim();
-    if (!trimmed) throw new Error("Empty input for embedding.");
+    if (!trimmed) {
+      throw new Error('Empty input for embedding.');
+    }
 
-    const model = genAI.getGenerativeModel({ model: "gemini-embedding-001" });
+    const model = genAI.getGenerativeModel({ model: 'gemini-embedding-001' });
 
     const result = await model.embedContent(trimmed);
 
     const embedding = result.embedding.values;
     return new Float32Array(embedding);
   } catch (error) {
-    console.error("Embedding error (Gemini):", error);
+    console.error('Embedding error (Gemini):', error);
     return new Float32Array();
   }
 };

@@ -52,8 +52,8 @@
 //   return new Float32Array(response.data[0].embedding);
 // };
 
-require("dotenv").config();
-const { GoogleGenerativeAI } = require("@google/generative-ai");
+require('dotenv').config();
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
@@ -84,7 +84,7 @@ Return only a list of 10–15 questions and answers in JSON format like this:
 
     const userPrompt = `Here is a chunk of the document:\n\n${textChunk}\n\nGenerate Q&A pairs now.`;
 
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
     const prompt = `${systemPrompt}\n\n${userPrompt}`;
 
@@ -97,7 +97,7 @@ Return only a list of 10–15 questions and answers in JSON format like this:
 
     return Array.isArray(qas) ? qas : [];
   } catch (error) {
-    console.error("Error in generateQAsViaGPT (Gemini):", error);
+    console.error('Error in generateQAsViaGPT (Gemini):', error);
     return [];
   }
 };
@@ -109,11 +109,11 @@ Return only a list of 10–15 questions and answers in JSON format like this:
  */
 exports.getEmbedding = async (text) => {
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-embedding-001" });
+    const model = genAI.getGenerativeModel({ model: 'gemini-embedding-001' });
     const result = await model.embedContent(text);
     return new Float32Array(result.embedding.values);
   } catch (error) {
-    console.error("Error generating embedding (Gemini):", error);
+    console.error('Error generating embedding (Gemini):', error);
     return new Float32Array();
   }
 };

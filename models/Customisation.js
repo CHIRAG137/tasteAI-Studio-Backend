@@ -1,14 +1,14 @@
-const mongoose = require("mongoose");
+const mongoose = require('mongoose');
 
 const customizationSchema = new mongoose.Schema(
   {
     botId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "ChatBot",
+      ref: 'ChatBot',
       required: true,
       unique: true,
     },
-    
+
     // Chat window customization
     headerTitle: String,
     headerSubtitle: String,
@@ -24,51 +24,51 @@ const customizationSchema = new mongoose.Schema(
     borderRadius: Number,
     chatCustomCSS: {
       type: String,
-      default: "",
+      default: '',
       maxlength: 50000,
     },
     useChatCustomCSS: {
       type: Boolean,
       default: false,
     },
-    
+
     // Button customization
     buttonBackground: {
       type: String,
-      default: "linear-gradient(135deg, #9b5de5, #f15bb5)",
+      default: 'linear-gradient(135deg, #9b5de5, #f15bb5)',
     },
     buttonColor: {
       type: String,
-      default: "#ffffff",
+      default: '#ffffff',
     },
     buttonSize: {
       type: String,
-      default: "56",
+      default: '56',
     },
     buttonBorderRadius: {
       type: String,
-      default: "50",
+      default: '50',
     },
     buttonPosition: {
       type: String,
-      enum: ["bottom-right", "bottom-left"],
-      default: "bottom-right",
+      enum: ['bottom-right', 'bottom-left'],
+      default: 'bottom-right',
     },
     buttonBottom: {
       type: String,
-      default: "20",
+      default: '20',
     },
     buttonRight: {
       type: String,
-      default: "20",
+      default: '20',
     },
     buttonLeft: {
       type: String,
-      default: "20",
+      default: '20',
     },
     buttonCustomCSS: {
       type: String,
-      default: "",
+      default: '',
       maxlength: 50000,
     },
     useButtonCustomCSS: {
@@ -79,4 +79,4 @@ const customizationSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-module.exports = mongoose.model("Customization", customizationSchema);
+module.exports = mongoose.model('Customization', customizationSchema);

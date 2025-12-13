@@ -1,8 +1,8 @@
-const mongoose = require("mongoose");
+const mongoose = require('mongoose');
 
 const QAHistorySchema = new mongoose.Schema(
   {
-    bot: { type: mongoose.Schema.Types.ObjectId, ref: "ChatBot" },
+    bot: { type: mongoose.Schema.Types.ObjectId, ref: 'ChatBot' },
     question: String,
     answer: String,
     embedding: Buffer,
@@ -10,4 +10,4 @@ const QAHistorySchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-module.exports = mongoose.model("QAHistory", QAHistorySchema);
+module.exports = mongoose.model('QAHistory', QAHistorySchema);
