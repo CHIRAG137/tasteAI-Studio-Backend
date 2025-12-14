@@ -32,6 +32,7 @@ const ChatBotSchema = new mongoose.Schema(
       type: [String],
       default: [],
     },
+    is_video_bot: { type: Boolean, default: false },
   },
   { timestamps: true }
 );
