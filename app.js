@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const path = require('path');
+const http = require('http');
 const botRoutes = require('./routes/botRoutes');
 const crawlRoutes = require('./routes/crawlRoutes');
 const slackRoutes = require('./routes/slackRoutes');
@@ -11,6 +12,8 @@ const flowRoutes = require('./routes/flowRoutes');
 const summarizeRoutes = require('./routes/summarizeRoutes');
 const elevenlabsRoutes = require('./routes/elevenlabsRoutes');
 const didRoutes = require('./routes/didRoutes');
+const livekitRoutes = require('./routes/livekitRoutes');
+const initSTTWS = require('./websocksets/sttWebsocket');
 
 require('dotenv').config();
 
@@ -42,6 +45,7 @@ app.use('/api/flow', flowRoutes);
 app.use('/api/summarize', summarizeRoutes);
 app.use('/api/elevenlabs', elevenlabsRoutes);
 app.use('/api/did', didRoutes);
+app.use('/api/livekit', livekitRoutes);
 app.get('/widget.js', (req, res) => {
   res.sendFile(path.join(__dirname, 'public/widget.js'));
 });
@@ -54,6 +58,9 @@ app.get('/api/keep-alive', (req, res) => {
     uptime: Math.floor(process.uptime()),
   });
 });
+
+const server = http.createServer(app);
+initSTTWS(server);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));

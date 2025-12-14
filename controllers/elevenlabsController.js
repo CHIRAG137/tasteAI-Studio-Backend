@@ -47,3 +47,39 @@ exports.speechToText = async (req, res) => {
     return responseBuilder.internalError(res, null, err.message);
   }
 };
+
+exports.streamSpeech = async (req, res) => {
+  try {
+    const { text } = req.body;
+
+    if (!text) {
+      logger.warn('TTS request missing text');
+      return responseBuilder.badRequest(res, null, 'Text is required for TTS');
+    }
+
+    logger.info('Starting text-to-speech streaming', {
+      textLength: text.length,
+    });
+
+    res.setHeader('Content-Type', 'audio/mpeg');
+    res.setHeader('Transfer-Encoding', 'chunked');
+
+    await elevenlabsService.streamSpeech(text, res);
+
+    logger.info('Text-to-speech streaming completed successfully');
+  } catch (err) {
+    logger.error('Text-to-speech streaming failed', {
+      error: err.response?.data || err.message,
+    });
+
+    if (!res.headersSent) {
+      return responseBuilder.internalError(
+        res,
+        null,
+        err.message || 'TTS streaming failed'
+      );
+    }
+
+    res.destroy(err);
+  }
+};

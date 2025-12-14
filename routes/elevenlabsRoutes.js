@@ -10,5 +10,6 @@ router.post(
   upload.single('audio'),
   elevenlabsController.speechToText
 );
+router.post('/stream', elevenlabsController.streamSpeech);
 
 module.exports = router;
