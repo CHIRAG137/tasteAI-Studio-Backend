@@ -1,48 +1,68 @@
-const { AccessToken } = require('livekit-server-sdk');
-const logger = require('../utils/logger');
+const axios = require('axios');
 
-exports.createToken = async ({ room, identity }) => {
-  if (!room || !identity) {
-    logger.error('LiveKit token creation failed: missing parameters', {
-      room,
-      identity,
-    });
-    throw new Error('room and identity are required to create LiveKit token');
-  }
+const TAVUS_BASE_URL = process.env.TAVUS_BASE_URL;
+const TAVUS_API_KEY = process.env.TAVUS_API_KEY;
 
-  logger.info('Starting LiveKit token creation', {
-    room,
-    identity,
-  });
+const headers = {
+  Authorization: `Bearer ${TAVUS_API_KEY}`,
+  'Content-Type': 'application/json',
+};
 
-  try {
-    const token = new AccessToken(
-      process.env.LIVEKIT_API_KEY,
-      process.env.LIVEKIT_API_SECRET,
-      { identity }
-    );
+exports.createConversation = async ({ personaId, conversationName }) => {
+  const res = await axios.post(
+    `${TAVUS_BASE_URL}/v2/conversations`,
+    {
+      persona_id: personaId,
+      conversation_name: conversationName,
+      realtime: true,
+    },
+    { headers }
+  );
 
-    token.addGrant({
-      roomJoin: true,
-      room,
-      canPublish: true,
-      canSubscribe: true,
-    });
+  return res.data;
+};
 
-    const jwt = await token.toJwt();
+exports.sendMessage = async (conversationId, message) => {
+  const res = await axios.post(
+    `${TAVUS_BASE_URL}/v2/conversations/${conversationId}/messages`,
+    { text: message },
+    { headers }
+  );
 
-    logger.info('LiveKit token created successfully', {
-      room,
-      identity,
-      tokenLength: jwt.length,
-    });
+  return res.data;
+};
 
-    return jwt;
-  } catch (error) {
-    logger.error('Error during LiveKit token creation', {
-      error: error.message,
-      stack: error.stack,
-    });
-    throw error;
-  }
+exports.endConversation = async (conversationId) => {
+  await axios.post(
+    `${TAVUS_BASE_URL}/v2/conversations/${conversationId}/end`,
+    {},
+    { headers }
+  );
+};
+
+exports.evaluateQuiz = (quizId, answers) => {
+  const total = Object.keys(answers).length;
+  const correct = Math.floor(Math.random() * total);
+
+  return {
+    total,
+    correct,
+    feedback:
+      correct === total
+        ? 'Excellent! You nailed it 🎉'
+        : 'Good effort! Review the flash cards to improve.',
+    results: Object.keys(answers).map((qId) => ({
+      questionId: qId,
+      isCorrect: Math.random() > 0.5,
+    })),
+    newFlashCards: [
+      {
+        id: Date.now().toString(),
+        question: 'What is Tavus?',
+        answer: 'A real-time conversational video AI platform',
+        isFlipped: false,
+        fromQuiz: true,
+      },
+    ],
+  };
 };

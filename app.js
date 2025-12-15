@@ -45,7 +45,7 @@ app.use('/api/flow', flowRoutes);
 app.use('/api/summarize', summarizeRoutes);
 app.use('/api/elevenlabs', elevenlabsRoutes);
 app.use('/api/did', didRoutes);
-app.use('/api/livekit', livekitRoutes);
+app.use('/api/tavus', livekitRoutes);
 app.get('/widget.js', (req, res) => {
   res.sendFile(path.join(__dirname, 'public/widget.js'));
 });
