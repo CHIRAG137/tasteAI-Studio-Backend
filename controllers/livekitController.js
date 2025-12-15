@@ -1,46 +1,89 @@
-const livekitService = require('../services/livekitService');
-const responseBuilder = require('../utils/responseBuilder');
-const logger = require('../utils/logger');
+const tavusService = require('../services/livekitService');
 
-exports.getToken = async (req, res) => {
+exports.createConversation = async (req, res) => {
   try {
-    const { room, identity } = req.body;
+    const { personaId, conversationName } = req.body;
 
-    if (!room || !identity) {
-      logger.warn('LiveKit token request missing parameters', {
-        room,
-        identity,
-      });
-      return responseBuilder.badRequest(
-        res,
-        null,
-        'room and identity are required'
-      );
-    }
-
-    logger.info('Generating LiveKit token', {
-      room,
-      identity,
+    const data = await tavusService.createConversation({
+      personaId,
+      conversationName,
     });
 
-    const token = await livekitService.createToken({ room, identity });
-
-    logger.info('LiveKit token generated successfully', {
-      room,
-      identity,
+    res.json({
+      success: true,
+      conversationId: data.conversation_id,
+      conversationUrl: data.url,
+      dailyRoomUrl: data.daily_room_url,
     });
-
-    return responseBuilder.ok(res, { token }, 'LiveKit token generated');
   } catch (err) {
-    logger.error('Failed to generate LiveKit token', {
-      error: err.message,
-      stack: err.stack,
-    });
+    console.error(err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+};
 
-    return responseBuilder.internalError(
-      res,
-      null,
-      err.message || 'LiveKit token generation failed'
-    );
+exports.sendMessage = async (req, res) => {
+  try {
+    const { conversationId, message } = req.body;
+
+    const data = await tavusService.sendMessage(conversationId, message);
+
+    res.json({
+      success: true,
+      response: data.text,
+      audioUrl: data.audio_url || null,
+      flashCards: data.flash_cards || [],
+      quiz: data.quiz || null,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+};
+
+exports.endConversation = async (req, res) => {
+  try {
+    const { conversationId } = req.body;
+
+    await tavusService.endConversation(conversationId);
+
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+};
+
+exports.flipFlashCard = async (req, res) => {
+  try {
+    const { cardId } = req.body;
+
+    // Dummy flip logic (frontend state-driven)
+    res.json({
+      success: true,
+      flashCard: {
+        id: cardId,
+        isFlipped: true,
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ success: false });
+  }
+};
+
+exports.submitQuiz = async (req, res) => {
+  try {
+    const { quizId, answers } = req.body;
+
+    const result = tavusService.evaluateQuiz(quizId, answers);
+
+    res.json({
+      success: true,
+      feedback: result.feedback,
+      correctCount: result.correct,
+      totalCount: result.total,
+      results: result.results,
+      newFlashCards: result.newFlashCards,
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
   }
 };
