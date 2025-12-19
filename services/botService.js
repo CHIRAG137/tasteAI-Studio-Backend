@@ -178,6 +178,8 @@ exports.createBot = async (req) => {
     scraped_content,
     scraped_urls,
     is_video_bot,
+    video_bot_image_data,
+    video_bot_image_type
   } = req.body;
 
   if (!name || !description) {
@@ -265,6 +267,8 @@ exports.createBot = async (req) => {
     conversationFlow: parsedConversationFlow,
     scraped_urls: parsedScrapedUrls,
     is_video_bot,
+    video_bot_image_data,
+    video_bot_image_type
   });
 
   logger.info('Bot created', { botId: bot._id, userId: req.user.id, name });
@@ -530,6 +534,8 @@ exports.updateBot = async (botId, userId, body, file) => {
     scraped_content,
     scraped_urls,
     is_video_bot,
+    video_bot_image_data,
+    video_bot_image_type
   } = body;
 
   if (!name || !description) {
@@ -626,6 +632,9 @@ exports.updateBot = async (botId, userId, body, file) => {
     custom_instructions: custom_instructions || bot.custom_instructions,
     conversationFlow: parsedConversationFlow || bot.conversationFlow,
     scraped_urls: parsedScrapedUrls || bot.scraped_urls,
+    is_video_bot: is_video_bot,
+    video_bot_image_data: video_bot_image_data,
+    video_bot_image_type: video_bot_image_type
   });
 
   logger.info('Bot fields updated locally', { botId, userId });
