@@ -33,8 +33,8 @@ const ChatBotSchema = new mongoose.Schema(
       default: [],
     },
     is_video_bot: { type: Boolean, default: false },
-    video_bot_image_data: String,
-    video_bot_image_type: { type: String, default: "image/png" },
+    video_bot_image_url: String,
+    video_bot_image_public_id: String,
   },
   { timestamps: true }
 );
