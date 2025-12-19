@@ -1,15 +1,19 @@
-const geminiImageService = require("../services/imageGenerationService");
+const geminiImageService = require('../services/imageGenerationService');
 
 exports.generateImage = async (req, res) => {
   try {
     if (!req.file) {
-      return res.status(400).json({ success: false, message: "Image is required" });
+      return res
+        .status(400)
+        .json({ success: false, message: 'Image is required' });
     }
 
     const { prompt } = req.body;
 
     if (!prompt) {
-      return res.status(400).json({ success: false, message: "Prompt is required" });
+      return res
+        .status(400)
+        .json({ success: false, message: 'Prompt is required' });
     }
 
     const result = await geminiImageService.generateImage(
@@ -23,10 +27,10 @@ exports.generateImage = async (req, res) => {
       data: result,
     });
   } catch (error) {
-    console.error("Controller Error:", error);
+    console.error('Controller Error:', error);
     res.status(500).json({
       success: false,
-      message: "Image generation failed",
+      message: 'Image generation failed',
       error: error.message,
     });
   }
