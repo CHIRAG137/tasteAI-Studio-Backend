@@ -177,7 +177,7 @@ exports.createBot = async (req) => {
     conversationFlow,
     scraped_content,
     scraped_urls,
-    is_video_bot
+    is_video_bot,
   } = req.body;
 
   if (!name || !description) {
@@ -264,7 +264,7 @@ exports.createBot = async (req) => {
     custom_instructions,
     conversationFlow: parsedConversationFlow,
     scraped_urls: parsedScrapedUrls,
-    is_video_bot
+    is_video_bot,
   });
 
   logger.info('Bot created', { botId: bot._id, userId: req.user.id, name });
@@ -529,7 +529,7 @@ exports.updateBot = async (botId, userId, body, file) => {
     conversationFlow,
     scraped_content,
     scraped_urls,
-    is_video_bot
+    is_video_bot,
   } = body;
 
   if (!name || !description) {
