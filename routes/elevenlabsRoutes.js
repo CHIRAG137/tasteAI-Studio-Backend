@@ -10,6 +10,12 @@ router.post(
   upload.single('audio'),
   elevenlabsController.speechToText
 );
-router.post('/stream', elevenlabsController.streamSpeech);
+router.get('/voices', elevenlabsController.getAllVoices);
+router.get('/voices/:voiceId', elevenlabsController.getVoiceById);
+router.post(
+  '/voices/clone',
+  upload.array('audio', 5),
+  elevenlabsController.cloneVoice
+);
 
 module.exports = router;
