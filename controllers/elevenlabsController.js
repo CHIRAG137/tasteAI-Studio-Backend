@@ -4,14 +4,19 @@ const responseBuilder = require('../utils/responseBuilder');
 
 exports.textToSpeech = async (req, res) => {
   try {
-    const { text } = req.body;
+    const { text, voiceId } = req.body;
 
     if (!text) {
       logger.warn('Text missing for TTS request');
       return responseBuilder.badRequest(res, null, 'Text is required');
     }
 
-    const audioBuffer = await elevenlabsService.textToSpeech(text);
+    if (!voiceId) {
+      logger.warn('Voice Id missing for TTS request');
+      return responseBuilder.badRequest(res, null, 'Voice Id is required');
+    }
+
+    const audioBuffer = await elevenlabsService.textToSpeech(text, voiceId);
     logger.info('Text-to-speech conversion successful', {
       textSnippet: text.slice(0, 30),
     });
@@ -48,38 +53,84 @@ exports.speechToText = async (req, res) => {
   }
 };
 
-exports.streamSpeech = async (req, res) => {
+exports.getAllVoices = async (req, res) => {
   try {
-    const { text } = req.body;
+    const voices = await elevenlabsService.getAllVoices();
 
-    if (!text) {
-      logger.warn('TTS request missing text');
-      return responseBuilder.badRequest(res, null, 'Text is required for TTS');
-    }
-
-    logger.info('Starting text-to-speech streaming', {
-      textLength: text.length,
+    logger.info('Fetched all ElevenLabs voices', {
+      count: voices?.length,
     });
 
-    res.setHeader('Content-Type', 'audio/mpeg');
-    res.setHeader('Transfer-Encoding', 'chunked');
-
-    await elevenlabsService.streamSpeech(text, res);
-
-    logger.info('Text-to-speech streaming completed successfully');
+    return responseBuilder.ok(res, voices, 'Voices fetched successfully');
   } catch (err) {
-    logger.error('Text-to-speech streaming failed', {
+    logger.error('Failed to fetch ElevenLabs voices', {
       error: err.response?.data || err.message,
     });
+    return responseBuilder.internalError(res, null, err.message);
+  }
+};
 
-    if (!res.headersSent) {
-      return responseBuilder.internalError(
+exports.getVoiceById = async (req, res) => {
+  try {
+    const { voiceId } = req.params;
+
+    if (!voiceId) {
+      logger.warn('Voice ID missing');
+      return responseBuilder.badRequest(res, null, 'Voice ID is required');
+    }
+
+    const voice = await elevenlabsService.getVoiceById(voiceId);
+
+    logger.info('Fetched ElevenLabs voice', { voiceId });
+
+    return responseBuilder.ok(res, voice, 'Voice fetched successfully');
+  } catch (err) {
+    logger.error('Failed to fetch ElevenLabs voice', {
+      error: err.response?.data || err.message,
+    });
+    return responseBuilder.internalError(res, null, err.message);
+  }
+};
+
+exports.cloneVoice = async (req, res) => {
+  try {
+    const { name, description } = req.body;
+
+    if (!name) {
+      logger.warn('Voice clone failed: name missing');
+      return responseBuilder.badRequest(res, null, 'Voice name is required');
+    }
+
+    if (!req.files || req.files.length === 0) {
+      logger.warn('Voice clone failed: audio file missing');
+      return responseBuilder.badRequest(
         res,
         null,
-        err.message || 'TTS streaming failed'
+        'At least one audio file is required'
       );
     }
 
-    res.destroy(err);
+    const audioFiles = req.files.map((file) => file.buffer);
+
+    const voice = await elevenlabsService.cloneVoice({
+      name,
+      description,
+      audioFiles,
+    });
+
+    logger.info('Voice cloned successfully', {
+      voiceId: voice.voice_id,
+    });
+
+    return responseBuilder.ok(
+      res,
+      voice,
+      'Voice cloned successfully'
+    );
+  } catch (err) {
+    logger.error('Voice cloning failed', {
+      error: err.response?.data || err.message,
+    });
+    return responseBuilder.internalError(res, null, err.message);
   }
 };
