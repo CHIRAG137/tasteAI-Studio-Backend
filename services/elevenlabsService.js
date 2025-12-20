@@ -76,11 +76,19 @@ exports.speechToText = async (audioBuffer) => {
       }
     );
 
+    const { text, language_code, language_probability } = resp.data || {};
+
     logger.info('SpeechToText completed successfully', {
-      textLength: resp.data?.text?.length,
+      textLength: text?.length,
+      language: language_code,
+      confidence: language_probability,
     });
 
-    return resp.data.text;
+    return {
+      text,
+      language: language_code || 'unknown',
+      confidence: language_probability ?? null,
+    };
   } catch (error) {
     logger.error('Error in speechToText', {
       error: error.response?.data || error.message,
@@ -93,14 +101,11 @@ exports.getAllVoices = async () => {
   logger.info('Fetching all ElevenLabs voices');
 
   try {
-    const resp = await axios.get(
-      'https://api.elevenlabs.io/v1/voices',
-      {
-        headers: {
-          'xi-api-key': ELEVENLABS_API_KEY,
-        },
-      }
-    );
+    const resp = await axios.get('https://api.elevenlabs.io/v1/voices', {
+      headers: {
+        'xi-api-key': ELEVENLABS_API_KEY,
+      },
+    });
 
     logger.info('Fetched voices successfully', {
       count: resp.data?.voices?.length,
