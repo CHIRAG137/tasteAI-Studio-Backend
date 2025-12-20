@@ -35,6 +35,7 @@ const ChatBotSchema = new mongoose.Schema(
     is_video_bot: { type: Boolean, default: false },
     video_bot_image_url: String,
     video_bot_image_public_id: String,
+    voice_id: { type: String, default: "EXAVITQu4vr4xnSDxMaL" },
   },
   { timestamps: true }
 );
