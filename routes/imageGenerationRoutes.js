@@ -16,4 +16,10 @@ router.post(
   geminiImageController.generateImage
 );
 
+router.post(
+  '/upload-cropped-image',
+  upload.single('video_bot_image'),
+  geminiImageController.uploadCroppedImage
+);
+
 module.exports = router;

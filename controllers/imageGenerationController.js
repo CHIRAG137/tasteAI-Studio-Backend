@@ -33,13 +33,35 @@ exports.generateImage = async (req, res) => {
       throw new Error('No image returned from Gemini');
     }
 
-    const generatedImageBuffer = Buffer.from(
-      imagePart.inlineData.data,
-      'base64'
-    );
+    const generatedImageBase64 = imagePart.inlineData.data;
+    const mimeType = imagePart.inlineData.mimeType || 'image/png';
+
+    return res.status(200).json({
+      success: true,
+      video_bot_image_base64: generatedImageBase64,
+      video_bot_image_mime_type: mimeType,
+    });
+  } catch (error) {
+    console.error('Controller Error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Image generation failed',
+      error: error.message,
+    });
+  }
+};
+
+exports.uploadCroppedImage = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cropped image is required',
+      });
+    }
 
     const cloudinaryResult = await geminiImageService.uploadBufferToCloudinary(
-      generatedImageBuffer,
+      req.file.buffer,
       'video-bot-avatars'
     );
 
@@ -49,10 +71,10 @@ exports.generateImage = async (req, res) => {
       video_bot_image_public_id: cloudinaryResult.public_id,
     });
   } catch (error) {
-    console.error('Controller Error:', error);
+    console.error('Upload Cropped Image Error:', error);
     res.status(500).json({
       success: false,
-      message: 'Image generation failed',
+      message: 'Failed to upload cropped image',
       error: error.message,
     });
   }
