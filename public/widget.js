@@ -215,11 +215,11 @@ window.ChatBotWidget = {
 
     // Default CSS classes
     let defaultCSS = `
-      @keyframes fadeIn {
-        from { opacity: 0; transform: scale(0.95); }
-        to { opacity: 1; transform: scale(1); }
-      }
-    `;
+    @keyframes fadeIn {
+      from { opacity: 0; transform: scale(0.95); }
+      to { opacity: 1; transform: scale(1); }
+    }
+  `;
 
     // Add animation keyframes if needed
     if (!useButtonCustomCSS) {
@@ -239,65 +239,65 @@ window.ChatBotWidget = {
         }
 
         defaultCSS += `
-          #chatbot-widget-button {
-            animation: ${animation}-widget ${duration} ${timing} infinite;
-          }
-        `;
+        #chatbot-widget-button {
+          animation: ${animation}-widget ${duration} ${timing} infinite;
+        }
+      `;
       }
 
       // Add hover animation
       const hoverAnimation = c.buttonHoverAnimation || 'scale';
       if (hoverAnimation !== 'none') {
         defaultCSS += `
-          #chatbot-widget-button:hover {
-            ${this.getHoverAnimationCSS(hoverAnimation)}
-            transition: all 0.3s ease;
-          }
-        `;
+        #chatbot-widget-button:hover {
+          ${this.getHoverAnimationCSS(hoverAnimation)}
+          transition: all 0.3s ease;
+        }
+      `;
       } else {
         defaultCSS += `
-          #chatbot-widget-button:hover {
-            transform: scale(1.05);
-            box-shadow: 0 6px 15px rgba(0, 0, 0, 0.4);
-            transition: all 0.3s ease;
-          }
-        `;
+        #chatbot-widget-button:hover {
+          transform: scale(1.05);
+          box-shadow: 0 6px 15px rgba(0, 0, 0, 0.4);
+          transition: all 0.3s ease;
+        }
+      `;
       }
 
       // Add pulse effect
       if (c.buttonPulse) {
         defaultCSS += `
-          @keyframes pulse-ring-widget {
-            0% { transform: scale(1); opacity: 1; }
-            100% { transform: scale(1.5); opacity: 0; }
-          }
-          #chatbot-widget-button::before {
-            content: '';
-            position: absolute;
-            inset: 0;
-            border-radius: inherit;
-            background: inherit;
-            animation: pulse-ring-widget 2s infinite;
-            z-index: -1;
-          }
-        `;
+        @keyframes pulse-ring-widget {
+          0% { transform: scale(1); opacity: 1; }
+          100% { transform: scale(1.5); opacity: 0; }
+        }
+        #chatbot-widget-button::before {
+          content: '';
+          position: absolute;
+          inset: 0;
+          border-radius: inherit;
+          background: inherit;
+          animation: pulse-ring-widget 2s infinite;
+          z-index: -1;
+        }
+      `;
       }
 
       // Text bubble styling
       if (c.buttonShowText && c.buttonText) {
         defaultCSS += `
-          .chatbot-button-text {
-            background: white;
-            padding: ${c.buttonPadding || '12'}px;
-            border-radius: 20px;
-            box-shadow: ${c.buttonShadow || '0 4px 10px rgba(0,0,0,0.3)'};
-            color: ${c.buttonTextColor || '#1e293b'};
-            font-size: ${c.buttonTextSize || '14'}px;
-            white-space: nowrap;
-            font-weight: 500;
-            animation: fadeIn 0.3s ease-out;
-          }
-        `;
+        .chatbot-button-text {
+          background: white;
+          padding: ${c.buttonPadding || '12'}px;
+          border-radius: 20px;
+          box-shadow: ${c.buttonShadow || '0 4px 10px rgba(0,0,0,0.3)'};
+          color: ${c.buttonTextColor || '#1e293b'};
+          font-size: ${c.buttonTextSize || '14'}px;
+          white-space: nowrap;
+          font-weight: 500;
+          animation: fadeIn 0.3s ease-out;
+        }
+      `;
       }
     }
 
@@ -339,7 +339,7 @@ window.ChatBotWidget = {
       buttonIconSize
     );
 
-    // Create button wrapper if text is enabled
+    // Create main button container
     let buttonContainer = document.createElement('div');
     buttonContainer.id = 'chatbot-widget-container';
     buttonContainer.style.cssText = `
@@ -348,6 +348,15 @@ window.ChatBotWidget = {
     right: ${position === 'bottom-left' ? 'auto' : buttonRight + 'px'};
     left: ${position === 'bottom-left' ? buttonLeft + 'px' : 'auto'};
     z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    align-items: ${position === 'bottom-left' ? 'flex-start' : 'flex-end'};
+    gap: 8px;
+  `;
+
+    // Create inner wrapper for button and text label
+    const innerWrapper = document.createElement('div');
+    innerWrapper.style.cssText = `
     display: flex;
     align-items: center;
     gap: 8px;
@@ -390,7 +399,7 @@ window.ChatBotWidget = {
       }
 
       textElement.textContent = c.buttonText;
-      buttonContainer.appendChild(textElement);
+      innerWrapper.appendChild(textElement);
     }
 
     // Create the floating button
@@ -434,18 +443,69 @@ window.ChatBotWidget = {
       );
     }
 
-    // Add button to container
-    buttonContainer.appendChild(this.button);
+    // Add button to inner wrapper
+    innerWrapper.appendChild(this.button);
+
+    // Add inner wrapper to container
+    buttonContainer.appendChild(innerWrapper);
+
+    // Create "Powered by TasteAI Studio" branding - ALWAYS SHOW
+    const brandingElement = document.createElement('div');
+    brandingElement.className = 'chatbot-branding';
+    brandingElement.style.cssText = `
+    display: flex;
+    justify-content: ${position === 'bottom-left' ? 'flex-start' : 'flex-end'};
+    margin-top: 4px;
+  `;
+
+    brandingElement.innerHTML = `
+    <a href="https://tastestudio.ai" target="_blank" rel="noopener noreferrer" style="
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 10px;
+      color: #64748b;
+      text-decoration: none;
+      opacity: 0.8;
+      transition: opacity 0.2s ease;
+      padding: 4px 8px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.95);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    " onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.8'">
+      <span>Powered by</span>
+      <span style="font-weight: 600; color: #3b82f6;">TasteAI Studio</span>
+    </a>
+  `;
+
+    // Add branding to container
+    buttonContainer.appendChild(brandingElement);
+
+    // Toggle iframe visibility on button click
+    const self = this;
+    this.button.addEventListener('click', function () {
+      if (self.iframe.style.display === 'none') {
+        self.iframe.style.display = 'block';
+      } else {
+        self.iframe.style.display = 'none';
+      }
+    });
 
     // Create the iframe (initially hidden)
     this.iframe = document.createElement('iframe');
     this.iframe.id = 'chatbot-widget-iframe';
     this.iframe.src = `${this.config.apiUrl}/embed?botId=${this.config.botId}`;
 
+    // Calculate iframe bottom position to avoid overlap
+    // Button height + bottom spacing + branding height + extra gap
+    const iframeBottomPosition =
+      parseInt(buttonBottom) + parseInt(buttonSize) + 60;
+
     // Default iframe styles
     const defaultIframeStyles = {
       position: 'fixed',
-      bottom: '90px',
+      bottom: iframeBottomPosition + 'px',
       right: position === 'bottom-left' ? 'auto' : buttonRight + 'px',
       left: position === 'bottom-left' ? buttonLeft + 'px' : 'auto',
       width: '360px',
@@ -465,21 +525,11 @@ window.ChatBotWidget = {
       defaultIframeStyles
     );
 
-    // Toggle iframe visibility on button click
-    const self = this;
-    this.button.addEventListener('click', function () {
-      if (self.iframe.style.display === 'none') {
-        self.iframe.style.display = 'block';
-      } else {
-        self.iframe.style.display = 'none';
-      }
-    });
-
     // Append elements to the DOM
     document.body.appendChild(buttonContainer);
     document.body.appendChild(this.iframe);
 
-    console.log('ChatBotWidget: Widget created successfully');
+    console.log('ChatBotWidget: Widget created successfully with branding');
   },
 
   setupRouteChangeListeners: function () {
