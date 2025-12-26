@@ -497,10 +497,15 @@ window.ChatBotWidget = {
     this.iframe.id = 'chatbot-widget-iframe';
     this.iframe.src = `${this.config.apiUrl}/embed?botId=${this.config.botId}`;
 
+    // Calculate iframe bottom position to avoid overlap
+    // Button height + bottom spacing + branding height + extra gap
+    const iframeBottomPosition =
+      parseInt(buttonBottom) + parseInt(buttonSize) + 60;
+
     // Default iframe styles
     const defaultIframeStyles = {
       position: 'fixed',
-      bottom: '90px',
+      bottom: iframeBottomPosition + 'px',
       right: position === 'bottom-left' ? 'auto' : buttonRight + 'px',
       left: position === 'bottom-left' ? buttonLeft + 'px' : 'auto',
       width: '360px',
