@@ -145,7 +145,7 @@ window.ChatBotWidget = {
           60% { transform: translateX(10px) rotate(2deg); }
           75% { transform: translateX(-5px) rotate(-1deg); }
         }
-      `
+      `,
     };
     return animations[animation] || '';
   },
@@ -156,7 +156,7 @@ window.ChatBotWidget = {
       lift: 'transform: translateY(-8px) !important; box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3) !important;',
       glow: 'box-shadow: 0 0 25px rgba(155, 93, 229, 0.8) !important;',
       rotate: 'transform: rotate(360deg) !important;',
-      bounce: 'animation: bounce-hover-widget 0.5s !important;'
+      bounce: 'animation: bounce-hover-widget 0.5s !important;',
     };
     return hoverAnimations[animation] || '';
   },
@@ -165,21 +165,35 @@ window.ChatBotWidget = {
     const size = iconSize || '24';
     const iconPaths = {
       chat: 'M2 2v20l4-4h14V2H2zm16 10H6v-2h12v2z',
-      message: 'M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z',
-      support: 'M11 18h2v-2h-2v2zm1-16C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm0-14c-2.21 0-4 1.79-4 4h2c0-1.1.9-2 2-2s2 .9 2 2c0 2-3 1.75-3 5h2c0-2.25 3-2.5 3-5 0-2.21-1.79-4-4-4z',
+      message:
+        'M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z',
+      support:
+        'M11 18h2v-2h-2v2zm1-16C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm0-14c-2.21 0-4 1.79-4 4h2c0-1.1.9-2 2-2s2 .9 2 2c0 2-3 1.75-3 5h2c0-2.25 3-2.5 3-5 0-2.21-1.79-4-4-4z',
       help: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm2.07-7.75l-.9.92C13.45 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H8c0-2.21 1.79-4 4-4s4 1.79 4 4c0 .88-.36 1.68-.93 2.25z',
-      bot: 'M20 9V7c0-1.1-.9-2-2-2h-3c0-1.66-1.34-3-3-3S9 3.34 9 5H6c-1.1 0-2 .9-2 2v2c-1.66 0-3 1.34-3 3s1.34 3 3 3v4c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2v-4c1.66 0 3-1.34 3-3s-1.34-3-3-3zM7.5 11.5c0-.83.67-1.5 1.5-1.5s1.5.67 1.5 1.5S9.83 13 9 13s-1.5-.67-1.5-1.5zM16 17H8v-2h8v2zm-1-4c-.83 0-1.5-.67-1.5-1.5S14.17 10 15 10s1.5.67 1.5 1.5S15.83 13 15 13z'
+      bot: 'M20 9V7c0-1.1-.9-2-2-2h-3c0-1.66-1.34-3-3-3S9 3.34 9 5H6c-1.1 0-2 .9-2 2v2c-1.66 0-3 1.34-3 3s1.34 3 3 3v4c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2v-4c1.66 0 3-1.34 3-3s-1.34-3-3-3zM7.5 11.5c0-.83.67-1.5 1.5-1.5s1.5.67 1.5 1.5S9.83 13 9 13s-1.5-.67-1.5-1.5zM16 17H8v-2h8v2zm-1-4c-.83 0-1.5-.67-1.5-1.5S14.17 10 15 10s1.5.67 1.5 1.5S15.83 13 15 13z',
     };
 
     if (iconType === 'emoji' && customIcon) {
-      return '<span style="font-size: ' + size + 'px;">' + customIcon + '</span>';
+      return (
+        '<span style="font-size: ' + size + 'px;">' + customIcon + '</span>'
+      );
     } else if (iconType === 'custom' && customIcon) {
       return customIcon;
     } else if (iconType === 'none') {
       return '';
     } else {
       const path = iconPaths[iconValue] || iconPaths.chat;
-      return '<svg xmlns="http://www.w3.org/2000/svg" height="' + size + '" width="' + size + '" fill="' + color + '" viewBox="0 0 24 24"><path d="' + path + '"/></svg>';
+      return (
+        '<svg xmlns="http://www.w3.org/2000/svg" height="' +
+        size +
+        '" width="' +
+        size +
+        '" fill="' +
+        color +
+        '" viewBox="0 0 24 24"><path d="' +
+        path +
+        '"/></svg>'
+      );
     }
   },
 
@@ -212,18 +226,18 @@ window.ChatBotWidget = {
       const animation = c.buttonAnimation || 'none';
       if (animation !== 'none') {
         defaultCSS += this.getAnimationCSS(animation);
-        
+
         // Determine animation duration and timing
         let duration = '2s';
         let timing = 'ease-in-out';
-        
+
         if (animation === 'rotate') {
           duration = '3s';
           timing = 'linear';
         } else if (animation === 'shake') {
           duration = '0.5s';
         }
-        
+
         defaultCSS += `
           #chatbot-widget-button {
             animation: ${animation}-widget ${duration} ${timing} infinite;
@@ -304,7 +318,8 @@ window.ChatBotWidget = {
     const position = c.buttonPosition || this.config.position || 'bottom-right';
     const buttonSize = c.buttonSize || '56';
     const buttonBorderRadius = c.buttonBorderRadius || '50';
-    const buttonBackground = c.buttonBackground || 'linear-gradient(135deg, #9b5de5, #f15bb5)';
+    const buttonBackground =
+      c.buttonBackground || 'linear-gradient(135deg, #9b5de5, #f15bb5)';
     const buttonColor = c.buttonColor || '#ffffff';
     const buttonBottom = c.buttonBottom || '20';
     const buttonRight = c.buttonRight || '20';
@@ -316,32 +331,64 @@ window.ChatBotWidget = {
     const buttonIcon = c.buttonIcon || 'chat';
     const buttonCustomIcon = c.buttonCustomIcon || '';
     const buttonIconSize = c.buttonIconSize || '24';
-    const iconHTML = this.getIconSVG(buttonIconType, buttonCustomIcon, buttonIcon, buttonColor, buttonIconSize);
+    const iconHTML = this.getIconSVG(
+      buttonIconType,
+      buttonCustomIcon,
+      buttonIcon,
+      buttonColor,
+      buttonIconSize
+    );
 
     // Create button wrapper if text is enabled
     let buttonContainer = document.createElement('div');
     buttonContainer.id = 'chatbot-widget-container';
     buttonContainer.style.cssText = `
-      position: fixed;
-      bottom: ${buttonBottom}px;
-      right: ${position === 'bottom-left' ? 'auto' : buttonRight + 'px'};
-      left: ${position === 'bottom-left' ? buttonLeft + 'px' : 'auto'};
-      z-index: 9999;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      ${c.buttonShowText && c.buttonText ? (
-        c.buttonTextPosition === 'right' ? 'flex-direction: row;' :
-        c.buttonTextPosition === 'left' ? 'flex-direction: row-reverse;' :
-        c.buttonTextPosition === 'bottom' ? 'flex-direction: column;' :
-        'flex-direction: column-reverse;'
-      ) : ''}
-    `;
+    position: fixed;
+    bottom: ${buttonBottom}px;
+    right: ${position === 'bottom-left' ? 'auto' : buttonRight + 'px'};
+    left: ${position === 'bottom-left' ? buttonLeft + 'px' : 'auto'};
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    ${
+      c.buttonShowText && c.buttonText
+        ? c.buttonTextPosition === 'right'
+          ? 'flex-direction: row;'
+          : c.buttonTextPosition === 'left'
+            ? 'flex-direction: row-reverse;'
+            : c.buttonTextPosition === 'bottom'
+              ? 'flex-direction: column;'
+              : 'flex-direction: column-reverse;'
+        : ''
+    }
+  `;
 
-    // Create text label if enabled
-    if (c.buttonShowText && c.buttonText && !useButtonCustomCSS) {
+    // Create text label if enabled - ALWAYS CREATE IT, regardless of custom CSS
+    if (c.buttonShowText && c.buttonText) {
       const textElement = document.createElement('div');
       textElement.className = 'chatbot-button-text';
+
+      // Apply styles based on whether custom CSS is enabled
+      if (!useButtonCustomCSS) {
+        textElement.style.cssText = `
+        background: white;
+        padding: ${c.buttonPadding || '12'}px;
+        border-radius: 20px;
+        box-shadow: ${c.buttonShadow || '0 4px 10px rgba(0,0,0,0.3)'};
+        color: ${c.buttonTextColor || '#1e293b'};
+        font-size: ${c.buttonTextSize || '14'}px;
+        white-space: nowrap;
+        font-weight: 500;
+      `;
+      }
+      // If custom CSS is enabled, minimal styling (custom CSS will handle it)
+      else {
+        textElement.style.cssText = `
+        white-space: nowrap;
+      `;
+      }
+
       textElement.textContent = c.buttonText;
       buttonContainer.appendChild(textElement);
     }
@@ -365,7 +412,7 @@ window.ChatBotWidget = {
       boxShadow: buttonShadow,
       cursor: 'pointer',
       transition: 'all 0.3s ease',
-      position: 'relative'
+      position: 'relative',
     };
 
     // If using custom button CSS, only apply minimal properties
@@ -376,7 +423,7 @@ window.ChatBotWidget = {
         justifyContent: 'center',
         cursor: 'pointer',
         border: 'none',
-        position: 'relative'
+        position: 'relative',
       });
     } else {
       // Apply default styles and custom button styles from config if provided
