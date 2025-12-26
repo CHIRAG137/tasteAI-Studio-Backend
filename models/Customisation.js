@@ -75,6 +75,57 @@ const customizationSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    buttonText: {
+      type: String,
+      default: 'Chat with us',
+    },
+    buttonShowText: {
+      type: Boolean,
+      default: false,
+    },
+    buttonTextPosition: {
+      type: String,
+      enum: ['left', 'right', 'top', 'bottom'],
+      default: 'left',
+    },
+    buttonIcon: {
+      type: String,
+      default: 'chat',
+    },
+    buttonIconType: {
+      type: String,
+      enum: ['default', 'custom', 'emoji', 'none'],
+      default: 'default',
+    },
+    buttonCustomIcon: String,
+    buttonAnimation: {
+      type: String,
+      default: 'none',
+    },
+    buttonHoverAnimation: {
+      type: String,
+      default: 'scale',
+    },
+    buttonPulse: {
+      type: Boolean,
+      default: false,
+    },
+    buttonShadow: {
+      type: String,
+      default: '0 4px 10px rgba(0,0,0,0.3)',
+    },
+    buttonTextColor: {
+      type: String,
+      default: '#1e293b',
+    },
+    buttonTextSize: {
+      type: String,
+      default: '14',
+    },
+    buttonPadding: {
+      type: String,
+      default: '12',
+    },
   },
   { timestamps: true }
 );

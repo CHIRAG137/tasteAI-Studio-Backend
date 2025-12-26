@@ -94,6 +94,94 @@ window.ChatBotWidget = {
     }
   },
 
+  getAnimationCSS: function (animation) {
+    const animations = {
+      bounce: `
+        @keyframes bounce {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-10px); }
+        }
+      `,
+      pulse: `
+        @keyframes pulse {
+          0%, 100% { transform: scale(1); }
+          50% { transform: scale(1.05); }
+        }
+      `,
+      shake: `
+        @keyframes shake {
+          0%, 100% { transform: translateX(0); }
+          25% { transform: translateX(-5px); }
+          75% { transform: translateX(5px); }
+        }
+      `,
+      rotate: `
+        @keyframes rotate {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `,
+      swing: `
+        @keyframes swing {
+          0%, 100% { transform: rotate(0deg); }
+          25% { transform: rotate(15deg); }
+          75% { transform: rotate(-15deg); }
+        }
+      `,
+      tada: `
+        @keyframes tada {
+          0%, 100% { transform: scale(1) rotate(0deg); }
+          10%, 20% { transform: scale(0.9) rotate(-3deg); }
+          30%, 50%, 70%, 90% { transform: scale(1.1) rotate(3deg); }
+          40%, 60%, 80% { transform: scale(1.1) rotate(-3deg); }
+        }
+      `,
+      wobble: `
+        @keyframes wobble {
+          0%, 100% { transform: translateX(0%); }
+          15% { transform: translateX(-25px) rotate(-5deg); }
+          30% { transform: translateX(20px) rotate(3deg); }
+          45% { transform: translateX(-15px) rotate(-3deg); }
+          60% { transform: translateX(10px) rotate(2deg); }
+          75% { transform: translateX(-5px) rotate(-1deg); }
+        }
+      `
+    };
+    return animations[animation] || '';
+  },
+
+  getHoverAnimationCSS: function (animation) {
+    const hoverAnimations = {
+      scale: 'transform: scale(1.1);',
+      lift: 'transform: translateY(-5px);',
+      glow: 'box-shadow: 0 0 20px rgba(59, 130, 246, 0.6);',
+      rotate: 'transform: rotate(360deg);',
+      bounce: 'animation: bounce 0.5s;'
+    };
+    return hoverAnimations[animation] || '';
+  },
+
+  getIconSVG: function (iconType, customIcon, iconValue, color) {
+    const iconPaths = {
+      chat: 'M2 2v20l4-4h14V2H2zm16 10H6v-2h12v2z',
+      message: 'M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z',
+      support: 'M11 18h2v-2h-2v2zm1-16C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm0-14c-2.21 0-4 1.79-4 4h2c0-1.1.9-2 2-2s2 .9 2 2c0 2-3 1.75-3 5h2c0-2.25 3-2.5 3-5 0-2.21-1.79-4-4-4z',
+      help: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm2.07-7.75l-.9.92C13.45 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H8c0-2.21 1.79-4 4-4s4 1.79 4 4c0 .88-.36 1.68-.93 2.25z',
+      bot: 'M20 9V7c0-1.1-.9-2-2-2h-3c0-1.66-1.34-3-3-3S9 3.34 9 5H6c-1.1 0-2 .9-2 2v2c-1.66 0-3 1.34-3 3s1.34 3 3 3v4c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2v-4c1.66 0 3-1.34 3-3s-1.34-3-3-3zM7.5 11.5c0-.83.67-1.5 1.5-1.5s1.5.67 1.5 1.5S9.83 13 9 13s-1.5-.67-1.5-1.5zM16 17H8v-2h8v2zm-1-4c-.83 0-1.5-.67-1.5-1.5S14.17 10 15 10s1.5.67 1.5 1.5S15.83 13 15 13z'
+    };
+
+    if (iconType === 'emoji' && customIcon) {
+      return '<span style="font-size: 24px;">' + customIcon + '</span>';
+    } else if (iconType === 'custom' && customIcon) {
+      return customIcon;
+    } else if (iconType === 'none') {
+      return '';
+    } else {
+      const path = iconPaths[iconValue] || iconPaths.chat;
+      return '<svg xmlns="http://www.w3.org/2000/svg" height="24" width="24" fill="' + color + '" viewBox="0 0 24 24"><path d="' + path + '"/></svg>';
+    }
+  },
+
   createWidget: function () {
     // Prevent duplication
     if (
@@ -104,27 +192,83 @@ window.ChatBotWidget = {
     }
 
     // Get button customization from backend or use defaults
-    const buttonCustomization = this.customization || {};
-    const useButtonCustomCSS = buttonCustomization.useButtonCustomCSS || false;
+    const c = this.customization || {};
+    const useButtonCustomCSS = c.useButtonCustomCSS || false;
 
     // Create a style tag for button hover and animations
     const style = document.createElement('style');
 
     // Default CSS classes
     let defaultCSS = `
-      #chatbot-widget-button:hover {
-        transform: scale(1.05);
-        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
-      }
       @keyframes fadeIn {
         from { opacity: 0; transform: scale(0.95); }
         to { opacity: 1; transform: scale(1); }
       }
     `;
 
+    // Add animation keyframes if needed
+    if (!useButtonCustomCSS) {
+      const animation = c.buttonAnimation || 'none';
+      if (animation !== 'none') {
+        defaultCSS += this.getAnimationCSS(animation);
+        defaultCSS += `
+          #chatbot-widget-button {
+            animation: ${animation} ${animation === 'rotate' ? '3s' : '2s'} ${animation === 'rotate' ? 'linear' : 'ease-in-out'} infinite;
+          }
+        `;
+      }
+
+      // Add hover animation
+      const hoverAnimation = c.buttonHoverAnimation || 'scale';
+      if (hoverAnimation !== 'none') {
+        defaultCSS += `
+          #chatbot-widget-button:hover {
+            ${this.getHoverAnimationCSS(hoverAnimation)}
+            transition: all 0.3s ease;
+          }
+        `;
+      }
+
+      // Add pulse effect
+      if (c.buttonPulse) {
+        defaultCSS += `
+          @keyframes pulse-ring {
+            0% { transform: scale(1); opacity: 1; }
+            100% { transform: scale(1.5); opacity: 0; }
+          }
+          #chatbot-widget-button::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: inherit;
+            background: inherit;
+            animation: pulse-ring 2s infinite;
+            z-index: -1;
+          }
+        `;
+      }
+
+      // Text bubble styling
+      if (c.buttonShowText && c.buttonText) {
+        defaultCSS += `
+          .chatbot-button-text {
+            background: white;
+            padding: ${c.buttonPadding || '12'}px;
+            border-radius: 20px;
+            box-shadow: ${c.buttonShadow || '0 4px 10px rgba(0,0,0,0.3)'};
+            color: ${c.buttonTextColor || '#1e293b'};
+            font-size: ${c.buttonTextSize || '14'}px;
+            white-space: nowrap;
+            font-weight: 500;
+            animation: fadeIn 0.3s ease-out;
+          }
+        `;
+      }
+    }
+
     // If user provided custom button CSS from backend, append it
-    if (useButtonCustomCSS && buttonCustomization.buttonCustomCSS) {
-      defaultCSS += '\n' + buttonCustomization.buttonCustomCSS;
+    if (useButtonCustomCSS && c.buttonCustomCSS) {
+      defaultCSS += '\n' + c.buttonCustomCSS;
     }
 
     // If user provided custom CSS via init config, append it (backward compatibility)
@@ -135,42 +279,58 @@ window.ChatBotWidget = {
     style.innerHTML = defaultCSS;
     document.head.appendChild(style);
 
-    // Create the floating circular button
-    this.button = document.createElement('button');
-    this.button.id = 'chatbot-widget-button';
-    this.button.innerHTML = `
-      <svg xmlns="http://www.w3.org/2000/svg" height="24" width="24" fill="white" viewBox="0 0 24 24">
-        <path d="M2 2v20l4-4h14V2H2zm16 10H6v-2h12v2z"/>
-      </svg>
+    // Determine position and styling values
+    const position = c.buttonPosition || this.config.position || 'bottom-right';
+    const buttonSize = c.buttonSize || '56';
+    const buttonBorderRadius = c.buttonBorderRadius || '50';
+    const buttonBackground = c.buttonBackground || 'linear-gradient(135deg, #9b5de5, #f15bb5)';
+    const buttonColor = c.buttonColor || '#ffffff';
+    const buttonBottom = c.buttonBottom || '20';
+    const buttonRight = c.buttonRight || '20';
+    const buttonLeft = c.buttonLeft || '20';
+    const buttonShadow = c.buttonShadow || '0 4px 10px rgba(0,0,0,0.3)';
+
+    // Get button icon
+    const buttonIconType = c.buttonIconType || 'default';
+    const buttonIcon = c.buttonIcon || 'chat';
+    const buttonCustomIcon = c.buttonCustomIcon || '';
+    const iconHTML = this.getIconSVG(buttonIconType, buttonCustomIcon, buttonIcon, buttonColor);
+
+    // Create button wrapper if text is enabled
+    let buttonContainer = document.createElement('div');
+    buttonContainer.id = 'chatbot-widget-container';
+    buttonContainer.style.cssText = `
+      position: fixed;
+      bottom: ${buttonBottom}px;
+      right: ${position === 'bottom-left' ? 'auto' : buttonRight + 'px'};
+      left: ${position === 'bottom-left' ? buttonLeft + 'px' : 'auto'};
+      z-index: 9999;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      ${c.buttonShowText && c.buttonText ? (
+        c.buttonTextPosition === 'right' ? 'flex-direction: row;' :
+        c.buttonTextPosition === 'left' ? 'flex-direction: row-reverse;' :
+        c.buttonTextPosition === 'bottom' ? 'flex-direction: column;' :
+        'flex-direction: column-reverse;'
+      ) : ''}
     `;
 
-    // Determine position from backend or config
-    const position =
-      buttonCustomization.buttonPosition ||
-      this.config.position ||
-      'bottom-right';
-    const buttonSize = buttonCustomization.buttonSize || '56';
-    const buttonBorderRadius = buttonCustomization.buttonBorderRadius || '50';
-    const buttonBackground =
-      buttonCustomization.buttonBackground ||
-      'linear-gradient(135deg, #9b5de5, #f15bb5)';
-    const buttonColor = buttonCustomization.buttonColor || '#ffffff';
-    const buttonBottom = buttonCustomization.buttonBottom || '20';
-    const buttonRight = buttonCustomization.buttonRight || '20';
-    const buttonLeft = buttonCustomization.buttonLeft || '20';
-
-    // Update SVG fill color
-    if (buttonColor) {
-      this.button.querySelector('svg').setAttribute('fill', buttonColor);
+    // Create text label if enabled
+    if (c.buttonShowText && c.buttonText) {
+      const textElement = document.createElement('div');
+      textElement.className = 'chatbot-button-text';
+      textElement.textContent = c.buttonText;
+      buttonContainer.appendChild(textElement);
     }
+
+    // Create the floating button
+    this.button = document.createElement('button');
+    this.button.id = 'chatbot-widget-button';
+    this.button.innerHTML = iconHTML;
 
     // Default button styles
     const defaultButtonStyles = {
-      position: 'fixed',
-      bottom: buttonBottom + 'px',
-      right: position === 'bottom-left' ? 'auto' : buttonRight + 'px',
-      left: position === 'bottom-left' ? buttonLeft + 'px' : 'auto',
-      zIndex: '9999',
       background: buttonBackground,
       color: buttonColor,
       border: 'none',
@@ -180,25 +340,21 @@ window.ChatBotWidget = {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      boxShadow: '0 4px 10px rgba(0,0,0,0.3)',
+      boxShadow: buttonShadow,
       cursor: 'pointer',
-      transition: 'transform 0.2s, box-shadow 0.2s',
+      transition: 'all 0.3s ease',
+      position: 'relative'
     };
 
-    // If using custom button CSS, only apply positioning and display properties
+    // If using custom button CSS, only apply minimal properties
     if (useButtonCustomCSS) {
       Object.assign(this.button.style, {
-        position: 'fixed',
-        bottom: buttonBottom + 'px',
-        right: position === 'bottom-left' ? 'auto' : buttonRight + 'px',
-        left: position === 'bottom-left' ? buttonLeft + 'px' : 'auto',
-        zIndex: '9999',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         cursor: 'pointer',
         border: 'none',
-        transition: 'transform 0.2s, box-shadow 0.2s',
+        position: 'relative'
       });
     } else {
       // Apply default styles and custom button styles from config if provided
@@ -208,6 +364,9 @@ window.ChatBotWidget = {
         defaultButtonStyles
       );
     }
+
+    // Add button to container
+    buttonContainer.appendChild(this.button);
 
     // Create the iframe (initially hidden)
     this.iframe = document.createElement('iframe');
@@ -248,7 +407,7 @@ window.ChatBotWidget = {
     });
 
     // Append elements to the DOM
-    document.body.appendChild(this.button);
+    document.body.appendChild(buttonContainer);
     document.body.appendChild(this.iframe);
 
     console.log('ChatBotWidget: Widget created successfully');
