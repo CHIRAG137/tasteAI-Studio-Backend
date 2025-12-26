@@ -97,39 +97,39 @@ window.ChatBotWidget = {
   getAnimationCSS: function (animation) {
     const animations = {
       bounce: `
-        @keyframes bounce {
+        @keyframes bounce-widget {
           0%, 100% { transform: translateY(0); }
           50% { transform: translateY(-10px); }
         }
       `,
       pulse: `
-        @keyframes pulse {
+        @keyframes pulse-widget {
           0%, 100% { transform: scale(1); }
           50% { transform: scale(1.05); }
         }
       `,
       shake: `
-        @keyframes shake {
+        @keyframes shake-widget {
           0%, 100% { transform: translateX(0); }
-          25% { transform: translateX(-5px); }
-          75% { transform: translateX(5px); }
+          10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+          20%, 40%, 60%, 80% { transform: translateX(5px); }
         }
       `,
       rotate: `
-        @keyframes rotate {
+        @keyframes rotate-widget {
           from { transform: rotate(0deg); }
           to { transform: rotate(360deg); }
         }
       `,
       swing: `
-        @keyframes swing {
+        @keyframes swing-widget {
           0%, 100% { transform: rotate(0deg); }
           25% { transform: rotate(15deg); }
           75% { transform: rotate(-15deg); }
         }
       `,
       tada: `
-        @keyframes tada {
+        @keyframes tada-widget {
           0%, 100% { transform: scale(1) rotate(0deg); }
           10%, 20% { transform: scale(0.9) rotate(-3deg); }
           30%, 50%, 70%, 90% { transform: scale(1.1) rotate(3deg); }
@@ -137,8 +137,8 @@ window.ChatBotWidget = {
         }
       `,
       wobble: `
-        @keyframes wobble {
-          0%, 100% { transform: translateX(0%); }
+        @keyframes wobble-widget {
+          0%, 100% { transform: translateX(0) rotate(0deg); }
           15% { transform: translateX(-25px) rotate(-5deg); }
           30% { transform: translateX(20px) rotate(3deg); }
           45% { transform: translateX(-15px) rotate(-3deg); }
@@ -152,16 +152,17 @@ window.ChatBotWidget = {
 
   getHoverAnimationCSS: function (animation) {
     const hoverAnimations = {
-      scale: 'transform: scale(1.1);',
-      lift: 'transform: translateY(-5px);',
-      glow: 'box-shadow: 0 0 20px rgba(59, 130, 246, 0.6);',
-      rotate: 'transform: rotate(360deg);',
-      bounce: 'animation: bounce 0.5s;'
+      scale: 'transform: scale(1.15) !important;',
+      lift: 'transform: translateY(-8px) !important; box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3) !important;',
+      glow: 'box-shadow: 0 0 25px rgba(155, 93, 229, 0.8) !important;',
+      rotate: 'transform: rotate(360deg) !important;',
+      bounce: 'animation: bounce-hover-widget 0.5s !important;'
     };
     return hoverAnimations[animation] || '';
   },
 
-  getIconSVG: function (iconType, customIcon, iconValue, color) {
+  getIconSVG: function (iconType, customIcon, iconValue, color, iconSize) {
+    const size = iconSize || '24';
     const iconPaths = {
       chat: 'M2 2v20l4-4h14V2H2zm16 10H6v-2h12v2z',
       message: 'M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z',
@@ -171,14 +172,14 @@ window.ChatBotWidget = {
     };
 
     if (iconType === 'emoji' && customIcon) {
-      return '<span style="font-size: 24px;">' + customIcon + '</span>';
+      return '<span style="font-size: ' + size + 'px;">' + customIcon + '</span>';
     } else if (iconType === 'custom' && customIcon) {
       return customIcon;
     } else if (iconType === 'none') {
       return '';
     } else {
       const path = iconPaths[iconValue] || iconPaths.chat;
-      return '<svg xmlns="http://www.w3.org/2000/svg" height="24" width="24" fill="' + color + '" viewBox="0 0 24 24"><path d="' + path + '"/></svg>';
+      return '<svg xmlns="http://www.w3.org/2000/svg" height="' + size + '" width="' + size + '" fill="' + color + '" viewBox="0 0 24 24"><path d="' + path + '"/></svg>';
     }
   },
 
@@ -211,9 +212,21 @@ window.ChatBotWidget = {
       const animation = c.buttonAnimation || 'none';
       if (animation !== 'none') {
         defaultCSS += this.getAnimationCSS(animation);
+        
+        // Determine animation duration and timing
+        let duration = '2s';
+        let timing = 'ease-in-out';
+        
+        if (animation === 'rotate') {
+          duration = '3s';
+          timing = 'linear';
+        } else if (animation === 'shake') {
+          duration = '0.5s';
+        }
+        
         defaultCSS += `
           #chatbot-widget-button {
-            animation: ${animation} ${animation === 'rotate' ? '3s' : '2s'} ${animation === 'rotate' ? 'linear' : 'ease-in-out'} infinite;
+            animation: ${animation}-widget ${duration} ${timing} infinite;
           }
         `;
       }
@@ -227,12 +240,20 @@ window.ChatBotWidget = {
             transition: all 0.3s ease;
           }
         `;
+      } else {
+        defaultCSS += `
+          #chatbot-widget-button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 6px 15px rgba(0, 0, 0, 0.4);
+            transition: all 0.3s ease;
+          }
+        `;
       }
 
       // Add pulse effect
       if (c.buttonPulse) {
         defaultCSS += `
-          @keyframes pulse-ring {
+          @keyframes pulse-ring-widget {
             0% { transform: scale(1); opacity: 1; }
             100% { transform: scale(1.5); opacity: 0; }
           }
@@ -242,7 +263,7 @@ window.ChatBotWidget = {
             inset: 0;
             border-radius: inherit;
             background: inherit;
-            animation: pulse-ring 2s infinite;
+            animation: pulse-ring-widget 2s infinite;
             z-index: -1;
           }
         `;
@@ -290,11 +311,12 @@ window.ChatBotWidget = {
     const buttonLeft = c.buttonLeft || '20';
     const buttonShadow = c.buttonShadow || '0 4px 10px rgba(0,0,0,0.3)';
 
-    // Get button icon
+    // Get button icon with size
     const buttonIconType = c.buttonIconType || 'default';
     const buttonIcon = c.buttonIcon || 'chat';
     const buttonCustomIcon = c.buttonCustomIcon || '';
-    const iconHTML = this.getIconSVG(buttonIconType, buttonCustomIcon, buttonIcon, buttonColor);
+    const buttonIconSize = c.buttonIconSize || '24';
+    const iconHTML = this.getIconSVG(buttonIconType, buttonCustomIcon, buttonIcon, buttonColor, buttonIconSize);
 
     // Create button wrapper if text is enabled
     let buttonContainer = document.createElement('div');
@@ -317,7 +339,7 @@ window.ChatBotWidget = {
     `;
 
     // Create text label if enabled
-    if (c.buttonShowText && c.buttonText) {
+    if (c.buttonShowText && c.buttonText && !useButtonCustomCSS) {
       const textElement = document.createElement('div');
       textElement.className = 'chatbot-button-text';
       textElement.textContent = c.buttonText;

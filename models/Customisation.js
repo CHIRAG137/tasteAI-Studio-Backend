@@ -98,6 +98,10 @@ const customizationSchema = new mongoose.Schema(
       default: 'default',
     },
     buttonCustomIcon: String,
+    buttonIconSize: {
+      type: String,
+      default: '24',
+    },
     buttonAnimation: {
       type: String,
       default: 'none',
