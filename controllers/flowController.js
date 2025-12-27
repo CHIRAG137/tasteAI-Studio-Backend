@@ -1,3 +1,4 @@
+const { attachIpAddress } = require('../middlewares/ipExtractorMiddleware');
 const ChatBot = require('../models/ChatBot');
 const FlowSession = require('../models/FlowSession');
 const flowEngine = require('../services/flowEngineService');
@@ -61,9 +62,14 @@ exports.startFlow = async (req, res) => {
       return res.status(404).json({ error: 'Bot not found' });
     }
 
+    const ipAddress = req.clientIp;
+    const userAgent = req.userAgent || 'Unknown';
+
     const session = new FlowSession({
       bot: bot._id,
       variables: {},
+      ipAddress: ipAddress,
+      userAgent: userAgent,
     });
 
     // Find the start node
