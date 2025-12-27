@@ -180,7 +180,7 @@ exports.createBot = async (req) => {
     is_video_bot,
     video_bot_image_url,
     video_bot_image_public_id,
-    voice_id
+    voice_id,
   } = req.body;
 
   if (!name || !description) {
@@ -270,7 +270,7 @@ exports.createBot = async (req) => {
     is_video_bot,
     video_bot_image_url,
     video_bot_image_public_id,
-    voice_id
+    voice_id,
   });
 
   logger.info('Bot created', { botId: bot._id, userId: req.user.id, name });
@@ -538,7 +538,7 @@ exports.updateBot = async (botId, userId, body, file) => {
     is_video_bot,
     video_bot_image_url,
     video_bot_image_public_id,
-    voice_id
+    voice_id,
   } = body;
 
   if (!name || !description) {
@@ -638,7 +638,7 @@ exports.updateBot = async (botId, userId, body, file) => {
     is_video_bot: is_video_bot,
     video_bot_image_url: video_bot_image_url,
     video_bot_image_public_id: video_bot_image_public_id,
-    voice_id: voice_id
+    voice_id: voice_id,
   });
 
   logger.info('Bot fields updated locally', { botId, userId });
@@ -771,9 +771,11 @@ exports.getAllChatHistories = async (botId) => {
     throw new Error('Bot not found');
   }
 
-  const sessions = await FlowSession.find({ bot: botId }).sort({
-    createdAt: -1,
-  });
+  const sessions = await FlowSession.find({ bot: botId })
+    .select(
+      '_id ipAddress userAgent isFinished createdAt lastUpdatedAt history'
+    )
+    .sort({ createdAt: -1 });
 
   logger.info('Service: Successfully retrieved chat histories', {
     botId,
@@ -835,6 +837,8 @@ exports.getChatHistoryBySession = async (botId, sessionId) => {
     history: cleanedHistory,
     currentNodeId: session.currentNodeId,
     isFinished: session.isFinished,
+    ipAddress: session.ipAddress,
+    userAgent: session.userAgent,
     createdAt: session.createdAt,
     lastUpdatedAt: session.lastUpdatedAt,
   };

@@ -5,6 +5,8 @@ const FlowSessionSchema = new mongoose.Schema({
   currentNodeId: { type: String, default: null },
   variables: { type: mongoose.Schema.Types.Mixed, default: {} },
   history: { type: Array, default: [] },
+  ipAddress: { type: String, default: null },
+  userAgent: { type: String, default: null },
   isFinished: { type: Boolean, default: false },
   createdAt: { type: Date, default: Date.now },
   lastUpdatedAt: { type: Date, default: Date.now },
