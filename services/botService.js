@@ -671,7 +671,7 @@ exports.updateBot = async (botId, userId, body, file) => {
     video_bot_image_url: video_bot_image_url,
     video_bot_image_public_id: video_bot_image_public_id,
     voice_id: voice_id,
-    isTalkToHumanEnabled: human_handoff_enabled === 'true',
+    human_handoff_enabled: human_handoff_enabled === 'true',
     human_handoff_emails: parsedHumanEmails || bot.human_handoff_emails,
   });
 
