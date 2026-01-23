@@ -181,6 +181,8 @@ exports.createBot = async (req) => {
     video_bot_image_url,
     video_bot_image_public_id,
     voice_id,
+    human_handoff_enabled,
+    human_handoff_emails,
   } = req.body;
 
   if (!name || !description) {
@@ -245,6 +247,19 @@ exports.createBot = async (req) => {
     }
   }
 
+  let parsedHumanEmails = [];
+  if (human_handoff_emails) {
+    if (Array.isArray(human_handoff_emails)) {
+      parsedHumanEmails = human_handoff_emails;
+    } else if (typeof human_handoff_emails === 'string') {
+      try {
+        parsedHumanEmails = JSON.parse(human_handoff_emails);
+      } catch {
+        parsedHumanEmails = human_handoff_emails.split(',').map(e => e.trim());
+      }
+    }
+  }
+
   // Create bot
   const bot = await ChatBot.create({
     user: req.user.id,
@@ -271,6 +286,8 @@ exports.createBot = async (req) => {
     video_bot_image_url,
     video_bot_image_public_id,
     voice_id,
+    isTalkToHumanEnabled: human_handoff_enabled === 'true',
+    humanEmails: parsedHumanEmails,
   });
 
   logger.info('Bot created', { botId: bot._id, userId: req.user.id, name });
@@ -539,6 +556,8 @@ exports.updateBot = async (botId, userId, body, file) => {
     video_bot_image_url,
     video_bot_image_public_id,
     voice_id,
+    human_handoff_enabled,
+    human_handoff_emails,
   } = body;
 
   if (!name || !description) {
@@ -605,6 +624,19 @@ exports.updateBot = async (botId, userId, body, file) => {
     }
   }
 
+  let parsedHumanEmails;
+  if (human_handoff_emails !== undefined) {
+    if (Array.isArray(human_handoff_emails)) {
+      parsedHumanEmails = human_handoff_emails;
+    } else if (typeof human_handoff_emails === 'string') {
+      try {
+        parsedHumanEmails = JSON.parse(human_handoff_emails);
+      } catch {
+        parsedHumanEmails = human_handoff_emails.split(',').map(e => e.trim());
+      }
+    }
+  }
+
   // Detect URL changes
   const prevUrls = Array.isArray(bot.scraped_urls)
     ? bot.scraped_urls.sort()
@@ -639,6 +671,16 @@ exports.updateBot = async (botId, userId, body, file) => {
     video_bot_image_url: video_bot_image_url,
     video_bot_image_public_id: video_bot_image_public_id,
     voice_id: voice_id,
+    isTalkToHumanEnabled:
+      human_handoff_enabled !== undefined
+        ? human_handoff_enabled === 'true'
+        : bot.human_handoff_enabled,
+
+    human_handoff_emails:
+      parsedHumanEmails !== undefined
+        ? parsedHumanEmails
+        : bot.human_handoff_emails,
+
   });
 
   logger.info('Bot fields updated locally', { botId, userId });
