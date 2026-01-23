@@ -286,8 +286,8 @@ exports.createBot = async (req) => {
     video_bot_image_url,
     video_bot_image_public_id,
     voice_id,
-    isTalkToHumanEnabled: human_handoff_enabled === 'true',
-    humanEmails: parsedHumanEmails,
+    human_handoff_enabled: human_handoff_enabled === 'true',
+    human_handoff_emails: parsedHumanEmails,
   });
 
   logger.info('Bot created', { botId: bot._id, userId: req.user.id, name });
@@ -671,16 +671,8 @@ exports.updateBot = async (botId, userId, body, file) => {
     video_bot_image_url: video_bot_image_url,
     video_bot_image_public_id: video_bot_image_public_id,
     voice_id: voice_id,
-    isTalkToHumanEnabled:
-      human_handoff_enabled !== undefined
-        ? human_handoff_enabled === 'true'
-        : bot.human_handoff_enabled,
-
-    human_handoff_emails:
-      parsedHumanEmails !== undefined
-        ? parsedHumanEmails
-        : bot.human_handoff_emails,
-
+    isTalkToHumanEnabled: human_handoff_enabled === 'true',
+    human_handoff_emails: parsedHumanEmails || bot.human_handoff_emails,
   });
 
   logger.info('Bot fields updated locally', { botId, userId });
