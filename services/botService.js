@@ -181,6 +181,8 @@ exports.createBot = async (req) => {
     video_bot_image_url,
     video_bot_image_public_id,
     voice_id,
+    isTalkToHumanEnabled,
+    humanEmails,
   } = req.body;
 
   if (!name || !description) {
@@ -245,6 +247,19 @@ exports.createBot = async (req) => {
     }
   }
 
+  let parsedHumanEmails = [];
+  if (humanEmails) {
+    if (Array.isArray(humanEmails)) {
+      parsedHumanEmails = humanEmails;
+    } else if (typeof humanEmails === 'string') {
+      try {
+        parsedHumanEmails = JSON.parse(humanEmails);
+      } catch {
+        parsedHumanEmails = humanEmails.split(',').map(e => e.trim());
+      }
+    }
+  }
+
   // Create bot
   const bot = await ChatBot.create({
     user: req.user.id,
@@ -271,6 +286,8 @@ exports.createBot = async (req) => {
     video_bot_image_url,
     video_bot_image_public_id,
     voice_id,
+    isTalkToHumanEnabled: isTalkToHumanEnabled === 'true',
+    humanEmails: parsedHumanEmails,
   });
 
   logger.info('Bot created', { botId: bot._id, userId: req.user.id, name });
@@ -539,6 +556,8 @@ exports.updateBot = async (botId, userId, body, file) => {
     video_bot_image_url,
     video_bot_image_public_id,
     voice_id,
+    isTalkToHumanEnabled,
+    humanEmails,
   } = body;
 
   if (!name || !description) {
@@ -605,6 +624,19 @@ exports.updateBot = async (botId, userId, body, file) => {
     }
   }
 
+  let parsedHumanEmails;
+  if (humanEmails !== undefined) {
+    if (Array.isArray(humanEmails)) {
+      parsedHumanEmails = humanEmails;
+    } else if (typeof humanEmails === 'string') {
+      try {
+        parsedHumanEmails = JSON.parse(humanEmails);
+      } catch {
+        parsedHumanEmails = humanEmails.split(',').map(e => e.trim());
+      }
+    }
+  }
+
   // Detect URL changes
   const prevUrls = Array.isArray(bot.scraped_urls)
     ? bot.scraped_urls.sort()
@@ -639,6 +671,16 @@ exports.updateBot = async (botId, userId, body, file) => {
     video_bot_image_url: video_bot_image_url,
     video_bot_image_public_id: video_bot_image_public_id,
     voice_id: voice_id,
+    isTalkToHumanEnabled:
+      isTalkToHumanEnabled !== undefined
+        ? isTalkToHumanEnabled === 'true'
+        : bot.isTalkToHumanEnabled,
+
+    humanEmails:
+      parsedHumanEmails !== undefined
+        ? parsedHumanEmails
+        : bot.humanEmails,
+
   });
 
   logger.info('Bot fields updated locally', { botId, userId });
