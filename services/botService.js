@@ -181,8 +181,8 @@ exports.createBot = async (req) => {
     video_bot_image_url,
     video_bot_image_public_id,
     voice_id,
-    isTalkToHumanEnabled,
-    humanEmails,
+    human_handoff_enabled,
+    human_handoff_emails,
   } = req.body;
 
   if (!name || !description) {
@@ -248,14 +248,14 @@ exports.createBot = async (req) => {
   }
 
   let parsedHumanEmails = [];
-  if (humanEmails) {
-    if (Array.isArray(humanEmails)) {
-      parsedHumanEmails = humanEmails;
-    } else if (typeof humanEmails === 'string') {
+  if (human_handoff_emails) {
+    if (Array.isArray(human_handoff_emails)) {
+      parsedHumanEmails = human_handoff_emails;
+    } else if (typeof human_handoff_emails === 'string') {
       try {
-        parsedHumanEmails = JSON.parse(humanEmails);
+        parsedHumanEmails = JSON.parse(human_handoff_emails);
       } catch {
-        parsedHumanEmails = humanEmails.split(',').map(e => e.trim());
+        parsedHumanEmails = human_handoff_emails.split(',').map(e => e.trim());
       }
     }
   }
@@ -286,7 +286,7 @@ exports.createBot = async (req) => {
     video_bot_image_url,
     video_bot_image_public_id,
     voice_id,
-    isTalkToHumanEnabled: isTalkToHumanEnabled === 'true',
+    isTalkToHumanEnabled: human_handoff_enabled === 'true',
     humanEmails: parsedHumanEmails,
   });
 
@@ -556,8 +556,8 @@ exports.updateBot = async (botId, userId, body, file) => {
     video_bot_image_url,
     video_bot_image_public_id,
     voice_id,
-    isTalkToHumanEnabled,
-    humanEmails,
+    human_handoff_enabled,
+    human_handoff_emails,
   } = body;
 
   if (!name || !description) {
@@ -625,14 +625,14 @@ exports.updateBot = async (botId, userId, body, file) => {
   }
 
   let parsedHumanEmails;
-  if (humanEmails !== undefined) {
-    if (Array.isArray(humanEmails)) {
-      parsedHumanEmails = humanEmails;
-    } else if (typeof humanEmails === 'string') {
+  if (human_handoff_emails !== undefined) {
+    if (Array.isArray(human_handoff_emails)) {
+      parsedHumanEmails = human_handoff_emails;
+    } else if (typeof human_handoff_emails === 'string') {
       try {
-        parsedHumanEmails = JSON.parse(humanEmails);
+        parsedHumanEmails = JSON.parse(human_handoff_emails);
       } catch {
-        parsedHumanEmails = humanEmails.split(',').map(e => e.trim());
+        parsedHumanEmails = human_handoff_emails.split(',').map(e => e.trim());
       }
     }
   }
@@ -672,14 +672,14 @@ exports.updateBot = async (botId, userId, body, file) => {
     video_bot_image_public_id: video_bot_image_public_id,
     voice_id: voice_id,
     isTalkToHumanEnabled:
-      isTalkToHumanEnabled !== undefined
-        ? isTalkToHumanEnabled === 'true'
-        : bot.isTalkToHumanEnabled,
+      human_handoff_enabled !== undefined
+        ? human_handoff_enabled === 'true'
+        : bot.human_handoff_enabled,
 
-    humanEmails:
+    human_handoff_emails:
       parsedHumanEmails !== undefined
         ? parsedHumanEmails
-        : bot.humanEmails,
+        : bot.human_handoff_emails,
 
   });
 

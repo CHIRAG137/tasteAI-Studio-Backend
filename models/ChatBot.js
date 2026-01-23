@@ -36,11 +36,11 @@ const ChatBotSchema = new mongoose.Schema(
     video_bot_image_url: String,
     video_bot_image_public_id: String,
     voice_id: { type: String, default: 'EXAVITQu4vr4xnSDxMaL' },
-    isTalkToHumanEnabled: {
+    human_handoff_enabled: {
       type: Boolean,
       default: false,
     },
-    humanEmails: {
+    human_handoff_emails: {
       type: [String],
       default: [],
     },
