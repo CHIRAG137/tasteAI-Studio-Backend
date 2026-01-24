@@ -8,6 +8,9 @@ const { generateQAsViaGPT, getEmbedding } = require('../utils/gptUtils');
 const { embedText, cosineSimilarity } = require('../utils/embedUtils');
 const logger = require('../utils/logger');
 const FlowSession = require('../models/FlowSession');
+const HumanAgentService = require('../services/humanAgentService');
+const HumanAgent = require('../models/HumanAgent');
+const BotAgent = require('../models/BotAgent');
 
 // Helper function to process a single chunk
 async function processChunk(chunk, botId, name, description, source, index) {
@@ -255,7 +258,9 @@ exports.createBot = async (req) => {
       try {
         parsedHumanEmails = JSON.parse(human_handoff_emails);
       } catch {
-        parsedHumanEmails = human_handoff_emails.split(',').map(e => e.trim());
+        parsedHumanEmails = human_handoff_emails
+          .split(',')
+          .map((e) => e.trim());
       }
     }
   }
@@ -291,6 +296,14 @@ exports.createBot = async (req) => {
   });
 
   logger.info('Bot created', { botId: bot._id, userId: req.user.id, name });
+
+  if (human_handoff_enabled === 'true' && parsedHumanEmails.length > 0) {
+    await HumanAgentService.syncBotAndHumanAgents({
+      botId: bot._id,
+      emails: parsedHumanEmails,
+      invitedBy: req.user.id,
+    });
+  }
 
   // Start parallel processing
   const processingPromises = [];
@@ -624,6 +637,10 @@ exports.updateBot = async (botId, userId, body, file) => {
     }
   }
 
+  const oldEmails = Array.isArray(bot.human_handoff_emails)
+    ? bot.human_handoff_emails
+    : [];
+
   let parsedHumanEmails;
   if (human_handoff_emails !== undefined) {
     if (Array.isArray(human_handoff_emails)) {
@@ -632,7 +649,9 @@ exports.updateBot = async (botId, userId, body, file) => {
       try {
         parsedHumanEmails = JSON.parse(human_handoff_emails);
       } catch {
-        parsedHumanEmails = human_handoff_emails.split(',').map(e => e.trim());
+        parsedHumanEmails = human_handoff_emails
+          .split(',')
+          .map((e) => e.trim());
       }
     }
   }
@@ -676,6 +695,30 @@ exports.updateBot = async (botId, userId, body, file) => {
   });
 
   logger.info('Bot fields updated locally', { botId, userId });
+
+  const newEmails = parsedHumanEmails || [];
+  const addedEmails = newEmails.filter((email) => !oldEmails.includes(email));
+  const removedEmails = oldEmails.filter((email) => !newEmails.includes(email));
+
+  if (addedEmails.length > 0) {
+    await HumanAgentService.syncBotAndHumanAgents({
+      botId: bot._id,
+      emails: addedEmails,
+      invitedBy: userId,
+    });
+  }
+
+  if (removedEmails.length > 0) {
+    const agents = await HumanAgent.find({ email: { $in: removedEmails } });
+    const agentIds = agents.map((a) => a._id);
+    await BotAgent.updateMany(
+      {
+        bot: bot._id,
+        humanAgent: { $in: agentIds },
+      },
+      { isEnabled: false }
+    );
+  }
 
   // Slack auto-join
   if (is_slack_enabled === 'true' && slack_channel_id) {
