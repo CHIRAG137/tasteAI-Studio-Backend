@@ -178,3 +178,81 @@ exports.getBotsByAgent = async (req, res) => {
     return responseBuilder.internalError(res, 'Failed to fetch bots');
   }
 };
+
+exports.updateAgentStatus = async (req, res) => {
+  try {
+    const agentId = req.agent.id;
+    const { isOnline, availabilityStatus } = req.body;
+
+    const agent = await humanAgentService.updateAgentStatus(agentId, {
+      isOnline,
+      availabilityStatus,
+    });
+
+    logger.info('Agent status updated', {
+      agentId,
+      isOnline,
+      availabilityStatus,
+    });
+
+    return responseBuilder.ok(
+      res,
+      {
+        isOnline: agent.isOnline,
+        availabilityStatus: agent.availabilityStatus,
+        lastSeenAt: agent.lastSeenAt,
+      },
+      'Status updated successfully'
+    );
+  } catch (error) {
+    logger.error('Error updating agent status', {
+      error: error.message,
+      agentId: req.agent?.id,
+    });
+    return responseBuilder.internalError(res, 'Failed to update status');
+  }
+};
+
+exports.getAgentStats = async (req, res) => {
+  try {
+    const agentId = req.agent.id;
+
+    const stats = await humanAgentService.getAgentStats(agentId);
+
+    logger.info('Fetched agent stats', { agentId });
+
+    return responseBuilder.ok(res, stats, 'Stats fetched successfully');
+  } catch (error) {
+    logger.error('Error fetching agent stats', {
+      error: error.message,
+      agentId: req.agent?.id,
+    });
+    return responseBuilder.internalError(res, 'Failed to fetch stats');
+  }
+};
+
+exports.heartbeat = async (req, res) => {
+  try {
+    const agentId = req.agent.id;
+
+    const agent = await humanAgentService.updateAgentStatus(agentId, {
+      isOnline: true,
+    });
+
+    return responseBuilder.ok(
+      res,
+      {
+        isOnline: agent.isOnline,
+        currentActiveChats: agent.currentActiveChats,
+        lastSeenAt: agent.lastSeenAt,
+      },
+      'Heartbeat received'
+    );
+  } catch (error) {
+    logger.error('Error processing heartbeat', {
+      error: error.message,
+      agentId: req.agent?.id,
+    });
+    return responseBuilder.internalError(res, 'Heartbeat failed');
+  }
+};

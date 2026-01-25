@@ -1,0 +1,64 @@
+const express = require('express');
+const router = express.Router();
+const handoffController = require('../controllers/handoffController');
+const { authenticateHumanAgent } = require('../middlewares/humanAgentAuthMiddleware');
+
+/**
+ * @route   POST /api/handoff/request
+ * @desc    User requests human handoff (public - called from chat bot)
+ * @access  Public
+ */
+router.post('/request', handoffController.requestHandoff);
+
+/**
+ * @route   GET /api/handoff/sessions
+ * @desc    Get agent's handoff sessions
+ * @access  Private (Agent only)
+ * @query   status=all|active|resolved|pending
+ */
+router.get('/sessions', authenticateHumanAgent, handoffController.getAgentSessions);
+
+/**
+ * @route   POST /api/handoff/:id/accept
+ * @desc    Agent accepts a handoff session
+ * @access  Private (Agent only)
+ */
+router.post('/:id/accept', authenticateHumanAgent, handoffController.acceptHandoff);
+
+/**
+ * @route   POST /api/handoff/:id/resolve
+ * @desc    Agent resolves a handoff session
+ * @access  Private (Agent only)
+ */
+router.post('/:id/resolve', authenticateHumanAgent, handoffController.resolveHandoff);
+
+/**
+ * @route   POST /api/handoff/:id/message
+ * @desc    Add a message to handoff session
+ * @access  Private (Agent only)
+ */
+router.post('/:id/message', authenticateHumanAgent, handoffController.addMessage);
+
+/**
+ * @route   GET /api/handoff/:id/messages
+ * @desc    Get messages for a handoff session
+ * @access  Private (Agent only)
+ */
+router.get('/:id/messages', authenticateHumanAgent, handoffController.getMessages);
+
+/**
+ * @route   POST /api/handoff/:id/client-message
+ * @desc    Client adds a message to handoff session
+ * @access  Public (called from chat bot)
+ */
+router.post('/:id/client-message', handoffController.addClientMessage);
+
+/**
+ * @route   GET /api/handoff/:id/client-messages
+ * @desc    Client gets messages for a handoff session
+ * @access  Public (called from chat bot)
+ * @query   flowSessionId=xxx (required)
+ */
+router.get('/:id/client-messages', handoffController.getClientMessages);
+
+module.exports = router;

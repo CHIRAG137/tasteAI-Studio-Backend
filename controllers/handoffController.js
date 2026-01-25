@@ -1,0 +1,350 @@
+const HandoffSession = require('../models/HandoffSession');
+const humanHandoffService = require('../services/HumanHandoffService');
+const logger = require('../utils/logger');
+const responseBuilder = require('../utils/responseBuilder');
+
+/**
+ * User requests human handoff
+ * POST /api/handoff/request
+ */
+exports.requestHandoff = async (req, res) => {
+  try {
+    const { botId, flowSessionId, userQuestion, userIpAddress, userAgent } =
+      req.body;
+
+    if (!botId || !flowSessionId) {
+      return responseBuilder.badRequest(
+        res,
+        null,
+        'Bot ID and Flow Session ID are required'
+      );
+    }
+
+    const result = await humanHandoffService.requestHumanHandoff({
+      botId,
+      flowSessionId,
+      userQuestion,
+      userIpAddress,
+      userAgent,
+    });
+
+    logger.info('Handoff requested successfully', {
+      botId,
+      flowSessionId,
+      handoffSessionId: result.handoffSession._id,
+    });
+
+    return responseBuilder.ok(res, result, result.message);
+  } catch (error) {
+    logger.error('Error requesting handoff', {
+      error: error.message,
+      body: req.body,
+    });
+    return responseBuilder.internalError(res, error.message);
+  }
+};
+
+/**
+ * Agent accepts a handoff session
+ * POST /api/handoff/:id/accept
+ */
+exports.acceptHandoff = async (req, res) => {
+  try {
+    const { id: handoffSessionId } = req.params;
+    const agentId = req.agent.id;
+
+    const result = await humanHandoffService.acceptHandoffSession(
+      agentId,
+      handoffSessionId
+    );
+
+    logger.info('Handoff accepted', { agentId, handoffSessionId });
+
+    return responseBuilder.ok(res, result, 'Handoff session accepted');
+  } catch (error) {
+    logger.error('Error accepting handoff', {
+      error: error.message,
+      agentId: req.agent?.id,
+      handoffSessionId: req.params.id,
+    });
+    return responseBuilder.internalError(res, error.message);
+  }
+};
+
+/**
+ * Agent resolves a handoff session
+ * POST /api/handoff/:id/resolve
+ */
+exports.resolveHandoff = async (req, res) => {
+  try {
+    const { id: handoffSessionId } = req.params;
+    const agentId = req.agent.id;
+    const { notes } = req.body;
+
+    const result = await humanHandoffService.resolveHandoffSession(
+      agentId,
+      handoffSessionId,
+      notes
+    );
+
+    logger.info('Handoff resolved', { agentId, handoffSessionId });
+
+    return responseBuilder.ok(res, result, 'Handoff session resolved');
+  } catch (error) {
+    logger.error('Error resolving handoff', {
+      error: error.message,
+      agentId: req.agent?.id,
+      handoffSessionId: req.params.id,
+    });
+    return responseBuilder.internalError(res, error.message);
+  }
+};
+
+/**
+ * Get agent's handoff sessions
+ * GET /api/handoff/sessions?status=all|active|resolved|pending
+ */
+exports.getAgentSessions = async (req, res) => {
+  try {
+    const agentId = req.agent.id;
+    const { status = 'all' } = req.query;
+
+    const sessions = await humanHandoffService.getAgentHandoffSessions(
+      agentId,
+      status
+    );
+
+    logger.info('Fetched agent sessions', {
+      agentId,
+      status,
+      count: sessions.length,
+    });
+
+    return responseBuilder.ok(
+      res,
+      { sessions, count: sessions.length },
+      'Sessions fetched successfully'
+    );
+  } catch (error) {
+    logger.error('Error fetching agent sessions', {
+      error: error.message,
+      agentId: req.agent?.id,
+    });
+    return responseBuilder.internalError(res, 'Failed to fetch sessions');
+  }
+};
+
+/**
+ * Add message to handoff session
+ * POST /api/handoff/:id/message
+ */
+exports.addMessage = async (req, res) => {
+  try {
+    const { id: handoffSessionId } = req.params;
+    const agentId = req.agent.id.toString();
+    const { message } = req.body;
+
+    // Validation
+    if (!message || typeof message !== 'string' || !message.trim()) {
+      return responseBuilder.badRequest(res, null, 'Valid message is required');
+    }
+
+    // Check if session exists and is active
+    const session = await HandoffSession.findById(handoffSessionId);
+    
+    console.log(session)
+    if (!session) {
+      return responseBuilder.notFound(res, null, 'Session not found');
+    }
+
+    if (session.status === 'resolved') {
+      return responseBuilder.badRequest(res, null, 'Cannot send messages to resolved session');
+    }
+
+    if (session.status === 'pending') {
+      return responseBuilder.badRequest(res, null, 'Session must be accepted first');
+    }
+
+    // Verify the agent is assigned to this session
+    if (session.assignedAgent && session.assignedAgent.toString() !== agentId) {
+      return responseBuilder.forbidden(res, null, 'You are not assigned to this session');
+    }
+
+    const result = await humanHandoffService.addMessageToSession(
+      handoffSessionId,
+      'agent',
+      message.trim(),
+      agentId
+    );
+
+    console.log('Message sent successfully:', {
+      sessionId: handoffSessionId,
+      agentId,
+      messageLength: message.length
+    });
+
+    logger.info('Message added to handoff session', {
+      agentId,
+      handoffSessionId,
+      messageCount: result.session.messages.length,
+    });
+
+    return responseBuilder.ok(res, {
+      message: result.message,
+      sessionId: handoffSessionId,
+    }, 'Message sent successfully');
+
+  } catch (error) {
+    logger.error('Error adding message', {
+      error: error.message,
+      stack: error.stack,
+      agentId: req.agent?.id,
+      handoffSessionId: req.params.id,
+    });
+
+    // Return more specific error message in development
+    const errorMessage = process.env.NODE_ENV === 'development' 
+      ? `Failed to send message: ${error.message}`
+      : 'Failed to send message';
+
+    return responseBuilder.internalError(res, errorMessage);
+  }
+};
+
+/**
+ * Get messages for a handoff session
+ * GET /api/handoff/:id/messages
+ */
+exports.getMessages = async (req, res) => {
+  try {
+    const { id: handoffSessionId } = req.params;
+    const HandoffSession = require('../models/HandoffSession');
+
+    const session = await HandoffSession.findById(handoffSessionId);
+
+    if (!session) {
+      return responseBuilder.notFound(res, null, 'Handoff session not found');
+    }
+
+    logger.info('Fetched handoff messages', {
+      handoffSessionId,
+      messageCount: session.messages.length,
+    });
+
+    return responseBuilder.ok(
+      res,
+      { messages: session.messages },
+      'Messages fetched successfully'
+    );
+  } catch (error) {
+    logger.error('Error fetching messages', {
+      error: error.message,
+      handoffSessionId: req.params.id,
+    });
+    return responseBuilder.internalError(res, 'Failed to fetch messages');
+  }
+};
+
+exports.addClientMessage = async (req, res) => {
+  try {
+    const { id: handoffSessionId } = req.params;
+    const { message, flowSessionId } = req.body;
+
+    if (!message) {
+      return responseBuilder.badRequest(res, null, 'Message is required');
+    }
+
+    // Verify the handoff session belongs to this flow session
+    const HandoffSession = require('../models/HandoffSession');
+    const session = await HandoffSession.findById(handoffSessionId);
+
+    if (!session) {
+      return responseBuilder.notFound(res, null, 'Handoff session not found');
+    }
+
+    if (session.flowSession.toString() !== flowSessionId) {
+      return responseBuilder.forbidden(
+        res,
+        null,
+        'Not authorized to send messages to this session'
+      );
+    }
+
+    const result = await humanHandoffService.addMessageToSession(
+      handoffSessionId,
+      'user',
+      message,
+      null // No agent ID for client messages
+    );
+
+    logger.info('Client message added to handoff session', {
+      handoffSessionId,
+      flowSessionId,
+    });
+
+    return responseBuilder.ok(res, result, 'Message sent');
+  } catch (error) {
+    logger.error('Error adding client message', {
+      error: error.message,
+      handoffSessionId: req.params.id,
+    });
+    return responseBuilder.internalError(res, 'Failed to send message');
+  }
+};
+
+/**
+ * Client gets messages for a handoff session (PUBLIC - no auth required)
+ * GET /api/handoff/:id/client-messages?flowSessionId=xxx
+ */
+exports.getClientMessages = async (req, res) => {
+  try {
+    const { id: handoffSessionId } = req.params;
+    const { flowSessionId } = req.query;
+
+    if (!flowSessionId) {
+      return responseBuilder.badRequest(
+        res,
+        null,
+        'Flow Session ID is required'
+      );
+    }
+
+    const HandoffSession = require('../models/HandoffSession');
+    const session = await HandoffSession.findById(handoffSessionId);
+
+    if (!session) {
+      return responseBuilder.notFound(res, null, 'Handoff session not found');
+    }
+
+    // Verify the handoff session belongs to this flow session
+    if (session.flowSession.toString() !== flowSessionId) {
+      return responseBuilder.forbidden(
+        res,
+        null,
+        'Not authorized to view messages for this session'
+      );
+    }
+
+    logger.info('Client fetched handoff messages', {
+      handoffSessionId,
+      flowSessionId,
+      messageCount: session.messages.length,
+    });
+
+    return responseBuilder.ok(
+      res,
+      {
+        messages: session.messages,
+        status: session.status,
+        assignedAgent: session.assignedAgent,
+      },
+      'Messages fetched successfully'
+    );
+  } catch (error) {
+    logger.error('Error fetching client messages', {
+      error: error.message,
+      handoffSessionId: req.params.id,
+    });
+    return responseBuilder.internalError(res, 'Failed to fetch messages');
+  }
+};

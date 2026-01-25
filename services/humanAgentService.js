@@ -7,6 +7,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const sendEmail = require('../utils/sendEmailUtil');
 const logger = require('../utils/logger');
+const HandoffSession = require('../models/HandoffSession');
 
 function generateToken() {
   return crypto.randomBytes(32).toString('hex');
@@ -240,3 +241,104 @@ exports.getBotsByAgent = async (agentId) => {
 
   return bots;
 };
+
+exports.getAgentStats = async (agentId) => {
+  try {
+    const agent = await HumanAgent.findById(agentId);
+
+    if (!agent) {
+      throw new Error('Agent not found');
+    }
+
+    // Get session counts
+    const totalSessions = await HandoffSession.countDocuments({
+      assignedAgent: agentId,
+    });
+
+    const activeSessions = await HandoffSession.countDocuments({
+      assignedAgent: agentId,
+      status: { $in: ['pending', 'active'] },
+    });
+
+    const resolvedSessions = await HandoffSession.countDocuments({
+      assignedAgent: agentId,
+      status: 'resolved',
+    });
+
+    // Get today's sessions
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const todaySessions = await HandoffSession.countDocuments({
+      assignedAgent: agentId,
+      requestedAt: { $gte: startOfDay },
+    });
+
+    return {
+      agent: {
+        email: agent.email,
+        displayName: agent.displayName,
+        isOnline: agent.isOnline,
+        availabilityStatus: agent.availabilityStatus,
+        currentActiveChats: agent.currentActiveChats,
+        maxConcurrentChats: agent.maxConcurrentChats,
+        loadPercentage: agent.loadPercentage,
+      },
+      metrics: {
+        totalChatsHandled: agent.totalChatsHandled,
+        averageResponseTime: agent.averageResponseTime,
+        averageResolutionTime: agent.averageResolutionTime,
+        averageRating: agent.averageRating,
+        totalRatings: agent.totalRatings,
+      },
+      sessions: {
+        total: totalSessions,
+        active: activeSessions,
+        resolved: resolvedSessions,
+        today: todaySessions,
+      },
+    };
+  } catch (error) {
+    logger.error('Error fetching agent stats', {
+      error: error.message,
+      agentId,
+    });
+    throw error;
+  }
+};
+
+exports.updateAgentStatus = async (agentId, status) => {
+  try {
+    const updates = {
+      isOnline: status.isOnline !== undefined ? status.isOnline : true,
+      lastSeenAt: new Date(),
+    };
+
+    if (status.availabilityStatus) {
+      updates.availabilityStatus = status.availabilityStatus;
+    } else if (status.isOnline) {
+      updates.availabilityStatus = 'available';
+    } else {
+      updates.availabilityStatus = 'offline';
+    }
+
+    const agent = await HumanAgent.findByIdAndUpdate(agentId, updates, {
+      new: true,
+    });
+
+    logger.debug('Agent status updated', {
+      agentId,
+      email: agent?.email,
+      status: updates,
+    });
+
+    return agent;
+  } catch (error) {
+    logger.error('Error updating agent status', {
+      error: error.message,
+      agentId,
+    });
+    throw error;
+  }
+};
+
