@@ -14,6 +14,7 @@ const summarizeRoutes = require('./routes/summarizeRoutes');
 const elevenlabsRoutes = require('./routes/elevenlabsRoutes');
 const imageGenerationRoutes = require('./routes/imageGenerationRoutes');
 const humanAgentRoutes = require('./routes/humanAgentRoutes');
+const handoffRoutes = require('./routes/handoffRoutes');
 
 require('dotenv').config();
 
@@ -46,6 +47,7 @@ app.use('/api/summarize', summarizeRoutes);
 app.use('/api/elevenlabs', elevenlabsRoutes);
 app.use('/api/human', imageGenerationRoutes);
 app.use('/api/human-agent', humanAgentRoutes);
+app.use('/api/handoff', handoffRoutes);
 app.get('/widget.js', (req, res) => {
   res.sendFile(path.join(__dirname, 'public/widget.js'));
 });
