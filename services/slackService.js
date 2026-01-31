@@ -1,9 +1,10 @@
-const axios = require('axios');
+const slackClient = require('../config/slackClient');
 const SlackIntegration = require('../models/SlackIntegration');
 const ChatBot = require('../models/ChatBot');
 const botController = require('../controllers/botController');
 const logger = require('../utils/logger');
 
+// get the oauth url for verification
 exports.getSlackOAuthUrl = (userId) => {
   const state = encodeURIComponent(JSON.stringify({ userId }));
   const url = `https://slack.com/oauth/v2/authorize?client_id=${
@@ -16,6 +17,7 @@ exports.getSlackOAuthUrl = (userId) => {
   return url;
 };
 
+// connect to slack app using slack oauth callback
 exports.processSlackOAuthCallback = async (code, state) => {
   let decodedState;
   try {
@@ -30,18 +32,14 @@ exports.processSlackOAuthCallback = async (code, state) => {
   }
 
   try {
-    const response = await axios.post(
-      'https://slack.com/api/oauth.v2.access',
-      null,
-      {
-        params: {
-          code,
-          client_id: process.env.SLACK_CLIENT_ID,
-          client_secret: process.env.SLACK_CLIENT_SECRET,
-          redirect_uri: process.env.SLACK_REDIRECT_URI,
-        },
-      }
-    );
+    const response = await slackClient.post('/oauth.v2.access', null, {
+      params: {
+        code,
+        client_id: process.env.SLACK_CLIENT_ID,
+        client_secret: process.env.SLACK_CLIENT_SECRET,
+        redirect_uri: process.env.SLACK_REDIRECT_URI,
+      },
+    });
 
     const { access_token, team, authed_user } = response.data;
 
@@ -78,6 +76,7 @@ exports.processSlackOAuthCallback = async (code, state) => {
   }
 };
 
+// webhook to listen to message received on the slack channel and responding to the query
 exports.handleSlackEvent = async (body) => {
   const { type, challenge, event, team_id } = body;
   logger.info('Received Slack event', { type, team_id });
@@ -113,13 +112,15 @@ exports.handleSlackEvent = async (body) => {
     const fakeRes = {
       json: async (data) => {
         try {
-          await axios.post(
-            'https://slack.com/api/chat.postMessage',
-            { channel: event.channel, text: data.answer || data.message },
+          await slackClient.post(
+            '/chat.postMessage',
+            { 
+              channel: event.channel, 
+              text: data.answer || data.message 
+            },
             {
               headers: {
                 Authorization: `Bearer ${slackIntegration.slackAccessToken}`,
-                'Content-Type': 'application/json',
               },
             }
           );

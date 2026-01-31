@@ -2,6 +2,7 @@ const slackService = require('../services/slackService');
 const logger = require('../utils/logger');
 const responseBuilder = require('../utils/responseBuilder');
 
+// initialising the slack oauth
 exports.initiateSlackOAuth = (req, res) => {
   if (!req.user) {
     logger.warn('Unauthorized Slack OAuth initiation attempt');
@@ -25,6 +26,7 @@ exports.initiateSlackOAuth = (req, res) => {
   }
 };
 
+// handle the slack oauth callback to connect to slack app
 exports.handleSlackOAuthCallback = async (req, res) => {
   const { code, state } = req.query;
 
@@ -47,6 +49,7 @@ exports.handleSlackOAuthCallback = async (req, res) => {
   }
 };
 
+// webhook to listen to message received on the slack channel and responding to the query
 exports.handleCommand = async (req, res) => {
   try {
     logger.info('Received Slack command/event', { body: req.body });
@@ -55,7 +58,7 @@ exports.handleCommand = async (req, res) => {
 
     if (response?.challenge) {
       logger.info('Responding to Slack URL verification challenge');
-      return res.send({ challenge: response.challenge }); // URL verification
+      return res.send({ challenge: response.challenge });
     }
 
     logger.info('Slack command handled successfully');

@@ -9,57 +9,112 @@ const sendEmail = require('../utils/sendEmailUtil');
 const logger = require('../utils/logger');
 const HandoffSession = require('../models/HandoffSession');
 
+// generate invite token function
 function generateToken() {
-  return crypto.randomBytes(32).toString('hex');
+  const token = crypto.randomBytes(32).toString('hex');
+  logger.debug('Generated invite token', { tokenPreview: token.substring(0, 8) });
+  return token;
 }
 
+// sync bot and human agents schema data while creating and editing bot
 exports.syncBotAndHumanAgents = async ({ botId, emails, invitedBy }) => {
-  if (!emails || emails.length === 0) return;
+  logger.info('Starting bot-human agent sync', {
+    botId,
+    invitedBy,
+    emailCount: emails?.length || 0,
+  });
+
+  if (!emails || emails.length === 0) {
+    logger.warn('No emails provided for bot-human agent sync', { botId });
+    return;
+  }
 
   for (const email of emails) {
-    let humanAgent = await HumanAgent.findOne({ email });
+    try {
+      logger.info('Processing agent email', { email, botId });
 
-    if (!humanAgent) {
-      humanAgent = await HumanAgent.create({
+      let humanAgent = await HumanAgent.findOne({ email });
+
+      if (!humanAgent) {
+        humanAgent = await HumanAgent.create({
+          email,
+          invitedBy,
+          isPasswordSet: false,
+        });
+
+        logger.info('Created new human agent', {
+          email,
+          humanAgentId: humanAgent._id,
+        });
+      } else {
+        logger.debug('Human agent already exists', {
+          email,
+          humanAgentId: humanAgent._id,
+        });
+      }
+
+      const mapping = await BotAgent.findOneAndUpdate(
+        { bot: botId, humanAgent: humanAgent._id },
+        { isEnabled: true },
+        { upsert: true, new: true }
+      );
+
+      logger.info('Bot-agent mapping synced', {
+        botId,
+        humanAgentId: humanAgent._id,
+        mappingId: mapping._id,
+      });
+
+      if (!humanAgent.isPasswordSet) {
+        const token = generateToken();
+
+        await HumanAgentInviteToken.create({
+          humanAgent: humanAgent._id,
+          token,
+          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        });
+
+        logger.info('Invite token created for agent', {
+          humanAgentId: humanAgent._id,
+          tokenPreview: token.substring(0, 8),
+        });
+
+        await sendEmail({
+          to: email,
+          subject: 'Set up your Agent Dashboard access',
+          html: `
+            <p>You've been invited as an agent.</p>
+            <p>
+              <a href="${process.env.FRONTEND_URL}/agent/set-password?token=${token}">
+                Set your password
+              </a>
+            </p>
+            <p>This link expires in 24 hours.</p>
+          `,
+        });
+
+        logger.info('Invite email sent to agent', { email });
+      } else {
+        logger.debug('Agent already has password set, skipping invite', {
+          email,
+          humanAgentId: humanAgent._id,
+        });
+      }
+    } catch (error) {
+      logger.error('Failed to sync human agent for bot', {
+        botId,
         email,
-        invitedBy,
-        isPasswordSet: false,
-      });
-    }
-
-    const mapping = await BotAgent.findOneAndUpdate(
-      { bot: botId, humanAgent: humanAgent._id },
-      { isEnabled: true },
-      { upsert: true, new: true }
-    );
-
-    if (!humanAgent.isPasswordSet) {
-      const token = generateToken();
-
-      await HumanAgentInviteToken.create({
-        humanAgent: humanAgent._id,
-        token,
-        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
-      });
-
-      await sendEmail({
-        to: email,
-        subject: 'Set up your Agent Dashboard access',
-        html: `
-          <p>You've been invited as an agent.</p>
-          <p>
-            <a href="${process.env.FRONTEND_URL}/agent/set-password?token=${token}">
-              Set your password
-            </a>
-          </p>
-          <p>This link expires in 24 hours.</p>
-        `,
+        error: error.message,
+        stack: error.stack,
       });
     }
   }
+
+  logger.info('Completed bot-human agent sync', { botId });
 };
 
-exports.setPassword = async (token, password) => {
+// human agent set password
+exports.humanAgentSetPassword = async (token, password) => {
   logger.info('Setting password for agent', { token: token.substring(0, 8) });
 
   // Find the invite token
@@ -129,7 +184,8 @@ exports.setPassword = async (token, password) => {
   };
 };
 
-exports.login = async (email, password) => {
+// human agent login
+exports.humanAgentLogin = async (email, password) => {
   logger.info('Agent login attempt', { email });
 
   // Find the human agent
@@ -189,7 +245,8 @@ exports.login = async (email, password) => {
   };
 };
 
-exports.verifyInviteToken = async (token) => {
+// human agent verify invite token
+exports.humanAgentVerifyInviteToken = async (token) => {
   logger.info('Verifying invite token', { token: token.substring(0, 8) });
 
   const inviteToken = await HumanAgentInviteToken.findOne({ token }).populate(
@@ -226,7 +283,8 @@ exports.verifyInviteToken = async (token) => {
   };
 };
 
-exports.getBotsByAgent = async (agentId) => {
+// get bots by human agent id
+exports.getBotsByHumanAgentId = async (agentId) => {
   logger.info('Fetching bots for agent', { agentId });
 
   // Find all BotAgent mappings for this agent
@@ -242,7 +300,8 @@ exports.getBotsByAgent = async (agentId) => {
   return bots;
 };
 
-exports.getAgentStats = async (agentId) => {
+// gt human agent stats by id
+exports.getHumanAgentStatsById = async (agentId) => {
   try {
     const agent = await HumanAgent.findById(agentId);
 
@@ -307,7 +366,8 @@ exports.getAgentStats = async (agentId) => {
   }
 };
 
-exports.updateAgentStatus = async (agentId, status) => {
+// update human agent status
+exports.updateHumanAgentStatus = async (agentId, status) => {
   try {
     const updates = {
       isOnline: status.isOnline !== undefined ? status.isOnline : true,
@@ -342,3 +402,49 @@ exports.updateAgentStatus = async (agentId, status) => {
   }
 };
 
+// get human agent profile by agent id
+exports.getHumanAgentProfileByAgentId = async (agentId) => {
+  const agent = await HumanAgent.findById(agentId).select(
+    'displayName avatarUrl phoneNumber availabilityStatus timezone skills workingHours emailNotifications soundNotifications autoAcceptChats'
+  );
+
+  if (!agent) {
+    logger.warn('Agent not found while fetching profile', { agentId });
+    throw new Error('Agent not found');
+  }
+
+  return agent;
+};
+
+// update human agent profile by agent id
+exports.updateHumanAgentProfileByAgentId = async (agentId, data) => {
+  const allowedUpdates = {
+    displayName: data.displayName,
+    avatarUrl: data.avatarUrl,
+    phoneNumber: data.phoneNumber,
+    availabilityStatus: data.availabilityStatus,
+    timezone: data.timezone,
+    skills: data.skills,
+    workingHours: data.workingHours,
+    emailNotifications: data.emailNotifications,
+    soundNotifications: data.soundNotifications,
+    autoAcceptChats: data.autoAcceptChats,
+  };
+
+  const agent = await HumanAgent.findByIdAndUpdate(
+    agentId,
+    { $set: allowedUpdates },
+    { new: true }
+  ).select(
+    'displayName avatarUrl phoneNumber availabilityStatus timezone skills workingHours emailNotifications soundNotifications autoAcceptChats'
+  );
+
+  if (!agent) {
+    logger.warn('Agent not found while updating profile', { agentId });
+    throw new Error('Agent not found');
+  }
+
+  logger.info('Agent profile updated', { agentId });
+
+  return agent;
+};

@@ -3,168 +3,25 @@ const SlackIntegration = require('../models/SlackIntegration');
 const ChatBot = require('../models/ChatBot');
 const QAHistory = require('../models/QAHistory');
 const Customization = require('../models/Customisation');
-const { extractTextFromPDF } = require('../utils/textExtractor');
-const { generateQAsViaGPT, getEmbedding } = require('../utils/gptUtils');
-const { embedText, cosineSimilarity } = require('../utils/embedUtils');
+const { getEmbedding } = require('../utils/gptUtils');
+const { cosineSimilarity } = require('../utils/embedUtils');
 const logger = require('../utils/logger');
 const FlowSession = require('../models/FlowSession');
 const HumanAgentService = require('../services/humanAgentService');
 const HumanAgent = require('../models/HumanAgent');
 const BotAgent = require('../models/BotAgent');
+const {
+  processMarkdownContent,
+  processPDFContent,
+} = require('../utils/dataProcessingUtils');
 
-// Helper function to process a single chunk
-async function processChunk(chunk, botId, name, description, source, index) {
-  try {
-    const qas = await generateQAsViaGPT(chunk, name, description);
-
-    // Process all Q&As in parallel
-    const qaPromises = qas.map(async (qa) => {
-      const { question, answer } = qa;
-
-      if (question && answer) {
-        const embedding = await embedText(question);
-
-        await QAHistory.create({
-          bot: botId,
-          question,
-          answer,
-          embedding: Buffer.from(embedding.buffer),
-        });
-
-        return { success: true, question: question.substring(0, 50) + '...' };
-      }
-      return { success: false };
-    });
-
-    const results = await Promise.allSettled(qaPromises);
-    const successful = results.filter(
-      (r) => r.status === 'fulfilled' && r.value.success
-    ).length;
-
-    logger.debug(`Processed ${source} chunk`, {
-      botId,
-      index,
-      successful,
-      total: qas.length,
-    });
-
-    return { success: true, qaCount: successful };
-  } catch (err) {
-    logger.error(`Error processing ${source} chunk`, {
-      botId,
-      index,
-      error: err.message,
-    });
-    return { success: false, error: err.message };
-  }
-}
-
-// Helper function to process markdown content
-async function processMarkdownContent(markdownArray, botId, name, description) {
-  if (!markdownArray || markdownArray.length === 0) {
-    return 0;
-  }
-
-  logger.info('Processing scraped markdown content for bot', {
-    botId,
-    pageCount: markdownArray.length,
-  });
-
-  // Process all markdown pages in parallel
-  const pagePromises = markdownArray.map(async (markdown, i) => {
-    if (!markdown || !markdown.trim()) {
-      logger.warn('Skipping empty markdown content', { botId, index: i });
-      return { pageIndex: i, qaCount: 0 };
-    }
-
-    logger.debug('Processing markdown page', {
-      botId,
-      pageIndex: i + 1,
-      contentLength: markdown.length,
-    });
-
-    // Split markdown into chunks
-    const chunks = markdown.match(/.{1,3000}/g) || [];
-
-    // Process all chunks of this page in parallel
-    const chunkPromises = chunks.map((chunk, j) =>
-      processChunk(
-        chunk,
-        botId,
-        name,
-        description,
-        `markdown page ${i + 1}`,
-        j + 1
-      )
-    );
-
-    const chunkResults = await Promise.allSettled(chunkPromises);
-    const qaCount = chunkResults
-      .filter((r) => r.status === 'fulfilled' && r.value.success)
-      .reduce((sum, r) => sum + r.value.qaCount, 0);
-
-    return { pageIndex: i, qaCount };
-  });
-
-  const results = await Promise.allSettled(pagePromises);
-  const totalQAs = results
-    .filter((r) => r.status === 'fulfilled')
-    .reduce((sum, r) => sum + r.value.qaCount, 0);
-
-  logger.info('Completed processing scraped markdown content', {
-    botId,
-    pagesProcessed: markdownArray.length,
-    totalQAs,
-  });
-
-  return totalQAs;
-}
-
-// Helper function to process PDF content
-async function processPDFContent(file, botId, name, description) {
-  if (!file) {
-    return 0;
-  }
-
-  logger.info('Processing uploaded PDF for bot', {
-    botId,
-    file: file.originalname,
-  });
-
-  const text = await extractTextFromPDF(file.path);
-
-  if (!text || !text.trim()) {
-    logger.warn('PDF extraction resulted in empty text', { botId });
-    return 0;
-  }
-
-  const chunks = text.match(/.{1,3000}/g) || [];
-
-  // Process all PDF chunks in parallel
-  const chunkPromises = chunks.map((chunk, i) =>
-    processChunk(chunk, botId, name, description, 'PDF', i + 1)
-  );
-
-  const results = await Promise.allSettled(chunkPromises);
-  const totalQAs = results
-    .filter((r) => r.status === 'fulfilled' && r.value.success)
-    .reduce((sum, r) => sum + r.value.qaCount, 0);
-
-  logger.info('Completed processing PDF content', {
-    botId,
-    totalQAs,
-  });
-
-  return totalQAs;
-}
-
+// create chatbot
 exports.createBot = async (req) => {
   const {
     name,
     website_url,
     description,
     is_voice_enabled,
-    is_auto_translate,
     supported_languages,
     primary_purpose,
     specialisation_area,
@@ -175,7 +32,6 @@ exports.createBot = async (req) => {
     keywords,
     custom_instructions,
     is_slack_enabled,
-    slack_command,
     slack_channel_id,
     conversationFlow,
     scraped_content,
@@ -250,6 +106,7 @@ exports.createBot = async (req) => {
     }
   }
 
+  // human handoff emails
   let parsedHumanEmails = [];
   if (human_handoff_emails) {
     if (Array.isArray(human_handoff_emails)) {
@@ -272,9 +129,7 @@ exports.createBot = async (req) => {
     website_url,
     description,
     is_voice_enabled: is_voice_enabled === 'true',
-    is_auto_translate: is_auto_translate === 'true',
     is_slack_enabled: is_slack_enabled === 'true',
-    slack_command,
     slack_channel_id,
     supported_languages: parsedLanguages,
     primary_purpose,
@@ -297,6 +152,7 @@ exports.createBot = async (req) => {
 
   logger.info('Bot created', { botId: bot._id, userId: req.user.id, name });
 
+  // sync human and bot agents models
   if (human_handoff_enabled === 'true' && parsedHumanEmails.length > 0) {
     await HumanAgentService.syncBotAndHumanAgents({
       botId: bot._id,
@@ -305,7 +161,7 @@ exports.createBot = async (req) => {
     });
   }
 
-  // Start parallel processing
+  // Start parallel data processing and slack integration
   const processingPromises = [];
 
   // 1. Process scraped markdown content (parallel)
@@ -415,53 +271,135 @@ exports.createBot = async (req) => {
   });
 
   // Build success message
-  let message = 'Bot created successfully';
-  const processedSources = [];
+  let messageParts = [`Bot "${name}" created successfully`];
 
+  // Bot capabilities
+  const capabilities = [];
+  if (is_voice_enabled === 'true') capabilities.push('voice');
+  if (is_video_bot) capabilities.push('video');
+  if (capabilities.length > 0) {
+    messageParts.push(`with ${capabilities.join(' & ')} support`);
+  }
+
+  // Languages
+  if (parsedLanguages?.length > 0) {
+    messageParts.push(`supporting ${parsedLanguages.length} language(s)`);
+  }
+
+  // Knowledge sources
+  const processedSources = [];
   if (markdownQAs > 0) {
     processedSources.push(
-      `${parsedScrapedContent.length} scraped pages (${markdownQAs} Q&As)`
+      `${parsedScrapedContent.length} scraped page(s) (${markdownQAs} Q&As)`
+    );
+  }
+  if (pdfQAs > 0) {
+    processedSources.push(`PDF upload (${pdfQAs} Q&As)`);
+  }
+  if (processedSources.length > 0) {
+    messageParts.push(`trained on ${processedSources.join(' and ')}`);
+  }
+
+  // Human handoff
+  if (human_handoff_enabled === 'true' && parsedHumanEmails.length > 0) {
+    messageParts.push(
+      `with human handoff enabled for ${parsedHumanEmails.length} agent(s)`
     );
   }
 
-  if (pdfQAs > 0) {
-    processedSources.push(`uploaded PDF (${pdfQAs} Q&As)`);
-  }
-
-  if (processedSources.length > 0) {
-    message += ` with GPT-generated Q&As from ${processedSources.join(
-      ' and '
-    )}`;
-  }
-
+  // Slack
   if (slackJoined) {
-    message += ' and added to Slack channel';
+    messageParts.push('and connected to Slack');
   }
 
-  message += '.';
+  const message = `${messageParts.join(', ')}.`;
 
   logger.info('Bot creation completed', {
-    botId: bot._id,
-    markdownQAs,
-    pdfQAs,
-    totalQAs: markdownQAs + pdfQAs,
-    slackJoined,
+    bot: {
+      id: bot._id,
+      name: bot.name,
+      isVoiceEnabled: bot.is_voice_enabled,
+      isVideoBot: bot.is_video_bot,
+      supportedLanguagesCount: bot.supported_languages?.length || 0,
+    },
+    training: {
+      markdown: {
+        pages: parsedScrapedContent.length,
+        qas: markdownQAs,
+      },
+      pdf: {
+        uploaded: !!req.file,
+        qas: pdfQAs,
+      },
+      totalQAs: markdownQAs + pdfQAs,
+    },
+    integrations: {
+      slack: {
+        enabled: is_slack_enabled === 'true',
+        joined: slackJoined,
+        channelId: slack_channel_id || null,
+      },
+      humanHandoff: {
+        enabled: human_handoff_enabled === 'true',
+        agentsCount: parsedHumanEmails.length,
+      },
+    },
+    user: {
+      id: req.user.id,
+    },
   });
 
   return {
     bot_id: bot._id,
     message,
-    sources_processed: {
+
+    bot: {
+      name,
+      description,
+      website_url,
+      is_voice_enabled: is_voice_enabled === 'true',
+      is_video_bot,
+      voice_id,
+      video_bot_image_url,
+      supported_languages: parsedLanguages,
+      primary_purpose,
+      specialisation_area,
+      conversation_tone,
+      response_style,
+      target_audience,
+      key_topics,
+      keywords,
+    },
+
+    integrations: {
+      slack: {
+        enabled: is_slack_enabled === 'true',
+        channel_id: slack_channel_id,
+        connected: slackJoined,
+      },
+      human_handoff: {
+        enabled: human_handoff_enabled === 'true',
+        agents_count: parsedHumanEmails.length,
+        agent_emails: parsedHumanEmails,
+      },
+    },
+
+    training_summary: {
       scraped_pages: parsedScrapedContent.length,
       markdown_qas: markdownQAs,
       pdf_uploaded: !!req.file,
       pdf_qas: pdfQAs,
       total_qas: markdownQAs + pdfQAs,
-      slack_integrated: slackJoined,
+    },
+
+    meta: {
+      created_at: bot.createdAt,
+      created_by: req.user.id,
     },
   };
 };
 
+// ask query to a chatbot
 exports.askBot = async (question, botId) => {
   const bot = await ChatBot.findById(botId);
   if (!bot) {
@@ -506,14 +444,43 @@ exports.askBot = async (question, botId) => {
   return { message: 'No match found.', score: bestScore };
 };
 
-exports.getAllChatBots = async (userId) => {
-  logger.info('Fetching all chat bots for user', { userId });
-  const bots = await ChatBot.find({ user: userId });
-  logger.info('Fetched chat bots', { userId, count: bots.length });
-  return bots;
+// get all the chatbots(paginated)
+exports.getAllChatBots = async (userId, { skip, limit, page }) => {
+  logger.info('Fetching chat bots for user', {
+    userId,
+    page,
+    limit,
+  });
+
+  const [bots, total] = await Promise.all([
+    ChatBot.find({ user: userId })
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit),
+    ChatBot.countDocuments({ user: userId }),
+  ]);
+
+  logger.info('Fetched chat bots from DB', {
+    userId,
+    returnedCount: bots.length,
+    totalBots: total,
+  });
+
+  return {
+    bots,
+    pagination: {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+      hasNextPage: skip + bots.length < total,
+      hasPrevPage: page > 1,
+    },
+  };
 };
 
-exports.getBotById = async (botId) => {
+// get bot by bot id
+exports.getBotByBotId = async (botId) => {
   const bot = await ChatBot.findById(botId);
   if (!bot) {
     logger.warn('Bot not found', { botId });
@@ -523,13 +490,15 @@ exports.getBotById = async (botId) => {
   return bot;
 };
 
-exports.deleteBot = async (botId, userId) => {
+// delete bot by bot id
+exports.deleteBotByBotId = async (botId, userId) => {
   const bot = await ChatBot.findOne({ _id: botId, user: userId });
   if (!bot) {
     logger.warn('Bot not found for deletion', { botId, userId });
     throw new Error('Bot not found');
   }
 
+  // delete associated data with chatbot
   await Customization.findOneAndDelete({ botId });
   await QAHistory.deleteMany({ bot: botId });
   await ChatBot.findByIdAndDelete(botId);
@@ -537,7 +506,8 @@ exports.deleteBot = async (botId, userId) => {
   logger.info('Bot and associated data deleted', { botId, userId });
 };
 
-exports.updateBot = async (botId, userId, body, file) => {
+// update bot by bot id
+exports.updateBotByBotId = async (botId, userId, body, file) => {
   const bot = await ChatBot.findOne({ _id: botId, user: userId });
   if (!bot) {
     logger.warn('Bot not found for update', { botId, userId });
@@ -549,7 +519,6 @@ exports.updateBot = async (botId, userId, body, file) => {
     website_url,
     description,
     is_voice_enabled,
-    is_auto_translate,
     supported_languages,
     primary_purpose,
     specialisation_area,
@@ -560,7 +529,6 @@ exports.updateBot = async (botId, userId, body, file) => {
     keywords,
     custom_instructions,
     is_slack_enabled,
-    slack_command,
     slack_channel_id,
     conversationFlow,
     scraped_content,
@@ -671,9 +639,7 @@ exports.updateBot = async (botId, userId, body, file) => {
     website_url: website_url || bot.website_url,
     description: description || bot.description,
     is_voice_enabled: is_voice_enabled === 'true',
-    is_auto_translate: is_auto_translate === 'true',
     is_slack_enabled: is_slack_enabled === 'true',
-    slack_command: slack_command || bot.slack_command,
     slack_channel_id: slack_channel_id || bot.slack_channel_id,
     supported_languages: parsedLanguages || bot.supported_languages,
     primary_purpose: primary_purpose || bot.primary_purpose,
@@ -802,7 +768,8 @@ exports.updateBot = async (botId, userId, body, file) => {
   return bot;
 };
 
-exports.getCustomization = async (botId) => {
+// get customization by bot id
+exports.getCustomizationByBotId = async (botId) => {
   if (!botId) {
     logger.error('Get customization failed: Bot ID missing');
     throw new Error('Bot ID is required');
@@ -821,7 +788,8 @@ exports.getCustomization = async (botId) => {
   return customization;
 };
 
-exports.saveCustomization = async (botId, data) => {
+// save bot customization
+exports.saveBotCustomization = async (botId, data) => {
   if (!botId) {
     logger.error('Save customization failed: Bot ID missing');
     throw new Error('Bot ID is required');
@@ -839,8 +807,13 @@ exports.saveCustomization = async (botId, data) => {
   return customization;
 };
 
-exports.getAllChatHistories = async (botId) => {
-  logger.info('Service: Retrieving all chat histories', { botId });
+// get all chat histories by bot id(paginated)
+exports.getAllChatHistoriesByBotId = async (botId, page = 1, limit = 10) => {
+  logger.info('Service: Retrieving all chat histories', {
+    botId,
+    page,
+    limit,
+  });
 
   const bot = await ChatBot.findById(botId);
   if (!bot) {
@@ -848,21 +821,46 @@ exports.getAllChatHistories = async (botId) => {
     throw new Error('Bot not found');
   }
 
-  const sessions = await FlowSession.find({ bot: botId })
-    .select(
-      '_id ipAddress userAgent isFinished createdAt lastUpdatedAt history'
-    )
-    .sort({ createdAt: -1 });
+  const skip = (page - 1) * limit;
+
+  const [sessions, totalSessions] = await Promise.all([
+    FlowSession.find({ bot: botId })
+      .select(
+        '_id ipAddress userAgent isFinished createdAt lastUpdatedAt history'
+      )
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit),
+
+    FlowSession.countDocuments({ bot: botId }),
+  ]);
+
+  const totalPages = Math.ceil(totalSessions / limit);
 
   logger.info('Service: Successfully retrieved chat histories', {
     botId,
-    totalSessions: sessions.length,
+    page,
+    limit,
+    totalSessions,
+    returnedSessions: sessions.length,
   });
 
-  return { botId, totalSessions: sessions.length, sessions };
+  return {
+    botId,
+    pagination: {
+      page,
+      limit,
+      totalPages,
+      totalSessions,
+      hasNextPage: page < totalPages,
+      hasPrevPage: page > 1,
+    },
+    sessions,
+  };
 };
 
-exports.getChatHistoryBySession = async (botId, sessionId) => {
+// get chat history by session id
+exports.getChatHistoryBySessionId = async (botId, sessionId) => {
   logger.info('Service: Retrieving specific chat history', {
     botId,
     sessionId,

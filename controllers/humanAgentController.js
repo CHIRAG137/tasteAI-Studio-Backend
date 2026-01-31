@@ -2,7 +2,8 @@ const humanAgentService = require('../services/humanAgentService');
 const logger = require('../utils/logger');
 const responseBuilder = require('../utils/responseBuilder');
 
-exports.setPassword = async (req, res) => {
+// human agent set password
+exports.humanAgentSetPassword = async (req, res) => {
   try {
     const { token, password } = req.body;
 
@@ -24,7 +25,7 @@ exports.setPassword = async (req, res) => {
       );
     }
 
-    const result = await humanAgentService.setPassword(token, password);
+    const result = await humanAgentService.humanAgentSetPassword(token, password);
 
     logger.info('Agent password set successfully', {
       agentId: result.agentId,
@@ -58,7 +59,8 @@ exports.setPassword = async (req, res) => {
   }
 };
 
-exports.login = async (req, res) => {
+// human agent login
+exports.humanAgentLogin = async (req, res) => {
   try {
     const { email, password } = req.body;
 
@@ -71,7 +73,7 @@ exports.login = async (req, res) => {
       );
     }
 
-    const result = await humanAgentService.login(email, password);
+    const result = await humanAgentService.humanAgentLogin(email, password);
 
     logger.info('Agent logged in successfully', {
       agentId: result.agent._id,
@@ -112,7 +114,8 @@ exports.login = async (req, res) => {
   }
 };
 
-exports.verifyToken = async (req, res) => {
+// human agent verify token
+exports.humanAgentVerifyToken = async (req, res) => {
   try {
     const { token } = req.body;
 
@@ -121,7 +124,7 @@ exports.verifyToken = async (req, res) => {
       return responseBuilder.badRequest(res, null, 'Token is required');
     }
 
-    const result = await humanAgentService.verifyInviteToken(token);
+    const result = await humanAgentService.humanAgentVerifyInviteToken(token);
 
     logger.info('Token verified successfully', {
       agentId: result.agentId,
@@ -153,11 +156,12 @@ exports.verifyToken = async (req, res) => {
   }
 };
 
-exports.getBotsByAgent = async (req, res) => {
+// get chatbots by human agent id
+exports.getBotsByHumanAgentId = async (req, res) => {
   try {
-    const agentId = req.agent.id; // From auth middleware
+    const agentId = req.agent.id;
 
-    const bots = await humanAgentService.getBotsByAgent(agentId);
+    const bots = await humanAgentService.getBotsByHumanAgentId(agentId);
 
     logger.info('Fetched bots for agent', {
       agentId,
@@ -179,12 +183,13 @@ exports.getBotsByAgent = async (req, res) => {
   }
 };
 
-exports.updateAgentStatus = async (req, res) => {
+// update human agent status
+exports.updateHumanAgentStatus = async (req, res) => {
   try {
     const agentId = req.agent.id;
     const { isOnline, availabilityStatus } = req.body;
 
-    const agent = await humanAgentService.updateAgentStatus(agentId, {
+    const agent = await humanAgentService.updateHumanAgentStatus(agentId, {
       isOnline,
       availabilityStatus,
     });
@@ -213,11 +218,12 @@ exports.updateAgentStatus = async (req, res) => {
   }
 };
 
-exports.getAgentStats = async (req, res) => {
+// get human agent stats by id
+exports.getHumanAgentStatsById = async (req, res) => {
   try {
     const agentId = req.agent.id;
 
-    const stats = await humanAgentService.getAgentStats(agentId);
+    const stats = await humanAgentService.getHumanAgentStatsById(agentId);
 
     logger.info('Fetched agent stats', { agentId });
 
@@ -231,28 +237,65 @@ exports.getAgentStats = async (req, res) => {
   }
 };
 
-exports.heartbeat = async (req, res) => {
+// get human agent profile by agent id
+exports.getHumanAgentProfileByAgentId = async (req, res) => {
   try {
     const agentId = req.agent.id;
 
-    const agent = await humanAgentService.updateAgentStatus(agentId, {
-      isOnline: true,
-    });
+    logger.info('Fetching agent profile', { agentId });
+
+    const profile = await humanAgentService.getHumanAgentProfileByAgentId(agentId);
 
     return responseBuilder.ok(
       res,
-      {
-        isOnline: agent.isOnline,
-        currentActiveChats: agent.currentActiveChats,
-        lastSeenAt: agent.lastSeenAt,
-      },
-      'Heartbeat received'
+      profile,
+      'Agent profile fetched successfully'
     );
   } catch (error) {
-    logger.error('Error processing heartbeat', {
-      error: error.message,
+    logger.error('Failed to fetch agent profile', {
       agentId: req.agent?.id,
+      error: error.message,
     });
-    return responseBuilder.internalError(res, 'Heartbeat failed');
+
+    return responseBuilder.internalError(
+      res,
+      null,
+      'Failed to fetch agent profile'
+    );
+  }
+};
+
+// update human agent profile by agent id
+exports.updateHumanAgentProfileByAgentId = async (req, res) => {
+  try {
+    const agentId = req.agent.id;
+    const profileData = req.body;
+
+    logger.info('Updating agent profile', {
+      agentId,
+      fields: Object.keys(profileData),
+    });
+
+    const updatedProfile = await humanAgentService.updateHumanAgentProfileByAgentId(
+      agentId,
+      profileData
+    );
+
+    return responseBuilder.ok(
+      res,
+      updatedProfile,
+      'Agent profile updated successfully'
+    );
+  } catch (error) {
+    logger.error('Failed to update agent profile', {
+      agentId: req.agent?.id,
+      error: error.message,
+    });
+
+    return responseBuilder.internalError(
+      res,
+      null,
+      'Failed to update agent profile'
+    );
   }
 };
