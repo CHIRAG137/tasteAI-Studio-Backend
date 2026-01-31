@@ -2,6 +2,7 @@ const firecrawlService = require('../services/firecrawlService');
 const logger = require('../utils/logger');
 const responseBuilder = require('../utils/responseBuilder');
 
+// crawl the website and extract sub-urls
 exports.crawlWebsite = async (req, res) => {
   try {
     logger.info('Crawl website request received', { body: req.body });
@@ -15,6 +16,7 @@ exports.crawlWebsite = async (req, res) => {
   }
 };
 
+// scrape multiple urls 
 exports.scrapeUrls = async (req, res) => {
   try {
     logger.info('Scrape URLs request received', { body: req.body });
@@ -32,12 +34,13 @@ exports.scrapeUrls = async (req, res) => {
   }
 };
 
-exports.getScrapeResult = async (req, res) => {
+// get scrape result by job id
+exports.getScrapeResultByJobId = async (req, res) => {
   try {
     const { jobId } = req.params;
     logger.info('Get scrape result request received', { jobId });
 
-    const result = await firecrawlService.getScrapeResult(jobId);
+    const result = await firecrawlService.getScrapeResultByJobId(jobId);
 
     logger.info('Scrape result fetched successfully', {
       jobId,

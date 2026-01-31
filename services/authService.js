@@ -1,19 +1,12 @@
 const bcrypt = require('bcrypt');
-const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const SlackIntegration = require('../models/SlackIntegration');
-const { OAuth2Client } = require('google-auth-library');
 const logger = require('../utils/logger');
+const client = require('../config/googleClient');
+const { createToken } = require('../utils/tokenUtils');
 
-const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
-
-const createToken = (user) => {
-  return jwt.sign({ id: user._id, email: user.email }, process.env.JWT_SECRET, {
-    expiresIn: '7d',
-  });
-};
-
-exports.register = async (email, password, name) => {
+// register user
+exports.registerUser = async (email, password, name) => {
   try {
     const existingUser = await User.findOne({ email });
     if (existingUser) {
@@ -33,7 +26,8 @@ exports.register = async (email, password, name) => {
   }
 };
 
-exports.login = async (email, password) => {
+// login user
+exports.loginUser = async (email, password) => {
   try {
     const user = await User.findOne({ email });
     if (!user || !user.password) {
@@ -56,7 +50,8 @@ exports.login = async (email, password) => {
   }
 };
 
-exports.googleLogin = async (googleToken) => {
+// user login via google login
+exports.googleLoginUser = async (googleToken) => {
   try {
     const ticket = await client.verifyIdToken({
       idToken: googleToken,
@@ -82,7 +77,8 @@ exports.googleLogin = async (googleToken) => {
   }
 };
 
-exports.getUserDetails = async (userId) => {
+// get user details by user id
+exports.getUserDetailsByUserId = async (userId) => {
   try {
     const user = await User.findById(userId).select('-password');
     if (!user) {

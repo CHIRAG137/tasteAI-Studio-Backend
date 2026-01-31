@@ -2,10 +2,11 @@ const authService = require('../services/authService');
 const logger = require('../utils/logger');
 const responseBuilder = require('../utils/responseBuilder');
 
-exports.register = async (req, res) => {
+// register user
+exports.registerUser = async (req, res) => {
   try {
     const { email, password, name } = req.body;
-    const result = await authService.register(email, password, name);
+    const result = await authService.registerUser(email, password, name);
 
     logger.info('User registered successfully', { email });
     return responseBuilder.created(res, result, 'User registered successfully');
@@ -15,10 +16,11 @@ exports.register = async (req, res) => {
   }
 };
 
-exports.login = async (req, res) => {
+// login user
+exports.loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
-    const result = await authService.login(email, password);
+    const result = await authService.loginUser(email, password);
 
     logger.info('User logged in', { email });
     return responseBuilder.ok(res, result, 'Login successful');
@@ -28,10 +30,11 @@ exports.login = async (req, res) => {
   }
 };
 
-exports.googleLogin = async (req, res) => {
+// login user via google login
+exports.googleLoginUser = async (req, res) => {
   try {
     const googleToken = req.body.token;
-    const result = await authService.googleLogin(googleToken);
+    const result = await authService.googleLoginUser(googleToken);
 
     logger.info('Google login successful');
     return responseBuilder.ok(res, result, 'Google login successful');
@@ -41,10 +44,11 @@ exports.googleLogin = async (req, res) => {
   }
 };
 
-exports.getUserDetails = async (req, res) => {
+// get user details by user id
+exports.getUserDetailsByUserId = async (req, res) => {
   try {
     const userId = req.user._id;
-    const result = await authService.getUserDetails(userId);
+    const result = await authService.getUserDetailsByUserId(userId);
 
     if (!result) {
       logger.warn('User not found', { userId });

@@ -71,10 +71,34 @@ exports.requestHumanHandoff = async ({
       assignmentMethod: assignmentResult.method,
     });
 
-    // 6. Update agent's active chat count if online
-    if (assignmentResult.agent.isOnline) {
-      await HumanAgent.findByIdAndUpdate(assignmentResult.agent._id, {
-        $inc: { currentActiveChats: 1 },
+    // 6. Increment agent chat count (ATOMIC)
+    await HumanAgent.findByIdAndUpdate(
+      assignmentResult.agent._id,
+      { $inc: { totalChatsAssigned: 1 } },
+      { new: false }
+    );
+
+    const agent = assignmentResult.agent;
+
+    const shouldAutoAccept =
+      agent.autoAcceptChats && agent.isAvailableForChat();
+
+    if (shouldAutoAccept) {
+      await HumanAgent.findByIdAndUpdate(
+        agent._id,
+        { $inc: { currentActiveChats: 1 } },
+        { new: true }
+      );
+
+      if (updatedAgent.currentActiveChats >= updatedAgent.maxConcurrentChats) {
+        await HumanAgent.findByIdAndUpdate(agent._id, {
+          availabilityStatus: 'busy',
+        });
+      }
+
+      await HandoffSession.findByIdAndUpdate(handoffSession._id, {
+        status: 'active',
+        acceptedAt: new Date(),
       });
     }
 
@@ -253,9 +277,12 @@ async function sendHandoffNotifications(
   }
 
   // Optional: If assigned agent doesn't respond in 2 minutes, escalate to others
-  setTimeout(() => {
-    checkAndEscalate(handoffSession._id, allAgents);
-  }, 2 * 60 * 1000); // 2 minutes
+  setTimeout(
+    () => {
+      checkAndEscalate(handoffSession._id, allAgents);
+    },
+    2 * 60 * 1000
+  ); // 2 minutes
 }
 
 /**
@@ -431,7 +458,11 @@ exports.acceptHandoffSession = async (agentId, handoffSessionId) => {
 /**
  * Agent resolves handoff session
  */
-exports.resolveHandoffSession = async (agentId, handoffSessionId, notes = '') => {
+exports.resolveHandoffSession = async (
+  agentId,
+  handoffSessionId,
+  notes = ''
+) => {
   try {
     const session = await HandoffSession.findById(handoffSessionId);
 
@@ -527,7 +558,12 @@ exports.getAgentHandoffSessions = async (agentId, status = 'all') => {
 /**
  * Add a message to handoff session
  */
-exports.addMessageToSession = async (handoffSessionId, sender, message, agentId = null) => {
+exports.addMessageToSession = async (
+  handoffSessionId,
+  sender,
+  message,
+  agentId = null
+) => {
   try {
     const session = await HandoffSession.findById(handoffSessionId);
 
@@ -564,10 +600,10 @@ exports.addMessageToSession = async (handoffSessionId, sender, message, agentId 
       messageCount: session.messages.length,
     });
 
-    return { 
+    return {
       success: true,
       message: newMessage,
-      session: session
+      session: session,
     };
   } catch (error) {
     logger.error('Error adding message', {

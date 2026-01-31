@@ -1,29 +1,55 @@
 const summarizerService = require('../services/summarizeService');
+const logger = require('../utils/logger');
+const responseBuilder = require('../utils/responseBuilder');
 
-exports.summarizeConversation = async (req, res) => {
+// summarize session conversion using gemini
+exports.summarizeSessionConversation = async (req, res) => {
   try {
     const { messages, botName } = req.body;
 
-    if (!messages || !Array.isArray(messages) || messages.length === 0) {
-      return res
-        .status(400)
-        .json({ status: 'error', message: 'Messages array is required.' });
+    // Validation
+    if (!Array.isArray(messages) || messages.length === 0) {
+      logger.warn('Summarization failed - invalid messages payload', {
+        botName,
+        messageCount: Array.isArray(messages) ? messages.length : 0,
+      });
+
+      return responseBuilder.badRequest(
+        res,
+        null,
+        'Messages array is required.'
+      );
     }
 
-    const summary = await summarizerService.summarizeWithGemini(
+    logger.info('Starting conversation summarization', {
+      botName,
+      messageCount: messages.length,
+    });
+
+    const summary = await summarizerService.summarizeConversationWithGemini(
       messages,
       botName
     );
 
-    res.json({
-      status: 'success',
+    logger.info('Conversation summarization completed', {
+      botName,
+      messageCount: messages.length,
+      summaryLength: summary?.length || 0,
+    });
+
+    return responseBuilder.ok(res, {
       summary,
     });
   } catch (error) {
-    console.error('Error in summarizeConversation controller:', error);
-    res.status(500).json({
-      status: 'error',
-      message: error.message || 'Failed to summarize conversation.',
+    logger.error('Error during conversation summarization', {
+      error: error.message,
+      stack: error.stack,
     });
+
+    return responseBuilder.internalError(
+      res,
+      null,
+      error.message || 'Failed to summarize conversation.'
+    );
   }
 };

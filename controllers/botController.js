@@ -2,6 +2,7 @@ const botService = require('../services/botService');
 const logger = require('../utils/logger');
 const responseBuilder = require('../utils/responseBuilder');
 
+// create chatbot
 exports.createBot = async (req, res) => {
   try {
     const result = await botService.createBot(req);
@@ -16,10 +17,11 @@ exports.createBot = async (req, res) => {
       error: error.message,
       stack: error.stack,
     });
-    return responseBuilder.error(res, 'Failed to create bot');
+    return responseBuilder.internalError(res, 'Failed to create bot');
   }
 };
 
+// ask a query to a bot
 exports.askBot = async (req, res) => {
   try {
     const { question, botId } = req.body;
@@ -29,27 +31,52 @@ exports.askBot = async (req, res) => {
     return responseBuilder.ok(res, result, 'Bot responded successfully');
   } catch (error) {
     logger.error('Ask bot error', { error: error.message, stack: error.stack });
-    return responseBuilder.error(res, 'Failed to get bot response');
+    return responseBuilder.internalError(res, 'Failed to get bot response');
   }
 };
 
+// get all the chatbots(paginated)
 exports.getAllChatBots = async (req, res) => {
   try {
     const userId = req.user.id;
-    const bots = await botService.getAllChatBots(userId);
 
-    logger.info('Fetched all chat bots', { userId, count: bots.length });
-    return responseBuilder.ok(res, { bots }, 'Chat bots fetched successfully');
+    const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+    const limit = Math.min(parseInt(req.query.limit, 10) || 10, 50);
+    const skip = (page - 1) * limit;
+
+    const { bots, pagination } = await botService.getAllChatBots(
+      userId,
+      { skip, limit, page }
+    );
+
+    logger.info('Fetched chat bots', {
+      userId,
+      page,
+      limit,
+      returnedCount: bots.length,
+      totalBots: pagination.total,
+    });
+
+    return responseBuilder.ok(
+      res,
+      { bots, pagination },
+      'Chat bots fetched successfully'
+    );
   } catch (error) {
-    logger.error('Error fetching all chat bots', { error: error.message });
+    logger.error('Error fetching all chat bots', {
+      userId: req.user?.id,
+      error: error.message,
+    });
+
     return responseBuilder.internalError(res, 'Failed to fetch bots');
   }
 };
 
-exports.getBotById = async (req, res) => {
+// get bot by bot id
+exports.getBotByBotId = async (req, res) => {
   try {
     const botId = req.params.botId;
-    const bot = await botService.getBotById(botId);
+    const bot = await botService.getBotByBotId(botId);
 
     if (!bot) {
       logger.warn('Bot not found', { botId });
@@ -67,11 +94,12 @@ exports.getBotById = async (req, res) => {
   }
 };
 
-exports.deleteBot = async (req, res) => {
+// delete bot by bot id
+exports.deleteBotByBotId = async (req, res) => {
   try {
     const userId = req.user.id;
     const botId = req.params.botId;
-    await botService.deleteBot(botId, userId);
+    await botService.deleteBotByBotId(botId, userId);
 
     logger.info('Bot deleted successfully', { botId, userId });
     return responseBuilder.ok(
@@ -89,13 +117,14 @@ exports.deleteBot = async (req, res) => {
   }
 };
 
-exports.updateBot = async (req, res) => {
+// update bot by bot id
+exports.updateBotByBotId = async (req, res) => {
   try {
     const userId = req.user.id;
     const botId = req.params.botId;
     const file = req.file;
 
-    const updatedBot = await botService.updateBot(
+    const updatedBot = await botService.updateBotByBotId(
       botId,
       userId,
       req.body,
@@ -118,12 +147,13 @@ exports.updateBot = async (req, res) => {
   }
 };
 
-exports.getCustomization = async (req, res) => {
+// get bot customization by bot id
+exports.getBotCustomizationByBotId = async (req, res) => {
   try {
     const { botId } = req.params;
     logger.info('Fetching customization', { botId, userId: req.user?.id });
 
-    const customization = await botService.getCustomization(botId);
+    const customization = await botService.getCustomizationByBotId(botId);
 
     logger.info('Customization fetched successfully', {
       botId,
@@ -148,7 +178,8 @@ exports.getCustomization = async (req, res) => {
   }
 };
 
-exports.saveCustomization = async (req, res) => {
+// save bot customisation
+exports.saveBotCustomization = async (req, res) => {
   try {
     const { botId } = req.params;
     logger.info('Saving customization', {
@@ -157,7 +188,7 @@ exports.saveCustomization = async (req, res) => {
       body: req.body,
     });
 
-    const customization = await botService.saveCustomization(botId, req.body);
+    const customization = await botService.saveBotCustomization(botId, req.body);
 
     logger.info('Customization saved successfully', {
       botId,
@@ -182,17 +213,33 @@ exports.saveCustomization = async (req, res) => {
   }
 };
 
-exports.getAllChatHistories = async (req, res) => {
+// get all chat histories by bot id(paginated)
+exports.getAllChatHistoriesByBotId = async (req, res) => {
   const { botId } = req.params;
-  try {
-    logger.info('Fetching all chat histories', { botId, userId: req.user?.id });
+  const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+  const limit = Math.min(parseInt(req.query.limit, 10) || 10, 100);
 
-    const result = await botService.getAllChatHistories(botId);
+  try {
+    logger.info('Fetching all chat histories', {
+      botId,
+      userId: req.user?.id,
+      page,
+      limit,
+    });
+
+    const result = await botService.getAllChatHistoriesByBotId(
+      botId,
+      page,
+      limit
+    );
 
     logger.info('Fetched all chat histories successfully', {
       botId,
       userId: req.user?.id,
+      page,
+      limit,
       totalSessions: result.totalSessions,
+      totalPages: result.totalPages,
     });
 
     return responseBuilder.ok(
@@ -215,7 +262,8 @@ exports.getAllChatHistories = async (req, res) => {
   }
 };
 
-exports.getChatHistoryBySession = async (req, res) => {
+// get chat history by session id
+exports.getChatHistoryBySessionId = async (req, res) => {
   const { botId, sessionId } = req.params;
   try {
     logger.info('Fetching specific chat history', {
@@ -224,7 +272,7 @@ exports.getChatHistoryBySession = async (req, res) => {
       userId: req.user?.id,
     });
 
-    const result = await botService.getChatHistoryBySession(botId, sessionId);
+    const result = await botService.getChatHistoryBySessionId(botId, sessionId);
 
     logger.info('Fetched specific chat history successfully', {
       botId,

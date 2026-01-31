@@ -1,17 +1,28 @@
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const genAIClient = require('../config/genAIClient');
+const logger = require('../utils/logger');
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-
-exports.summarizeWithGemini = async (messages, botName) => {
+exports.summarizeConversationWithGemini = async (messages, botName) => {
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    logger.info('Initializing Gemini summarization', {
+      botName,
+      messageCount: messages.length,
+    });
 
-    // Combine all messages into a single conversation text
+    const model = genAIClient.getGenerativeModel({
+      model: 'gemini-2.5-flash',
+    });
+
     const conversationText = messages
       .map(
-        (msg) => `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`
+        (msg) =>
+          `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`
       )
       .join('\n\n');
+
+    logger.debug('Gemini summarization prompt prepared', {
+      botName,
+      conversationLength: conversationText.length,
+    });
 
     const prompt = `
 You are an AI summarizer. Summarize the following conversation between a user and a chatbot named ${botName}.
@@ -25,9 +36,19 @@ ${conversationText}
     const result = await model.generateContent(prompt);
     const text = result.response.text();
 
+    logger.info('Gemini summarization successful', {
+      botName,
+      summaryLength: text?.length || 0,
+    });
+
     return text;
   } catch (error) {
-    console.error('Gemini summarization failed:', error);
+    logger.error('Gemini summarization failed', {
+      botName,
+      error: error.message,
+      stack: error.stack,
+    });
+
     throw new Error('Failed to summarize conversation using Gemini.');
   }
 };
