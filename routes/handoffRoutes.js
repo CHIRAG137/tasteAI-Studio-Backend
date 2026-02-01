@@ -12,11 +12,14 @@ router.post('/request', handoffController.requestHandoff);
 
 /**
  * @route   GET /api/handoff/sessions
- * @desc    Get agent's handoff sessions
- * @access  Private (Agent only)
- * @query   status=all|active|resolved|pending
+ * @desc    Get all handoff sessions for the authenticated agent
+ * @query   status - Filter by status ('all', 'active', 'pending', 'resolved')
+ * @query   includeEscalated - Include escalated sessions (default: true)
+ * @query   page - Page number for pagination
+ * @query   limit - Items per page
+ * @access  Private (Agent must be authenticated)
  */
-router.get('/sessions', authenticateHumanAgent, handoffController.getAgentSessions);
+router.get('/sessions', authenticateHumanAgent, handoffController.getHumanAgentHandoffs);
 
 /**
  * @route   POST /api/handoff/:id/accept

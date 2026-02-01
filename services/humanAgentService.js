@@ -287,20 +287,36 @@ exports.humanAgentVerifyInviteToken = async (token) => {
 exports.getBotsByHumanAgentId = async (agentId) => {
   logger.info('Fetching bots for agent', { agentId });
 
-  // Find all BotAgent mappings for this agent
+  // Fetch all bot-agent mappings for this human agent
   const botAgents = await BotAgent.find({
     humanAgent: agentId,
-    isEnabled: true,
   }).populate('bot');
 
-  const bots = botAgents.map((ba) => ba.bot).filter((bot) => bot !== null);
+  const enabledBots = [];
+  const disabledBots = [];
 
-  logger.info('Fetched bots for agent', { agentId, count: bots.length });
+  for (const ba of botAgents) {
+    if (!ba.bot) continue;
 
-  return bots;
+    if (ba.isEnabled) {
+      enabledBots.push(ba.bot);
+    } else {
+      disabledBots.push(ba.bot);
+    }
+  }
+
+  logger.info('Fetched bots for agent', {
+    agentId,
+    enabledCount: enabledBots.length,
+    disabledCount: disabledBots.length,
+  });
+
+  return {
+    enabledBots,
+    disabledBots,
+  };
 };
 
-// gt human agent stats by id
 exports.getHumanAgentStatsById = async (agentId) => {
   try {
     const agent = await HumanAgent.findById(agentId);
@@ -309,29 +325,100 @@ exports.getHumanAgentStatsById = async (agentId) => {
       throw new Error('Agent not found');
     }
 
-    // Get session counts
-    const totalSessions = await HandoffSession.countDocuments({
-      assignedAgent: agentId,
-    });
-
-    const activeSessions = await HandoffSession.countDocuments({
-      assignedAgent: agentId,
-      status: { $in: ['pending', 'active'] },
-    });
-
-    const resolvedSessions = await HandoffSession.countDocuments({
-      assignedAgent: agentId,
-      status: 'resolved',
-    });
-
-    // Get today's sessions
     const startOfDay = new Date();
     startOfDay.setHours(0, 0, 0, 0);
 
-    const todaySessions = await HandoffSession.countDocuments({
-      assignedAgent: agentId,
-      requestedAt: { $gte: startOfDay },
-    });
+    const [
+      // Session stats - only sessions currently assigned to agent
+      totalSessionsAssigned,
+      activeSessionsAssigned,
+      resolvedSessionsAssigned,
+      todayResolvedSessions,
+
+      // Escalation stats - sessions that came via escalation
+      totalEscalatedToAgent,
+      currentlyActiveEscalated,
+      totalEscalatedAway,
+      resolvedEscalatedSessions,
+      
+      // Escalation reason breakdown
+      escalationReasonsRaw,
+    ] = await Promise.all([
+      // Total sessions ever assigned to this agent (current assignee)
+      HandoffSession.countDocuments({ 
+        assignedAgent: agentId 
+      }),
+
+      // Active/pending sessions currently assigned to this agent
+      HandoffSession.countDocuments({
+        assignedAgent: agentId,
+        status: { $in: ['pending', 'active'] },
+      }),
+
+      // Resolved sessions currently assigned to this agent
+      HandoffSession.countDocuments({
+        assignedAgent: agentId,
+        status: 'resolved',
+      }),
+
+      // Sessions resolved today by this agent
+      HandoffSession.countDocuments({
+        assignedAgent: agentId,
+        status: 'resolved',
+        resolvedAt: { $gte: startOfDay },
+      }),
+
+      // Total sessions escalated TO this agent (currently assigned + has escalation history)
+      HandoffSession.countDocuments({
+        assignedAgent: agentId,
+        escalated: true,
+        'escalationHistory.newAgent': agentId,
+      }),
+
+      // Currently active/pending sessions that were escalated to this agent
+      HandoffSession.countDocuments({
+        assignedAgent: agentId,
+        escalated: true,
+        'escalationHistory.newAgent': agentId,
+        status: { $in: ['pending', 'active'] },
+      }),
+
+      // Total sessions escalated AWAY from this agent (in escalation history as previous agent)
+      HandoffSession.countDocuments({
+        'escalationHistory.previousAgent': agentId,
+      }),
+
+      // Resolved sessions that were escalated to this agent
+      HandoffSession.countDocuments({
+        assignedAgent: agentId,
+        escalated: true,
+        'escalationHistory.newAgent': agentId,
+        status: 'resolved',
+      }),
+
+      // Escalation reason breakdown for sessions escalated away
+      HandoffSession.aggregate([
+        { $unwind: '$escalationHistory' },
+        {
+          $match: {
+            'escalationHistory.previousAgent': agentId,
+          },
+        },
+        {
+          $group: {
+            _id: '$escalationHistory.reason',
+            count: { $sum: 1 },
+          },
+        },
+      ]),
+    ]);
+
+    const escalationReasons = escalationReasonsRaw.reduce((acc, item) => {
+      acc[item._id || 'unknown'] = item.count;
+      return acc;
+    }, {});
+
+    logger.info('Human agent stats computed', { agentId });
 
     return {
       agent: {
@@ -339,27 +426,39 @@ exports.getHumanAgentStatsById = async (agentId) => {
         displayName: agent.displayName,
         isOnline: agent.isOnline,
         availabilityStatus: agent.availabilityStatus,
-        currentActiveChats: agent.currentActiveChats,
+        currentActiveChats: agent.currentActiveChats, // Sessions in active/pending state assigned to agent
         maxConcurrentChats: agent.maxConcurrentChats,
         loadPercentage: agent.loadPercentage,
       },
+
       metrics: {
-        totalChatsHandled: agent.totalChatsHandled,
+        totalChatsHandled: agent.totalChatsHandled, // Sessions resolved by agent
         averageResponseTime: agent.averageResponseTime,
         averageResolutionTime: agent.averageResolutionTime,
         averageRating: agent.averageRating,
         totalRatings: agent.totalRatings,
       },
+
       sessions: {
-        total: totalSessions,
-        active: activeSessions,
-        resolved: resolvedSessions,
-        today: todaySessions,
+        total: totalSessionsAssigned, // Total sessions assigned to agent (any status)
+        active: activeSessionsAssigned, // Sessions in pending/active assigned to agent
+        resolved: resolvedSessionsAssigned, // Sessions in resolved status assigned to agent
+        today: todayResolvedSessions, // Sessions resolved today assigned to agent
+      },
+
+      escalations: {
+        totalAssigned: totalEscalatedToAgent, // Total sessions assigned by escalation
+        currentlyActive: currentlyActiveEscalated, // Active/pending sessions assigned by escalation
+        escalatedAway: totalEscalatedAway, // Total sessions escalated away from agent
+        escalatedTo: totalEscalatedToAgent, // Total sessions assigned to agent by escalation (same as totalAssigned)
+        resolvedByAgent: resolvedEscalatedSessions, // Resolved sessions that were escalated to agent
+        byReason: escalationReasons, // Breakdown by escalation reason
       },
     };
   } catch (error) {
-    logger.error('Error fetching agent stats', {
+    logger.error('Error fetching human agent stats', {
       error: error.message,
+      stack: error.stack,
       agentId,
     });
     throw error;
