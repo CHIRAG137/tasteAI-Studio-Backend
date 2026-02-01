@@ -8,6 +8,7 @@ const { cosineSimilarity } = require('../utils/embedUtils');
 const logger = require('../utils/logger');
 const FlowSession = require('../models/FlowSession');
 const HumanAgentService = require('../services/humanAgentService');
+const { handleHumanAgentRemovalEscalation } = require('../services/handleHumanAgentRemovalService');
 const HumanAgent = require('../models/HumanAgent');
 const BotAgent = require('../models/BotAgent');
 const {
@@ -666,6 +667,8 @@ exports.updateBotByBotId = async (botId, userId, body, file) => {
   const addedEmails = newEmails.filter((email) => !oldEmails.includes(email));
   const removedEmails = oldEmails.filter((email) => !newEmails.includes(email));
 
+  let removedAgentIds = [];
+
   if (addedEmails.length > 0) {
     await HumanAgentService.syncBotAndHumanAgents({
       botId: bot._id,
@@ -677,6 +680,7 @@ exports.updateBotByBotId = async (botId, userId, body, file) => {
   if (removedEmails.length > 0) {
     const agents = await HumanAgent.find({ email: { $in: removedEmails } });
     const agentIds = agents.map((a) => a._id);
+    removedAgentIds = agentIds;
     await BotAgent.updateMany(
       {
         bot: bot._id,
@@ -684,6 +688,11 @@ exports.updateBotByBotId = async (botId, userId, body, file) => {
       },
       { isEnabled: false }
     );
+    logger.info('Disabled bot-agent relationships for removed agents', {
+      botId,
+      removedEmails,
+      agentIds: agentIds.map((id) => id.toString()),
+    });
   }
 
   // Slack auto-join
@@ -759,6 +768,30 @@ exports.updateBotByBotId = async (botId, userId, body, file) => {
   }
 
   await bot.save();
+
+  if (removedAgentIds.length > 0) {
+    try {
+      logger.info('Starting handoff escalation for removed agents', {
+        botId,
+        removedAgentIds: removedAgentIds.map((id) => id.toString()),
+      });
+
+      await handleHumanAgentRemovalEscalation(bot._id, removedAgentIds);
+
+      logger.info('Handoff escalation completed successfully', {
+        botId,
+        removedAgentIds: removedAgentIds.map((id) => id.toString()),
+      });
+    } catch (escalationError) {
+      logger.error('Error during handoff escalation', {
+        error: escalationError.message,
+        stack: escalationError.stack,
+        botId,
+        removedAgentIds: removedAgentIds.map((id) => id.toString()),
+      });
+    }
+  }
+
   logger.info('Bot updated and saved successfully', {
     botId,
     userId,

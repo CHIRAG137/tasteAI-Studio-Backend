@@ -100,37 +100,61 @@ exports.resolveHandoff = async (req, res) => {
   }
 };
 
-/**
- * Get agent's handoff sessions
- * GET /api/handoff/sessions?status=all|active|resolved|pending
- */
-exports.getAgentSessions = async (req, res) => {
+// get all handoff sessions for the authenticated agent including sessions that were escalated away
+exports.getHumanAgentHandoffs = async (req, res) => {
   try {
     const agentId = req.agent.id;
-    const { status = 'all' } = req.query;
+    const {
+      status = 'all',
+      includeEscalated = 'true',
+      page = 1,
+      limit = 50,
+    } = req.query;
 
-    const sessions = await humanHandoffService.getAgentHandoffSessions(
-      agentId,
-      status
-    );
-
-    logger.info('Fetched agent sessions', {
+    logger.info('Fetching human agent handoff sessions', {
       agentId,
       status,
-      count: sessions.length,
+      includeEscalated,
+      page,
+      limit,
+    });
+
+    const result = await humanHandoffService.getHumanAgentHandoffSessions(
+      agentId,
+      {
+        status,
+        includeEscalated: includeEscalated === 'true',
+        page: parseInt(page, 10),
+        limit: parseInt(limit, 10),
+      }
+    );
+
+    logger.info('Handoff sessions fetched successfully', {
+      agentId,
+      totalSessions: result.pagination?.total || result.sessions.length,
+      page: result.pagination?.page,
     });
 
     return responseBuilder.ok(
       res,
-      { sessions, count: sessions.length },
-      'Sessions fetched successfully'
+      {
+        sessions: result.sessions,
+        pagination: result.pagination,
+      },
+      'Handoff sessions retrieved successfully'
     );
   } catch (error) {
-    logger.error('Error fetching agent sessions', {
+    logger.error('Error fetching human agent handoff sessions', {
       error: error.message,
+      stack: error.stack,
       agentId: req.agent?.id,
+      query: req.query,
     });
-    return responseBuilder.internalError(res, 'Failed to fetch sessions');
+
+    return responseBuilder.internalError(
+      res,
+      error.message || 'Failed to retrieve handoff sessions'
+    );
   }
 };
 
@@ -152,7 +176,6 @@ exports.addMessage = async (req, res) => {
     // Check if session exists and is active
     const session = await HandoffSession.findById(handoffSessionId);
     
-    console.log(session)
     if (!session) {
       return responseBuilder.notFound(res, null, 'Session not found');
     }

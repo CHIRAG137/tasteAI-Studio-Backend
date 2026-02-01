@@ -527,10 +527,35 @@ exports.resolveHandoffSession = async (
 /**
  * Get handoff sessions for an agent
  */
-exports.getAgentHandoffSessions = async (agentId, status = 'all') => {
+exports.getHumanAgentHandoffSessions = async (
+  agentId,
+  filters = {}
+) => {
   try {
-    const query = { assignedAgent: agentId };
+    const {
+      status = 'all',
+      includeEscalated = true,
+      page = 1,
+      limit = 50,
+    } = filters;
 
+    // Build the query
+    let query = {};
+
+    if (includeEscalated) {
+      // Include sessions currently assigned OR previously assigned (escalated away)
+      query = {
+        $or: [
+          { assignedAgent: agentId },
+          { 'escalationHistory.previousAgent': agentId },
+        ],
+      };
+    } else {
+      // Only currently assigned sessions
+      query = { assignedAgent: agentId };
+    }
+
+    // Add status filter
     if (status !== 'all') {
       if (status === 'active') {
         query.status = { $in: ['pending', 'active'] };
@@ -539,17 +564,78 @@ exports.getAgentHandoffSessions = async (agentId, status = 'all') => {
       }
     }
 
-    const sessions = await HandoffSession.find(query)
-      .populate('bot', 'name description')
-      .populate('flowSession')
-      .sort({ requestedAt: -1 })
-      .limit(100); // Limit to recent 100
+    // Execute query with pagination
+    const skip = (page - 1) * limit;
 
-    return sessions;
-  } catch (error) {
-    logger.error('Error fetching agent sessions', {
-      error: error.message,
+    const [sessions, totalCount] = await Promise.all([
+      HandoffSession.find(query)
+        .populate('bot', 'name description')
+        .populate('assignedAgent', 'email displayName avatarUrl')
+        .populate('escalationHistory.previousAgent', 'email displayName')
+        .populate('escalationHistory.newAgent', 'email displayName')
+        .populate('flowSession')
+        .sort({ requestedAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      HandoffSession.countDocuments(query),
+    ]);
+
+    // Enrich sessions with escalation metadata
+    const enrichedSessions = sessions.map((session) => {
+      // Check if this agent is the current assignee or was escalated
+      const isCurrentAssignee =
+        session.assignedAgent._id.toString() === agentId.toString();
+
+      let escalationInfo = null;
+
+      if (!isCurrentAssignee && session.escalationHistory?.length > 0) {
+        // Find the escalation record where this agent was the previous agent
+        const relevantEscalation = session.escalationHistory.find(
+          (esc) => esc.previousAgent._id.toString() === agentId.toString()
+        );
+
+        if (relevantEscalation) {
+          escalationInfo = {
+            wasEscalated: true,
+            escalatedFrom: relevantEscalation.previousStatus,
+            escalatedTo: relevantEscalation.newAgent.email,
+            escalatedAt: relevantEscalation.escalatedAt,
+            reason: relevantEscalation.reason,
+          };
+        }
+      }
+
+      return {
+        ...session,
+        isCurrentAssignee,
+        escalationInfo,
+      };
+    });
+
+    logger.info('Retrieved agent handoff sessions with escalation info', {
       agentId,
+      totalCount,
+      page,
+      limit,
+      includeEscalated,
+    });
+
+    return {
+      sessions: enrichedSessions,
+      pagination: {
+        currentPage: page,
+        totalPages: Math.ceil(totalCount / limit),
+        totalCount,
+        hasMore: skip + sessions.length < totalCount,
+      },
+    };
+  } catch (error) {
+    logger.error('Error fetching agent sessions with escalation', {
+      error: error.message,
+      stack: error.stack,
+      agentId,
+      filters,
     });
     throw error;
   }
