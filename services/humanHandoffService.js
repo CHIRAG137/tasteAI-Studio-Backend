@@ -114,6 +114,19 @@ exports.requestHumanHandoff = async ({
       human_handoff_requested: true,
       human_handoff_session: handoffSession._id,
       human_handoff_agent: assignmentResult.agent._id,
+      currentMode: 'handoff',
+      activeHandoffSessionId: handoffSession._id,
+      $push: {
+        history: {
+          mode: 'handoff',
+          type: 'handoff_initiated',
+          content: userQuestion,
+          agentAssigned: assignmentResult.agent._id,
+          handoffSessionId: handoffSession._id,
+          timestamp: new Date(),
+          fromUser: true,
+        },
+      },
     });
 
     logger.info('Human handoff session created', {
@@ -679,6 +692,42 @@ exports.addMessageToSession = async (
 
     // Save the session
     await session.save();
+
+    // Also save to FlowSession history if flowSession is linked
+    if (session.flowSession) {
+      try {
+        const flowSession = await FlowSession.findById(session.flowSession);
+        if (flowSession) {
+          flowSession.history.push({
+            mode: 'handoff',
+            messageText: message,
+            sender: sender,
+            agentId: agentId || null,
+            handoffSessionId: handoffSessionId,
+            timestamp: new Date(),
+            fromUser: sender === 'user',
+          });
+
+          // Update current mode to handoff
+          flowSession.currentMode = 'handoff';
+          flowSession.activeHandoffSessionId = handoffSessionId;
+
+          await flowSession.save();
+          logger.debug('Message saved to FlowSession history', {
+            flowSessionId: session.flowSession,
+            handoffSessionId,
+            sender,
+          });
+        }
+      } catch (error) {
+        logger.error('Error saving message to FlowSession', {
+          error: error.message,
+          flowSessionId: session.flowSession,
+          handoffSessionId,
+        });
+        // Don't throw error, continue with handoff message save
+      }
+    }
 
     logger.debug('Message added to handoff session', {
       handoffSessionId,
