@@ -92,10 +92,11 @@ exports.startFlow = async (req, res) => {
       startNode.id
     );
 
-    // Save outputs to history
+    // Save outputs to history with flow mode
     if (runResult.outputs && runResult.outputs.length > 0) {
       session.history.push(
         ...runResult.outputs.map((o) => ({
+          mode: 'flow',
           nodeId: o.nodeId,
           type: o.type,
           content: o.content,
@@ -108,6 +109,7 @@ exports.startFlow = async (req, res) => {
     // Save paused node to history if exists
     if (runResult.pausedFor) {
       session.history.push({
+        mode: 'flow',
         nodeId: runResult.pausedFor.nodeId,
         type: runResult.pausedFor.type,
         content: runResult.pausedFor.message || runResult.pausedFor.prompt,
@@ -123,6 +125,11 @@ exports.startFlow = async (req, res) => {
 
     if (!session.currentNodeId) {
       session.isFinished = true;
+    }
+
+    // Update current mode if not in handoff
+    if (session.currentMode !== 'handoff') {
+      session.currentMode = 'flow';
     }
 
     await session.save();
@@ -238,6 +245,7 @@ exports.respondToFlow = async (req, res) => {
 
         // Save user choice
         session.history.push({
+          mode: 'flow',
           nodeId: waitingNode.id,
           type: 'branch_select',
           content: {
@@ -265,6 +273,7 @@ exports.respondToFlow = async (req, res) => {
 
         // Save user input
         session.history.push({
+          mode: 'flow',
           nodeId: waitingNode.id,
           type: 'user_input',
           content: input,
@@ -290,10 +299,11 @@ exports.respondToFlow = async (req, res) => {
         break;
     }
 
-    // Save outputs to history
+    // Save outputs to history with flow mode
     if (runResult.outputs && runResult.outputs.length > 0) {
       session.history.push(
         ...runResult.outputs.map((o) => ({
+          mode: 'flow',
           nodeId: o.nodeId,
           type: o.type,
           content: o.content,
@@ -303,9 +313,10 @@ exports.respondToFlow = async (req, res) => {
       );
     }
 
-    // Save paused node to history if exists
+    // Save paused node to history if exists with flow mode
     if (runResult.pausedFor) {
       session.history.push({
+        mode: 'flow',
         nodeId: runResult.pausedFor.nodeId,
         type: runResult.pausedFor.type,
         content: runResult.pausedFor.message || runResult.pausedFor.prompt,
@@ -321,6 +332,11 @@ exports.respondToFlow = async (req, res) => {
 
     if (!session.currentNodeId) {
       session.isFinished = true;
+    }
+
+    // Update current mode if not in handoff
+    if (session.currentMode !== 'handoff') {
+      session.currentMode = 'flow';
     }
 
     await session.save();
@@ -349,3 +365,54 @@ exports.respondToFlow = async (req, res) => {
     return res.status(500).json({ error: err.message });
   }
 };
+
+/**
+ * Add a system message to flow session history
+ * POST /api/flow/session/:sessionId/system-message
+ * Used for handoff status messages and other system events
+ */
+exports.addSystemMessage = async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    const { message, messageType = 'system', handoffSessionId = null } = req.body;
+
+    if (!message) {
+      return res.status(400).json({ error: 'Message is required' });
+    }
+
+    const session = await FlowSession.findById(sessionId);
+    if (!session) {
+      return res.status(404).json({ error: 'Flow session not found' });
+    }
+
+    // Create history entry for system message
+    const historyEntry = {
+      mode: 'handoff',
+      type: messageType,
+      content: message,
+      sender: 'bot',
+      systemMessage: true,
+      timestamp: new Date(),
+      fromUser: false,
+    };
+
+    // Add handoff session ID if provided
+    if (handoffSessionId) {
+      historyEntry.handoffSessionId = handoffSessionId;
+    }
+
+    // Add to history
+    session.history.push(historyEntry);
+    await session.save();
+
+    return res.json({
+      status: 'success',
+      message: 'System message added to session',
+      data: historyEntry,
+    });
+  } catch (err) {
+    console.error('Error adding system message:', err);
+    return res.status(500).json({ error: err.message });
+  }
+};
+

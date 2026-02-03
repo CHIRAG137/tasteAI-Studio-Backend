@@ -24,10 +24,16 @@ exports.createBot = async (req, res) => {
 // ask a query to a bot
 exports.askBot = async (req, res) => {
   try {
-    const { question, botId } = req.body;
-    const result = await botService.askBot(question, botId);
+    const { question, botId, sessionId, flowSessionId } = req.body;
+    // Support both sessionId and flowSessionId parameter names
+    const resolvedSessionId = sessionId || flowSessionId;
+    const result = await botService.askBot(
+      question,
+      botId,
+      resolvedSessionId
+    );
 
-    logger.info('Bot answered question', { botId, question });
+    logger.info('Bot answered question', { botId, question, sessionId: resolvedSessionId });
     return responseBuilder.ok(res, result, 'Bot responded successfully');
   } catch (error) {
     logger.error('Ask bot error', { error: error.message, stack: error.stack });

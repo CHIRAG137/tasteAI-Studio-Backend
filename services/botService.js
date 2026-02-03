@@ -401,14 +401,14 @@ exports.createBot = async (req) => {
 };
 
 // ask query to a chatbot
-exports.askBot = async (question, botId) => {
+exports.askBot = async (question, botId, flowSessionId = null) => {
   const bot = await ChatBot.findById(botId);
   if (!bot) {
     logger.error('Bot not found', { botId });
     throw new Error('Bot not found');
   }
 
-  logger.info('Bot asked a question', { botId, question });
+  logger.info('Bot asked a question', { botId, question, flowSessionId });
 
   const inputEmbedding = await getEmbedding(question);
   const qas = await QAHistory.find({ bot: botId });
@@ -424,7 +424,11 @@ exports.askBot = async (question, botId) => {
     }
   }
 
+  let answer = null;
+  let source = 'qa';
+
   if (bestScore > 0.85 && bestMatch) {
+    answer = bestMatch.answer;
     await QAHistory.create({
       bot: botId,
       question,
@@ -433,16 +437,53 @@ exports.askBot = async (question, botId) => {
     });
 
     logger.info('Best QA match found', { botId, score: bestScore, question });
-
-    return { answer: bestMatch.answer, score: bestScore, source: 'qa' };
+  } else {
+    logger.warn('No strong QA match found', {
+      botId,
+      score: bestScore,
+      question,
+    });
+    source = 'none';
   }
 
-  logger.warn('No strong QA match found', {
-    botId,
-    score: bestScore,
-    question,
-  });
-  return { message: 'No match found.', score: bestScore };
+  // Save to FlowSession if sessionId is provided
+  if (flowSessionId) {
+    try {
+      const session = await FlowSession.findById(flowSessionId);
+      if (session) {
+        // Add the Q&A to the history
+        session.history.push({
+          mode: 'qa',
+          question,
+          answer: answer || 'No match found',
+          timestamp: new Date(),
+          fromUser: false,
+          score: bestScore,
+        });
+
+        // Update current mode to QA
+        if (session.currentMode !== 'handoff') {
+          session.currentMode = 'qa';
+        }
+
+        await session.save();
+        logger.info('QA saved to FlowSession', { flowSessionId, botId });
+      }
+    } catch (error) {
+      logger.error('Error saving QA to FlowSession', {
+        error: error.message,
+        flowSessionId,
+        botId,
+      });
+      // Don't throw error, continue with response
+    }
+  }
+
+  if (source === 'qa') {
+    return { answer, score: bestScore, source };
+  }
+
+  return { message: 'No match found.', score: bestScore, source };
 };
 
 // get all the chatbots(paginated)

@@ -11,4 +11,8 @@ router.post('/start/:botId', flowController.startFlow);
 // body: { input: "Chirag", optionIndexOrLabel: 0 }
 router.post('/session/:sessionId/respond', flowController.respondToFlow);
 
+// add a system message to flow session (for handoff messages, etc)
+// body: { message: "message text", messageType: "handoff_*", handoffSessionId?: "id" }
+router.post('/session/:sessionId/system-message', flowController.addSystemMessage);
+
 module.exports = router;
