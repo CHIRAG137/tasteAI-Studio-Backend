@@ -371,3 +371,80 @@ exports.getClientMessages = async (req, res) => {
     return responseBuilder.internalError(res, 'Failed to fetch messages');
   }
 };
+
+
+/**
+ * Client resolves a handoff session (public)
+ * POST /api/handoff/:id/client-resolve
+ */
+exports.resolveByClient = async (req, res) => {
+  try {
+    const { id: handoffSessionId } = req.params;
+    const { flowSessionId } = req.body;
+
+    if (!flowSessionId) {
+      return responseBuilder.badRequest(res, null, 'Flow Session ID is required');
+    }
+
+    const result = await humanHandoffService.resolveHandoffSessionByClient(
+      flowSessionId,
+      handoffSessionId
+    );
+
+    logger.info('Client resolved handoff', { handoffSessionId, flowSessionId });
+
+    return responseBuilder.ok(res, result, 'Handoff session resolved by client');
+  } catch (error) {
+    logger.error('Error client resolving handoff', { error: error.message, handoffSessionId: req.params.id });
+    return responseBuilder.internalError(res, error.message);
+  }
+};
+
+
+/**
+ * Client reopens a resolved handoff session (public)
+ * POST /api/handoff/:id/client-reopen
+ */
+exports.reopenByClient = async (req, res) => {
+  try {
+    const { id: handoffSessionId } = req.params;
+    const { flowSessionId } = req.body;
+
+    if (!flowSessionId) {
+      return responseBuilder.badRequest(res, null, 'Flow Session ID is required');
+    }
+
+    const result = await humanHandoffService.reopenHandoffSessionByClient(
+      flowSessionId,
+      handoffSessionId
+    );
+
+    logger.info('Client reopened handoff', { handoffSessionId, flowSessionId });
+
+    return responseBuilder.ok(res, result, 'Handoff session reopened by client');
+  } catch (error) {
+    logger.error('Error client reopening handoff', { error: error.message, handoffSessionId: req.params.id });
+    return responseBuilder.internalError(res, error.message);
+  }
+};
+
+
+/**
+ * Agent reopens a resolved handoff session (agent)
+ * POST /api/handoff/:id/reopen
+ */
+exports.reopenByAgent = async (req, res) => {
+  try {
+    const { id: handoffSessionId } = req.params;
+    const agentId = req.agent.id;
+
+    const result = await humanHandoffService.reopenHandoffSessionByAgent(agentId, handoffSessionId);
+
+    logger.info('Agent reopened handoff', { agentId, handoffSessionId });
+
+    return responseBuilder.ok(res, result, 'Handoff session reopened by agent');
+  } catch (error) {
+    logger.error('Error agent reopening handoff', { error: error.message, agentId: req.agent?.id, handoffSessionId: req.params.id });
+    return responseBuilder.internalError(res, error.message);
+  }
+};

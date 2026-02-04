@@ -36,6 +36,11 @@ router.post('/:id/accept', authenticateHumanAgent, handoffController.acceptHando
 router.post('/:id/resolve', authenticateHumanAgent, handoffController.resolveHandoff);
 
 /**
+ * Agent reopens a resolved session
+ */
+router.post('/:id/reopen', authenticateHumanAgent, handoffController.reopenByAgent);
+
+/**
  * @route   POST /api/handoff/:id/message
  * @desc    Add a message to handoff session
  * @access  Private (Agent only)
@@ -55,6 +60,10 @@ router.get('/:id/messages', authenticateHumanAgent, handoffController.getMessage
  * @access  Public (called from chat bot)
  */
 router.post('/:id/client-message', handoffController.addClientMessage);
+
+// Client resolve / reopen endpoints (public)
+router.post('/:id/client-resolve', handoffController.resolveByClient);
+router.post('/:id/client-reopen', handoffController.reopenByClient);
 
 /**
  * @route   GET /api/handoff/:id/client-messages
