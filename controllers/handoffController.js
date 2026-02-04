@@ -1,5 +1,5 @@
 const HandoffSession = require('../models/HandoffSession');
-const humanHandoffService = require('../services/HumanHandoffService');
+const humanHandoffService = require('../services/humanHandoffService');
 const logger = require('../utils/logger');
 const responseBuilder = require('../utils/responseBuilder');
 
