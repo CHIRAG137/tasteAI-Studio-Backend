@@ -538,6 +538,169 @@ exports.resolveHandoffSession = async (
 };
 
 /**
+ * Client resolves a handoff session (user ends the chat)
+ */
+exports.resolveHandoffSessionByClient = async (flowSessionId, handoffSessionId) => {
+  try {
+    const session = await HandoffSession.findById(handoffSessionId);
+
+    if (!session) {
+      throw new Error('Handoff session not found');
+    }
+
+    if (session.flowSession.toString() !== flowSessionId) {
+      throw new Error('Not authorized to resolve this session');
+    }
+
+    if (session.status === 'resolved') {
+      return { success: true, message: 'Session already resolved' };
+    }
+
+    const resolutionTime = Math.floor((Date.now() - session.requestedAt.getTime()) / 1000);
+
+    await HandoffSession.findByIdAndUpdate(handoffSessionId, {
+      status: 'resolved',
+      resolvedAt: new Date(),
+      resolutionTime,
+    });
+
+    // Update flow session flags
+    await FlowSession.findByIdAndUpdate(session.flowSession, {
+      human_handoff_resolved: true,
+      human_handoff_resolved_at: new Date(),
+    });
+
+    return { success: true, resolutionTime };
+  } catch (error) {
+    logger.error('Error resolving handoff by client', {
+      error: error.message,
+      flowSessionId,
+      handoffSessionId,
+    });
+    throw error;
+  }
+};
+
+
+/**
+ * Client re-opens a resolved handoff session (user requests reopen)
+ */
+exports.reopenHandoffSessionByClient = async (flowSessionId, handoffSessionId) => {
+  try {
+    const session = await HandoffSession.findById(handoffSessionId);
+
+    if (!session) throw new Error('Handoff session not found');
+
+    if (session.flowSession.toString() !== flowSessionId) {
+      throw new Error('Not authorized to reopen this session');
+    }
+
+    if (session.status !== 'resolved') {
+      return { success: true, message: 'Session is not resolved' };
+    }
+
+    // Re-run agent selection for reopen
+    const botId = session.bot;
+    const eligibleAgents = await getEligibleAgents(botId);
+    const assignmentResult = await findBestAgent(eligibleAgents, botId);
+
+    // Update session to pending and assign new agent
+    await HandoffSession.findByIdAndUpdate(handoffSessionId, {
+      status: 'pending',
+      requestedAt: new Date(),
+      resolvedAt: null,
+      acceptedAt: null,
+      assignedAgent: assignmentResult.agent._id,
+      assignmentMethod: assignmentResult.method,
+    });
+
+    // Update flow session
+    await FlowSession.findByIdAndUpdate(session.flowSession, {
+      human_handoff_resolved: false,
+      human_handoff_resolved_at: null,
+      human_handoff_requested: true,
+      human_handoff_agent: assignmentResult.agent._id,
+      activeHandoffSessionId: handoffSessionId,
+      $push: {
+        history: {
+          mode: 'handoff',
+          type: 'handoff_reopened',
+          handoffSessionId,
+          agentAssigned: assignmentResult.agent._id,
+          timestamp: new Date(),
+          fromUser: true,
+        },
+      },
+    });
+
+    // Send notifications to assigned agent
+    await sendHandoffNotifications(session, assignmentResult, eligibleAgents);
+
+    return { success: true, handoffSessionId, assignedAgent: assignmentResult.agent };
+  } catch (error) {
+    logger.error('Error reopening handoff by client', {
+      error: error.message,
+      flowSessionId,
+      handoffSessionId,
+    });
+    throw error;
+  }
+};
+
+
+/**
+ * Agent re-opens a resolved handoff session (agent reassigns / re-activates)
+ */
+exports.reopenHandoffSessionByAgent = async (agentId, handoffSessionId) => {
+  try {
+    const session = await HandoffSession.findById(handoffSessionId);
+
+    if (!session) throw new Error('Handoff session not found');
+
+    if (session.status !== 'resolved') {
+      return { success: true, message: 'Session is not resolved' };
+    }
+
+    // Update session back to active and assign to this agent
+    await HandoffSession.findByIdAndUpdate(handoffSessionId, {
+      status: 'active',
+      acceptedAt: new Date(),
+      resolvedAt: null,
+      assignedAgent: agentId,
+    });
+
+    // Increment agent active chat count
+    await HumanAgent.findByIdAndUpdate(agentId, { $inc: { currentActiveChats: 1 } });
+
+    // Update flow session
+    await FlowSession.findByIdAndUpdate(session.flowSession, {
+      human_handoff_resolved: false,
+      human_handoff_resolved_at: null,
+      activeHandoffSessionId: handoffSessionId,
+      $push: {
+        history: {
+          mode: 'handoff',
+          type: 'handoff_reopened_by_agent',
+          handoffSessionId,
+          agentAssigned: agentId,
+          timestamp: new Date(),
+          fromUser: false,
+        },
+      },
+    });
+
+    return { success: true, handoffSessionId };
+  } catch (error) {
+    logger.error('Error reopening handoff by agent', {
+      error: error.message,
+      agentId,
+      handoffSessionId,
+    });
+    throw error;
+  }
+};
+
+/**
  * Get handoff sessions for an agent
  */
 exports.getHumanAgentHandoffSessions = async (
