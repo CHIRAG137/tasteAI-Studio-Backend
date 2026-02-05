@@ -27,6 +27,11 @@ const HumanAgentInviteTokenSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    // whether a reminder email has been sent for this token
+    reminderSent: {
+      type: Boolean,
+      default: false,
+    },
   },
   { timestamps: true }
 );

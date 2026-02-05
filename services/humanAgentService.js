@@ -83,17 +83,40 @@ exports.syncBotAndHumanAgents = async ({ botId, emails, invitedBy }) => {
           to: email,
           subject: 'Set up your Agent Dashboard access',
           html: `
-            <p>You've been invited as an agent.</p>
-            <p>
-              <a href="${process.env.FRONTEND_URL}/agent/set-password?token=${token}">
-                Set your password
-              </a>
-            </p>
-            <p>This link expires in 24 hours.</p>
+        <div style="font-family: Arial, sans-serif; max-width: 680px; margin: 0 auto;">
+          <div style="text-align:center; padding: 24px 0;">
+            <h2 style="color: #064E3B; margin: 0;">Set up your Agent Dashboard access</h2>
+            <p style="color: #065F46; margin-top: 8px;">Welcome to TasteAI Studio — you're invited to join our agent team.</p>
+          </div>
+
+          <div style="background-color: #ffffff; border: 1px solid #e6f4ea; padding: 18px; border-radius: 8px;">
+            <p style="margin: 0 0 12px 0; color: #111827;">Hi there,</p>
+            <p style="margin: 0 0 12px 0; color: #374151; line-height: 1.4;">An administrator has invited you to access the Agent Dashboard so you can respond to user handoff requests and manage conversations.</p>
+
+            <div style="background-color: #f0fdf4; padding: 12px 14px; border-radius: 6px; margin: 14px 0;">
+              <p style="margin: 0; color: #065F46;"><strong>What to do next</strong></p>
+              <p style="margin: 8px 0 0 0; color: #065F46;">Click the button below to set your password and access the dashboard. This link will expire in 24 hours.</p>
+            </div>
+
+            <div style="text-align:center; margin: 18px 0;">
+              <a href="${process.env.FRONTEND_URL}/agent/set-password?token=${token}" style="background-color: #059669; color: #ffffff; padding: 12px 22px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: 600;">Set your password &amp; open dashboard</a>
+            </div>
+
+            <p style="margin: 0 0 8px 0; color: #6b7280;">If the button doesn't work, copy and paste the following URL into your browser:</p>
+            <p style="word-break: break-all; color: #111827; margin: 6px 0 0 0; font-size: 13px;">${process.env.FRONTEND_URL}/agent/set-password?token=${token}</p>
+
+            <hr style="border: none; border-top: 1px solid #eef2f7; margin: 18px 0;" />
+
+            <p style="color: #374151; font-size: 13px; margin: 0;">If you did not expect this invitation, you can safely ignore this message or contact your administrator.</p>
+          </div>
+
+          <p style="margin-top: 18px; color: #9ca3af; font-size: 12px;">This is an automated message from TasteAI Studio.</p>
+        </div>
           `,
         });
 
-        logger.info('Invite email sent to agent', { email });
+          logger.info('Invite email sent to agent', { email });
+
       } else {
         logger.debug('Agent already has password set, skipping invite', {
           email,

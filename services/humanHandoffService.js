@@ -634,7 +634,16 @@ exports.reopenHandoffSessionByClient = async (flowSessionId, handoffSessionId) =
     });
 
     // Send notifications to assigned agent
-    await sendHandoffNotifications(session, assignmentResult, eligibleAgents);
+      await sendHandoffNotifications(session, assignmentResult, eligibleAgents);
+
+      // Also send an explicit email notifying the assigned agent that the client reopened the chat
+      try {
+        if (assignmentResult?.agent) {
+          await sendClientReopenEmail(assignmentResult.agent, session);
+        }
+      } catch (e) {
+        logger.error('Failed to send client reopen email', { error: e.message, handoffSessionId: handoffSessionId });
+      }
 
     return { success: true, handoffSessionId, assignedAgent: assignmentResult.agent };
   } catch (error) {
@@ -644,6 +653,50 @@ exports.reopenHandoffSessionByClient = async (flowSessionId, handoffSessionId) =
       handoffSessionId,
     });
     throw error;
+  }
+
+
+  /**
+   * Send a styled email to agent when a client re-opens a resolved handoff session
+   */
+  async function sendClientReopenEmail(agent, session) {
+    try {
+      if (!agent.emailNotifications) {
+        logger.info('Agent has email notifications disabled; skipping reopen email', { agentEmail: agent.email });
+        return;
+      }
+
+      await sendEmail({
+        to: agent.email,
+        subject: 'Client reopened the chat — please review',
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #059669;">Conversation Reopened</h2>
+            <p>The user has reopened a previously resolved conversation and it has been assigned to you.</p>
+
+            <div style="background-color: #f0fdf4; padding: 15px; border-radius: 8px; margin: 20px 0;">
+              <p><strong>Session ID:</strong> ${session._id}</p>
+              <p><strong>Question:</strong></p>
+              <p style="margin: 10px 0;">${session.userQuestion || 'Not specified'}</p>
+              <p><strong>Requested at:</strong> ${new Date(session.requestedAt).toLocaleString()}</p>
+            </div>
+
+            <div style="margin-top: 20px;">
+              <a href="${process.env.FRONTEND_URL}/agent/dashboard/handoff/${session._id}" 
+                 style="background-color: #059669; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+                View and Respond
+              </a>
+            </div>
+
+            <p style="margin-top: 20px; color: #666; font-size: 12px;">This is an automated notification from TasteAI Studio.</p>
+          </div>
+        `,
+      });
+
+      logger.info('Client reopen email sent to agent', { agentEmail: agent.email, handoffSessionId: session._id });
+    } catch (error) {
+      logger.error('Failed to send client reopen email', { error: error.message, agentEmail: agent.email, handoffSessionId: session._id });
+    }
   }
 };
 
