@@ -73,4 +73,11 @@ router.post('/:id/client-reopen', handoffController.reopenByClient);
  */
 router.get('/:id/client-messages', handoffController.getClientMessages);
 
+/**
+ * @route   POST /api/handoff/:id/rate
+ * @desc    Client submits rating and optional feedback for a handoff session
+ * @access  Public (called from chat bot)
+ */
+router.post('/:id/rate', handoffController.rateByClient);
+
 module.exports = router;

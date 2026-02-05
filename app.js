@@ -15,6 +15,7 @@ const elevenlabsRoutes = require('./routes/elevenlabsRoutes');
 const imageGenerationRoutes = require('./routes/imageGenerationRoutes');
 const humanAgentRoutes = require('./routes/humanAgentRoutes');
 const handoffRoutes = require('./routes/handoffRoutes');
+const { startInviteReminderScheduler } = require('./services/inviteReminderScheduler');
 
 require('dotenv').config();
 
@@ -62,4 +63,8 @@ app.get('/api/keep-alive', (req, res) => {
 });
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+  // Start the invite reminder scheduler (runs every hour)
+  startInviteReminderScheduler('0 * * * *');
+});

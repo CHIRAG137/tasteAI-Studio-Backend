@@ -448,3 +448,64 @@ exports.reopenByAgent = async (req, res) => {
     return responseBuilder.internalError(res, error.message);
   }
 };
+
+/**
+ * Client rates a handoff session and provides optional feedback
+ * POST /api/handoff/:id/rate
+ */
+exports.rateByClient = async (req, res) => {
+  try {
+    const { id: handoffSessionId } = req.params;
+    const { flowSessionId, rating, feedback } = req.body;
+
+    if (!flowSessionId) {
+      return responseBuilder.badRequest(res, null, 'Flow Session ID is required');
+    }
+
+    if (!rating || typeof rating !== 'number' || rating < 1 || rating > 5) {
+      return responseBuilder.badRequest(res, null, 'Rating must be an integer between 1 and 5');
+    }
+
+    const HandoffSession = require('../models/HandoffSession');
+    const session = await HandoffSession.findById(handoffSessionId);
+    if (!session) {
+      return responseBuilder.notFound(res, null, 'Handoff session not found');
+    }
+
+    if (session.flowSession.toString() !== flowSessionId) {
+      return responseBuilder.forbidden(res, null, 'Not authorized to rate this session');
+    }
+
+    // Save rating and feedback
+    const previousRating = session.userRating || null;
+    session.userRating = rating;
+    if (feedback) session.userFeedback = feedback;
+    await session.save();
+
+    // Update agent aggregate rating
+    const HumanAgent = require('../models/HumanAgent');
+    const agent = await HumanAgent.findById(session.assignedAgent);
+    if (agent) {
+      if (previousRating) {
+        // adjust average without changing totalRatings
+        const total = agent.totalRatings || 0;
+        if (total > 0) {
+          agent.averageRating = ((agent.averageRating * total) - previousRating + rating) / total;
+        } else {
+          agent.averageRating = rating;
+          agent.totalRatings = 1;
+        }
+      } else {
+        const total = agent.totalRatings || 0;
+        agent.averageRating = ((agent.averageRating * total) + rating) / (total + 1);
+        agent.totalRatings = total + 1;
+      }
+      await agent.save();
+    }
+
+    return responseBuilder.ok(res, { success: true }, 'Rating submitted');
+  } catch (error) {
+    logger.error('Error submitting rating', { error: error.message, handoffSessionId: req.params.id });
+    return responseBuilder.internalError(res, error.message);
+  }
+};

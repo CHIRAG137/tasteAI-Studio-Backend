@@ -8,6 +8,8 @@ const { cosineSimilarity } = require('../utils/embedUtils');
 const logger = require('../utils/logger');
 const FlowSession = require('../models/FlowSession');
 const HumanAgentService = require('../services/humanAgentService');
+const sendEmail = require('../utils/sendEmailUtil');
+const User = require('../models/User');
 const { handleHumanAgentRemovalEscalation } = require('../services/handleHumanAgentRemovalService');
 const HumanAgent = require('../models/HumanAgent');
 const BotAgent = require('../models/BotAgent');
@@ -160,6 +162,41 @@ exports.createBot = async (req) => {
       emails: parsedHumanEmails,
       invitedBy: req.user.id,
     });
+    // Notify existing agents (who already have passwords) that they were added
+    try {
+      const existingAgents = await HumanAgent.find({ email: { $in: parsedHumanEmails } });
+      const inviter = await User.findById(req.user.id).lean().catch(() => null);
+      for (const agent of existingAgents) {
+        if (agent.isPasswordSet) {
+          try {
+            await sendEmail({
+              to: agent.email,
+              subject: `You've been added as an agent to ${name}`,
+              html: `
+        <div style="font-family: Arial, sans-serif; max-width: 680px; margin: 0 auto;">
+          <div style="text-align:center; padding: 20px 0;">
+            <h2 style="color: #064E3B; margin: 0;">You've been added as an agent</h2>
+            <p style="color: #065F46; margin-top: 8px;">You can now respond to user handoff requests for <strong>${name}</strong>.</p>
+          </div>
+          <div style="background-color: #ffffff; border: 1px solid #e6f4ea; padding: 16px; border-radius: 8px;">
+            <p style="margin: 0 0 12px 0; color: #374151;">Hello${agent.displayName ? ' ' + agent.displayName : ''},</p>
+            <p style="margin: 0 0 12px 0; color: #374151; line-height: 1.4;">${inviter ? (inviter.displayName || inviter.email) : 'An administrator'} has added you as a human agent for the bot <strong>${name}</strong>. You'll receive handoff requests from users and can respond via the Agent Dashboard.</p>
+            <div style="text-align:center; margin: 18px 0;">
+              <a href="${process.env.FRONTEND_URL}/agent/dashboard" style="background-color: #059669; color: #ffffff; padding: 10px 18px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: 600;">Open Agent Dashboard</a>
+            </div>
+            <p style="color: #6b7280; font-size: 13px; margin: 0;">If you have questions, contact your administrator.</p>
+          </div>
+        </div>
+              `,
+            });
+          } catch (e) {
+            logger.error('Failed sending agent added notification', { error: e.message, email: agent.email, botId: bot._id });
+          }
+        }
+      }
+    } catch (e) {
+      logger.error('Error notifying existing agents after bot create', { error: e.message, botId: bot._id });
+    }
   }
 
   // Start parallel data processing and slack integration
@@ -716,6 +753,42 @@ exports.updateBotByBotId = async (botId, userId, body, file) => {
       emails: addedEmails,
       invitedBy: userId,
     });
+
+    // Notify existing agents (already have password) that they were invited/added
+    try {
+      const existingAgents = await HumanAgent.find({ email: { $in: addedEmails } });
+      const inviter = await User.findById(userId).lean().catch(() => null);
+      for (const agent of existingAgents) {
+        if (agent.isPasswordSet) {
+          try {
+            await sendEmail({
+              to: agent.email,
+              subject: `You've been added as an agent to ${bot.name}`,
+              html: `
+        <div style="font-family: Arial, sans-serif; max-width: 680px; margin: 0 auto;">
+          <div style="text-align:center; padding: 20px 0;">
+            <h2 style="color: #064E3B; margin: 0;">You've been added as an agent</h2>
+            <p style="color: #065F46; margin-top: 8px;">You can now respond to user handoff requests for <strong>${bot.name}</strong>.</p>
+          </div>
+          <div style="background-color: #ffffff; border: 1px solid #e6f4ea; padding: 16px; border-radius: 8px;">
+            <p style="margin: 0 0 12px 0; color: #374151;">Hello${agent.displayName ? ' ' + agent.displayName : ''},</p>
+            <p style="margin: 0 0 12px 0; color: #374151; line-height: 1.4;">${inviter ? (inviter.displayName || inviter.email) : 'An administrator'} has added you as a human agent for the bot <strong>${bot.name}</strong>. You'll receive handoff requests from users and can respond via the Agent Dashboard.</p>
+            <div style="text-align:center; margin: 18px 0;">
+              <a href="${process.env.FRONTEND_URL}/agent/dashboard" style="background-color: #059669; color: #ffffff; padding: 10px 18px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: 600;">Open Agent Dashboard</a>
+            </div>
+            <p style="color: #6b7280; font-size: 13px; margin: 0;">If you have questions, contact your administrator.</p>
+          </div>
+        </div>
+              `,
+            });
+          } catch (e) {
+            logger.error('Failed sending agent added notification', { error: e.message, email: agent.email, botId: bot._id });
+          }
+        }
+      }
+    } catch (e) {
+      logger.error('Error notifying existing agents after bot update', { error: e.message, botId: bot._id });
+    }
   }
 
   if (removedEmails.length > 0) {
@@ -734,6 +807,35 @@ exports.updateBotByBotId = async (botId, userId, body, file) => {
       removedEmails,
       agentIds: agentIds.map((id) => id.toString()),
     });
+      try {
+        const remover = await User.findById(userId).lean().catch(() => null);
+        for (const email of removedEmails) {
+          try {
+            await sendEmail({
+              to: email,
+              subject: `Access revoked: ${bot.name} agent access removed`,
+              html: `
+        <div style="font-family: Arial, sans-serif; max-width: 680px; margin: 0 auto;">
+          <div style="text-align:center; padding: 20px 0;">
+            <h2 style="color: #9b1c1c; margin: 0;">Agent access revoked</h2>
+            <p style="color: #6b1f1f; margin-top: 8px;">Your access to the agent dashboard for <strong>${bot.name}</strong> has been revoked.</p>
+          </div>
+          <div style="background-color: #ffffff; border: 1px solid #fdecea; padding: 16px; border-radius: 8px;">
+            <p style="margin: 0 0 12px 0; color: #374151;">Hello,</p>
+            <p style="margin: 0 0 12px 0; color: #374151; line-height: 1.4;">Your agent access for the bot <strong>${bot.name}</strong> has been removed by ${remover ? (remover.displayName || remover.email) : 'an administrator'}.</p>
+            <p style="margin: 0 0 12px 0; color: #374151;">If you believe this was a mistake or have questions, please contact the administrator who invited you.</p>
+            <p style="color: #6b7280; font-size: 13px; margin: 0;">This change affects only the access to this bot and does not delete your account.</p>
+          </div>
+        </div>
+              `,
+            });
+          } catch (e) {
+            logger.error('Failed sending agent removed notification', { error: e.message, email, botId: bot._id });
+          }
+        }
+      } catch (e) {
+        logger.error('Error sending removed-agent notifications', { error: e.message, botId: bot._id });
+      }
   }
 
   // Slack auto-join
