@@ -366,3 +366,30 @@ exports.getAgentsByBotId = async (req, res) => {
     return responseBuilder.internalError(res, 'Failed to fetch agents');
   }
 };
+
+// human agent logout
+exports.humanAgentLogout = async (req, res) => {
+  try {
+    const agentId = req.agent.id;
+
+    const result = await humanAgentService.humanAgentLogout(agentId);
+
+    logger.info('Agent logged out successfully', {
+      agentId: result.agent._id,
+      email: result.agent.email,
+    });
+
+    return responseBuilder.ok(
+      res,
+      { message: 'Logout successful' },
+      'Logout successful'
+    );
+  } catch (error) {
+    logger.error('Logout error', {
+      error: error.message,
+      agentId: req.agent?.id,
+    });
+
+    return responseBuilder.internalError(res, 'Logout failed');
+  }
+};

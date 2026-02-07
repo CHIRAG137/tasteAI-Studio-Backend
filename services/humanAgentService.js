@@ -244,7 +244,6 @@ exports.humanAgentLogin = async (email, password) => {
 
   // Update last login time
   humanAgent.lastLoginAt = new Date();
-  await humanAgent.save();
 
   // Generate JWT token
   const token = jwt.sign(
@@ -256,6 +255,11 @@ exports.humanAgentLogin = async (email, password) => {
     process.env.JWT_SECRET || 'your-secret-key',
     { expiresIn: '7d' }
   );
+
+  // Store token and expiry in database
+  humanAgent.agentAuthToken = token;
+  humanAgent.agentAuthTokenExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+  await humanAgent.save();
 
   logger.info('Agent logged in successfully', {
     agentId: humanAgent._id,
@@ -762,6 +766,43 @@ exports.getAgentsByBotId = async (botId) => {
       botId,
       stack: error.stack,
     });
+    throw error;
+  }
+};
+
+// human agent logout
+exports.humanAgentLogout = async (agentId) => {
+  logger.info('Agent logout attempt', { agentId });
+
+  try {
+    const agent = await HumanAgent.findByIdAndUpdate(
+      agentId,
+      { 
+        lastLogoutAt: new Date(),
+        agentAuthToken: null,
+        agentAuthTokenExpiresAt: null,
+        isOnline: false,
+        availabilityStatus: 'offline'
+      },
+      { new: true }
+    );
+
+    if (!agent) {
+      logger.warn('Agent not found for logout', { agentId });
+      throw new Error('Agent not found');
+    }
+
+    logger.info('Agent logged out successfully', { 
+      agentId: agent._id,
+      email: agent.email 
+    });
+
+    return {
+      message: 'Logout successful',
+      agent
+    };
+  } catch (error) {
+    logger.error('Logout error', { agentId, error: error.message });
     throw error;
   }
 };

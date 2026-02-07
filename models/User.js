@@ -12,6 +12,18 @@ const userSchema = new mongoose.Schema({
   
   // authenticated user google Id(if preferred method of login is google login)
   googleId: { type: String },
-});
+
+  // auth token for bot dashboard
+  authToken: { type: String, default: null },
+
+  // auth token expiry timestamp
+  authTokenExpiresAt: { type: Date, default: null },
+
+  // timestamp of when user last logged out
+  lastLogoutAt: { type: Date },
+
+  // flag to check if user is active
+  isActive: { type: Boolean, default: true },
+}, { timestamps: true });
 
 module.exports = mongoose.model('User', userSchema);

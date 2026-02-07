@@ -74,4 +74,11 @@ router.put(
  */
 router.get('/bot/:botId/agents', humanAgentController.getAgentsByBotId);
 
+/**
+ * @route   POST /api/human-agent/logout
+ * @desc    Logout human agent
+ * @access  Private (Human Agent)
+ */
+router.post('/logout', authenticateHumanAgent, humanAgentController.humanAgentLogout);
+
 module.exports = router;
