@@ -62,3 +62,31 @@ exports.getUserDetailsByUserId = async (req, res) => {
     return responseBuilder.internalError(res, err.message);
   }
 };
+
+// logout agent user
+exports.logoutAgent = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const result = await authService.logoutAgent(userId);
+
+    logger.info('Agent logged out successfully', { userId });
+    return responseBuilder.ok(res, result, 'Agent logout successful');
+  } catch (err) {
+    logger.error('Agent logout failed', { error: err.message });
+    return responseBuilder.internalError(res, err.message);
+  }
+};
+
+// logout bot dashboard user
+exports.logoutBot = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const result = await authService.logoutBot(userId);
+
+    logger.info('Bot dashboard user logged out successfully', { userId });
+    return responseBuilder.ok(res, result, 'Bot dashboard logout successful');
+  } catch (err) {
+    logger.error('Bot dashboard logout failed', { error: err.message });
+    return responseBuilder.internalError(res, err.message);
+  }
+};

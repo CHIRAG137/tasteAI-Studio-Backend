@@ -244,7 +244,6 @@ exports.humanAgentLogin = async (email, password) => {
 
   // Update last login time
   humanAgent.lastLoginAt = new Date();
-  await humanAgent.save();
 
   // Generate JWT token
   const token = jwt.sign(
@@ -256,6 +255,11 @@ exports.humanAgentLogin = async (email, password) => {
     process.env.JWT_SECRET || 'your-secret-key',
     { expiresIn: '7d' }
   );
+
+  // Store token and expiry in database
+  humanAgent.agentAuthToken = token;
+  humanAgent.agentAuthTokenExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+  await humanAgent.save();
 
   logger.info('Agent logged in successfully', {
     agentId: humanAgent._id,
@@ -569,4 +573,236 @@ exports.updateHumanAgentProfileByAgentId = async (agentId, data) => {
   logger.info('Agent profile updated', { agentId });
 
   return agent;
+};
+
+// Get all agents by bot id with comprehensive stats
+exports.getAgentsByBotId = async (botId) => {
+  logger.info('Fetching agents with stats for bot', { botId });
+
+  try {
+    // Find all bot-agent mappings for this bot
+    const botAgents = await BotAgent.find({
+      bot: botId,
+      isEnabled: true,
+    }).populate('humanAgent');
+
+    if (!botAgents || botAgents.length === 0) {
+      logger.info('No agents found for bot', { botId });
+      return [];
+    }
+
+    // Get agent IDs
+    const agentIds = botAgents.map((ba) => ba.humanAgent._id);
+
+    // Fetch all handoff sessions for these agents
+    const handoffSessions = await HandoffSession.find({
+      bot: botId,
+      $or: [
+        { assignedAgent: { $in: agentIds } },
+        { 'escalationHistory.previousAgent': { $in: agentIds } },
+      ],
+    });
+
+    // Build comprehensive stats for each agent
+    const agentsWithStats = botAgents.map((botAgent) => {
+      const agent = botAgent.humanAgent;
+      const agentId = agent._id;
+
+      // Filter handoff sessions for this specific agent
+      const agentSessions = handoffSessions.filter(
+        (session) =>
+          session.assignedAgent.toString() === agentId.toString() ||
+          session.escalationHistory.some(
+            (esc) => esc.previousAgent.toString() === agentId.toString()
+          )
+      );
+
+      // Calculate stats
+      const totalHandoffs = agentSessions.length;
+      const resolvedHandoffs = agentSessions.filter(
+        (s) => s.status === 'resolved'
+      ).length;
+      const activeHandoffs = agentSessions.filter(
+        (s) => s.status === 'active'
+      ).length;
+      const pendingHandoffs = agentSessions.filter(
+        (s) => s.status === 'pending'
+      ).length;
+      const abandonedHandoffs = agentSessions.filter(
+        (s) => s.status === 'abandoned'
+      ).length;
+      const transferredHandoffs = agentSessions.filter(
+        (s) => s.status === 'transferred'
+      ).length;
+
+      // Calculate escalations
+      const escalatedSessions = agentSessions.filter((s) => s.escalated);
+      const totalEscalations = escalatedSessions.length;
+
+      // Calculate average response time from sessions that have this metric
+      const sessionsWithResponseTime = agentSessions.filter(
+        (s) => s.responseTime !== undefined && s.responseTime !== null
+      );
+      const avgResponseTime =
+        sessionsWithResponseTime.length > 0
+          ? Math.round(
+              sessionsWithResponseTime.reduce((sum, s) => sum + s.responseTime, 0) /
+                sessionsWithResponseTime.length
+            )
+          : 0;
+
+      // Calculate average resolution time
+      const sessionsWithResolutionTime = agentSessions.filter(
+        (s) => s.resolutionTime !== undefined && s.resolutionTime !== null
+      );
+      const avgResolutionTime =
+        sessionsWithResolutionTime.length > 0
+          ? Math.round(
+              sessionsWithResolutionTime.reduce(
+                (sum, s) => sum + s.resolutionTime,
+                0
+              ) / sessionsWithResolutionTime.length
+            )
+          : 0;
+
+      // Calculate resolution rate
+      const resolutionRate =
+        totalHandoffs > 0
+          ? Math.round((resolvedHandoffs / totalHandoffs) * 100)
+          : 0;
+
+      // Calculate escalation rate
+      const escalationRate =
+        totalHandoffs > 0
+          ? Math.round((totalEscalations / totalHandoffs) * 100)
+          : 0;
+
+      // Get average rating from sessions that have ratings
+      const sessionsWithRating = agentSessions.filter(
+        (s) => s.userRating !== undefined && s.userRating !== null
+      );
+      const avgUserRating =
+        sessionsWithRating.length > 0
+          ? (
+              sessionsWithRating.reduce((sum, s) => sum + s.userRating, 0) /
+              sessionsWithRating.length
+            ).toFixed(2)
+          : 0;
+
+      return {
+        // Agent basic info
+        agentId: agent._id,
+        email: agent.email,
+        displayName: agent.displayName || 'N/A',
+        avatarUrl: agent.avatarUrl || null,
+        phoneNumber: agent.phoneNumber || null,
+
+        // Account status
+        isActive: agent.isActive,
+        isPasswordSet: agent.isPasswordSet,
+        isOnline: agent.isOnline,
+        availabilityStatus: agent.availabilityStatus,
+        lastSeenAt: agent.lastSeenAt,
+        lastLoginAt: agent.lastLoginAt,
+
+        // Capacity info
+        totalChatsAssigned: agent.totalChatsAssigned,
+        currentActiveChats: agent.currentActiveChats,
+        maxConcurrentChats: agent.maxConcurrentChats,
+        loadPercentage: Math.round(
+          (agent.currentActiveChats / agent.maxConcurrentChats) * 100
+        ),
+        hasCapacity: agent.currentActiveChats < agent.maxConcurrentChats,
+
+        // Performance metrics
+        averageResponseTime: agent.averageResponseTime || avgResponseTime,
+        averageResolutionTime:
+          agent.averageResolutionTime || avgResolutionTime,
+        averageRating: agent.averageRating || avgUserRating,
+        totalRatings: agent.totalRatings,
+
+        // Handoff statistics
+        stats: {
+          totalHandoffs,
+          resolvedHandoffs,
+          activeHandoffs,
+          pendingHandoffs,
+          abandonedHandoffs,
+          transferredHandoffs,
+          resolutionRate,
+          totalEscalations,
+          escalationRate,
+          avgResponseTimeInSeconds: avgResponseTime,
+          avgResolutionTimeInSeconds: avgResolutionTime,
+          avgUserRating: parseFloat(avgUserRating),
+          totalRatingsReceived: sessionsWithRating.length,
+        },
+
+        // Skills and availability
+        skills: agent.skills || [],
+        timezone: agent.timezone,
+        workingHours: agent.workingHours,
+
+        // Preferences
+        emailNotifications: agent.emailNotifications,
+        soundNotifications: agent.soundNotifications,
+        autoAcceptChats: agent.autoAcceptChats,
+
+        // Metadata
+        createdAt: agent.createdAt,
+        updatedAt: agent.updatedAt,
+      };
+    });
+
+    logger.info('Fetched agents with stats for bot', {
+      botId,
+      agentCount: agentsWithStats.length,
+    });
+
+    return agentsWithStats;
+  } catch (error) {
+    logger.error('Error fetching agents with stats for bot', {
+      error: error.message,
+      botId,
+      stack: error.stack,
+    });
+    throw error;
+  }
+};
+
+// human agent logout
+exports.humanAgentLogout = async (agentId) => {
+  logger.info('Agent logout attempt', { agentId });
+
+  try {
+    const agent = await HumanAgent.findByIdAndUpdate(
+      agentId,
+      { 
+        lastLogoutAt: new Date(),
+        agentAuthToken: null,
+        agentAuthTokenExpiresAt: null,
+        isOnline: false,
+        availabilityStatus: 'offline'
+      },
+      { new: true }
+    );
+
+    if (!agent) {
+      logger.warn('Agent not found for logout', { agentId });
+      throw new Error('Agent not found');
+    }
+
+    logger.info('Agent logged out successfully', { 
+      agentId: agent._id,
+      email: agent.email 
+    });
+
+    return {
+      message: 'Logout successful',
+      agent
+    };
+  } catch (error) {
+    logger.error('Logout error', { agentId, error: error.message });
+    throw error;
+  }
 };

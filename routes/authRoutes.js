@@ -32,4 +32,8 @@ router.post('/google-login', authController.googleLoginUser);
  */
 router.get('/me', authMiddleware, authController.getUserDetailsByUserId);
 
+// logout routes
+router.post('/logout/agent', authMiddleware, authController.logoutAgent);
+router.post('/logout/bot', authMiddleware, authController.logoutBot);
+
 module.exports = router;

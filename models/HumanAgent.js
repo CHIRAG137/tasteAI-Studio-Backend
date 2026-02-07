@@ -185,6 +185,15 @@ const HumanAgentSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+
+    // agent auth token for agent dashboard
+    agentAuthToken: { type: String, default: null },
+
+    // agent auth token expiry timestamp
+    agentAuthTokenExpiresAt: { type: Date, default: null },
+
+    // timestamp of when agent last logged out
+    lastLogoutAt: { type: Date },
   },
   { timestamps: true }
 );

@@ -67,4 +67,18 @@ router.put(
   humanAgentController.updateHumanAgentProfileByAgentId
 );
 
+/**
+ * @route   GET /api/bots/:botId/agents
+ * @desc    Get all agents for a bot with comprehensive stats
+ * @access  Private (requires bot admin or owner)
+ */
+router.get('/bot/:botId/agents', humanAgentController.getAgentsByBotId);
+
+/**
+ * @route   POST /api/human-agent/logout
+ * @desc    Logout human agent
+ * @access  Private (Human Agent)
+ */
+router.post('/logout', authenticateHumanAgent, humanAgentController.humanAgentLogout);
+
 module.exports = router;

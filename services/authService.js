@@ -3,7 +3,7 @@ const User = require('../models/User');
 const SlackIntegration = require('../models/SlackIntegration');
 const logger = require('../utils/logger');
 const client = require('../config/googleClient');
-const { createToken } = require('../utils/tokenUtils');
+const { createToken, getTokenExpiry } = require('../utils/tokenUtils');
 
 // register user
 exports.registerUser = async (email, password, name) => {
@@ -17,6 +17,11 @@ exports.registerUser = async (email, password, name) => {
     const hashedPassword = await bcrypt.hash(password, 10);
     const user = await User.create({ email, password: hashedPassword, name });
     const token = createToken(user);
+    
+    // Store token and expiry in database
+    user.authToken = token;
+    user.authTokenExpiresAt = getTokenExpiry();
+    await user.save();
 
     logger.info('User registered in service', { userId: user._id, email });
     return { token, user };
@@ -42,6 +47,13 @@ exports.loginUser = async (email, password) => {
     }
 
     const token = createToken(user);
+    
+    // Store token and expiry in database
+    user.authToken = token;
+    user.authTokenExpiresAt = getTokenExpiry();
+    user.isActive = true;
+    await user.save();
+
     logger.info('User logged in successfully', { userId: user._id, email });
     return { token, user };
   } catch (err) {
@@ -70,6 +82,13 @@ exports.googleLoginUser = async (googleToken) => {
     }
 
     const token = createToken(user);
+    
+    // Store token and expiry in database
+    user.authToken = token;
+    user.authTokenExpiresAt = getTokenExpiry();
+    user.isActive = true;
+    await user.save();
+
     return { token, user };
   } catch (err) {
     logger.error('Error in Google login service', { error: err.message });
@@ -110,5 +129,47 @@ exports.getUserDetailsByUserId = async (userId) => {
       userId,
     });
     throw err;
+  }
+};
+
+// logout agent user
+exports.logoutAgent = async (userId) => {
+  try {
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { 
+        lastLogoutAt: new Date(), 
+        isActive: false,
+        authToken: null,
+        authTokenExpiresAt: null
+      },
+      { new: true }
+    );
+    logger.info('Agent logged out', { userId });
+    return { message: 'Agent logout successful', user };
+  } catch (err) {
+    logger.error('Logout failed', { userId, error: err.message });
+    throw new Error(`Logout failed: ${err.message}`);
+  }
+};
+
+// logout bot dashboard user
+exports.logoutBot = async (userId) => {
+  try {
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { 
+        lastLogoutAt: new Date(), 
+        isActive: false,
+        authToken: null,
+        authTokenExpiresAt: null
+      },
+      { new: true }
+    );
+    logger.info('Bot dashboard user logged out', { userId });
+    return { message: 'Bot dashboard logout successful', user };
+  } catch (err) {
+    logger.error('Logout failed', { userId, error: err.message });
+    throw new Error(`Logout failed: ${err.message}`);
   }
 };

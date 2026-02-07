@@ -2,6 +2,7 @@ const jwt = require('jsonwebtoken');
 const HumanAgent = require('../models/HumanAgent');
 const logger = require('../utils/logger');
 const responseBuilder = require('../utils/responseBuilder');
+const { isTokenExpired } = require('../utils/tokenUtils');
 
 exports.authenticateHumanAgent = async (req, res, next) => {
   try {
@@ -49,6 +50,29 @@ exports.authenticateHumanAgent = async (req, res, next) => {
         null,
         'Agent not found'
       );
+    }
+
+    // Check if token is expired in the database
+    if (isTokenExpired(agent.agentAuthTokenExpiresAt)) {
+      logger.warn('Agent authentication failed - token expired', {
+        agentId: agent._id,
+        expiresAt: agent.agentAuthTokenExpiresAt,
+      });
+      // Clear expired token from database
+      agent.agentAuthToken = null;
+      agent.agentAuthTokenExpiresAt = null;
+      agent.isOnline = false;
+      agent.availabilityStatus = 'offline';
+      await agent.save();
+      return responseBuilder.unauthorized(res, null, 'Token expired');
+    }
+
+    // Check if token in header matches token in database
+    if (agent.agentAuthToken !== token) {
+      logger.warn('Agent authentication failed - token mismatch', {
+        agentId: agent._id,
+      });
+      return responseBuilder.unauthorized(res, null, 'Invalid token');
     }
 
     // Check if agent is active
