@@ -509,3 +509,42 @@ exports.rateByClient = async (req, res) => {
     return responseBuilder.internalError(res, error.message);
   }
 };
+
+/**
+ * Get existing rating for a handoff session
+ * GET /api/handoff/:id/rating
+ */
+exports.getSessionRating = async (req, res) => {
+  try {
+    const { id: handoffSessionId } = req.params;
+    const { flowSessionId } = req.query;
+
+    if (!flowSessionId) {
+      return responseBuilder.badRequest(res, null, 'Flow Session ID is required');
+    }
+
+    const HandoffSession = require('../models/HandoffSession');
+    const session = await HandoffSession.findById(handoffSessionId);
+    
+    if (!session) {
+      return responseBuilder.notFound(res, null, 'Handoff session not found');
+    }
+
+    if (session.flowSession.toString() !== flowSessionId) {
+      return responseBuilder.forbidden(res, null, 'Not authorized to view this session');
+    }
+
+    logger.info('Rating retrieved for handoff session', {
+      handoffSessionId,
+      hasRating: !!session.userRating,
+    });
+
+    return responseBuilder.ok(res, {
+      userRating: session.userRating || null,
+      userFeedback: session.userFeedback || null,
+    }, 'Rating retrieved successfully');
+  } catch (error) {
+    logger.error('Error retrieving rating', { error: error.message, handoffSessionId: req.params.id });
+    return responseBuilder.internalError(res, error.message);
+  }
+};
