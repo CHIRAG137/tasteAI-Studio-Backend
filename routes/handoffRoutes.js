@@ -80,4 +80,12 @@ router.get('/:id/client-messages', handoffController.getClientMessages);
  */
 router.post('/:id/rate', handoffController.rateByClient);
 
+/**
+ * @route   GET /api/handoff/:id/rating
+ * @desc    Get existing rating for a handoff session
+ * @access  Public (called from chat bot)
+ * @query   flowSessionId=xxx (required)
+ */
+router.get('/:id/rating', handoffController.getSessionRating);
+
 module.exports = router;
