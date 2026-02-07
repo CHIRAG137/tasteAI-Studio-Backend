@@ -299,3 +299,70 @@ exports.updateHumanAgentProfileByAgentId = async (req, res) => {
     );
   }
 };
+
+// get all human agents by bot id with comprehensive stats
+exports.getAgentsByBotId = async (req, res) => {
+  try {
+    const { botId } = req.params;
+
+    if (!botId) {
+      logger.warn('Get agents failed - missing botId');
+      return responseBuilder.badRequest(res, null, 'Bot ID is required');
+    }
+
+    const agents = await humanAgentService.getAgentsByBotId(botId);
+
+    logger.info('Fetched agents with stats for bot', {
+      botId,
+      count: agents.length,
+    });
+
+    // Calculate summary statistics
+    const totalAgents = agents.length;
+    const activeAgents = agents.filter((a) => a.isActive).length;
+    const onlineAgents = agents.filter((a) => a.isOnline).length;
+    const passwordSetAgents = agents.filter((a) => a.isPasswordSet).length;
+
+    const totalHandoffs = agents.reduce((sum, a) => sum + a.stats.totalHandoffs, 0);
+    const totalResolved = agents.reduce((sum, a) => sum + a.stats.resolvedHandoffs, 0);
+    const totalEscalations = agents.reduce((sum, a) => sum + a.stats.totalEscalations, 0);
+    const avgResponseTime =
+      agents.length > 0
+        ? Math.round(
+            agents.reduce((sum, a) => sum + a.stats.avgResponseTimeInSeconds, 0) /
+              agents.length
+          )
+        : 0;
+
+    const overallResolutionRate =
+      totalHandoffs > 0 ? Math.round((totalResolved / totalHandoffs) * 100) : 0;
+
+    return responseBuilder.ok(
+      res,
+      {
+        botId,
+        summary: {
+          totalAgents,
+          activeAgents,
+          onlineAgents,
+          passwordSetAgents,
+          totalHandoffs,
+          totalResolved,
+          totalEscalations,
+          overallResolutionRate,
+          avgResponseTimeInSeconds: avgResponseTime,
+        },
+        agents,
+      },
+      'Agents with stats fetched successfully'
+    );
+  } catch (error) {
+    logger.error('Error fetching agents with stats by bot', {
+      error: error.message,
+      botId: req.params?.botId,
+      stack: error.stack,
+    });
+
+    return responseBuilder.internalError(res, 'Failed to fetch agents');
+  }
+};

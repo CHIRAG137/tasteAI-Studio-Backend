@@ -112,3 +112,31 @@ exports.getUserDetailsByUserId = async (userId) => {
     throw err;
   }
 };
+
+// logout agent user
+exports.logoutAgent = async (userId) => {
+  try {
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { lastLogoutAt: new Date(), isActive: false },
+      { new: true }
+    );
+    return { message: 'Agent logout successful', user };
+  } catch (err) {
+    throw new Error(`Logout failed: ${err.message}`);
+  }
+};
+
+// logout bot dashboard user
+exports.logoutBot = async (userId) => {
+  try {
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { lastLogoutAt: new Date(), isActive: false },
+      { new: true }
+    );
+    return { message: 'Bot dashboard logout successful', user };
+  } catch (err) {
+    throw new Error(`Logout failed: ${err.message}`);
+  }
+};
