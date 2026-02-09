@@ -9,7 +9,7 @@ exports.summarizeConversationWithGemini = async (messages, botName) => {
     });
 
     const model = genAIClient.getGenerativeModel({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3-pro-preview',
     });
 
     const conversationText = messages
