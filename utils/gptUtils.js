@@ -84,7 +84,7 @@ Return only a list of 10–15 questions and answers in JSON format like this:
 
     const userPrompt = `Here is a chunk of the document:\n\n${textChunk}\n\nGenerate Q&A pairs now.`;
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-3-pro-preview' });
 
     const prompt = `${systemPrompt}\n\n${userPrompt}`;
 

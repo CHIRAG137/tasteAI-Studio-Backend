@@ -40,7 +40,7 @@ exports.generateImage = async (imageBuffer, mimeType, prompt) => {
     logger.info('Generating image via Gemini', { prompt, mimeType });
 
     const model = genAIClient.getGenerativeModel({
-      model: 'gemini-2.5-flash-image',
+      model: 'gemini-3-pro-image-preview',
     });
 
     const imageBase64 = imageBuffer.toString('base64');
