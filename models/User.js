@@ -13,6 +13,9 @@ const userSchema = new mongoose.Schema({
   // authenticated user google Id(if preferred method of login is google login)
   googleId: { type: String },
 
+  // Auth0 user id (sub claim) when using Auth0 Universal Login
+  auth0Id: { type: String, sparse: true, unique: true },
+
   // auth token for bot dashboard
   authToken: { type: String, default: null },
 

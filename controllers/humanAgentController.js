@@ -114,6 +114,52 @@ exports.humanAgentLogin = async (req, res) => {
   }
 };
 
+// human agent login via Auth0
+exports.humanAgentAuth0Login = async (req, res) => {
+  try {
+    const accessToken = req.body.accessToken;
+    if (!accessToken) {
+      return responseBuilder.badRequest(res, null, 'accessToken is required');
+    }
+
+    const result = await humanAgentService.humanAgentAuth0Login(accessToken);
+
+    logger.info('Agent Auth0 login OK', {
+      agentId: result.agent._id,
+      email: result.agent.email,
+    });
+
+    return responseBuilder.ok(
+      res,
+      {
+        token: result.token,
+        agent: {
+          id: result.agent._id,
+          email: result.agent.email,
+          isActive: result.agent.isActive,
+        },
+      },
+      'Login successful',
+    );
+  } catch (error) {
+    logger.warn('Agent Auth0 login failed', { error: error.message });
+
+    if (
+      error.message?.includes('No agent account') ||
+      error.message?.includes('inactive') ||
+      error.message?.includes('linked to a different Auth0') ||
+      error.message?.includes('Could not resolve email') ||
+      error.message?.includes('AUTH0') ||
+      error.message?.includes('Auth0') ||
+      error.message?.includes('jwt')
+    ) {
+      return responseBuilder.unauthorized(res, null, error.message);
+    }
+
+    return responseBuilder.internalError(res, 'Auth0 login failed');
+  }
+};
+
 // human agent verify token
 exports.humanAgentVerifyToken = async (req, res) => {
   try {

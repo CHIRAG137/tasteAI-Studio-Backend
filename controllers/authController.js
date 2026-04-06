@@ -30,6 +30,22 @@ exports.loginUser = async (req, res) => {
   }
 };
 
+// login / register via Auth0 Universal Login (SPA sends Auth0 access token)
+exports.auth0LoginUser = async (req, res) => {
+  try {
+    const accessToken = req.body.accessToken;
+    if (!accessToken) {
+      return responseBuilder.badRequest(res, null, 'accessToken is required');
+    }
+    const result = await authService.auth0LoginUser(accessToken);
+    logger.info('Auth0 login successful');
+    return responseBuilder.ok(res, result, 'Auth0 login successful');
+  } catch (err) {
+    logger.warn('Auth0 login failed', { error: err.message });
+    return responseBuilder.unauthorized(res, null, err.message);
+  }
+};
+
 // login user via google login
 exports.googleLoginUser = async (req, res) => {
   try {

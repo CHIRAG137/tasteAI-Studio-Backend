@@ -1,4 +1,6 @@
 const botService = require('../services/botService');
+const ChatBot = require('../models/ChatBot');
+const FlowSession = require('../models/FlowSession');
 const logger = require('../utils/logger');
 const responseBuilder = require('../utils/responseBuilder');
 
@@ -25,8 +27,37 @@ exports.createBot = async (req, res) => {
 exports.askBot = async (req, res) => {
   try {
     const { question, botId, sessionId, flowSessionId } = req.body;
-    // Support both sessionId and flowSessionId parameter names
     const resolvedSessionId = sessionId || flowSessionId;
+    const visitorSub = req.get('x-visitor-auth0-sub');
+
+    const bot = await ChatBot.findById(botId);
+    if (!bot) {
+      return responseBuilder.notFound(res, null, 'Bot not found');
+    }
+
+    if (bot.require_visitor_auth0_identity) {
+      if (!visitorSub) {
+        return responseBuilder.unauthorized(
+          res,
+          { code: 'visitor_identity_required' },
+          'Visitor identity required',
+        );
+      }
+      if (resolvedSessionId) {
+        const session = await FlowSession.findById(resolvedSessionId);
+        if (
+          session?.visitorAuth0Sub &&
+          session.visitorAuth0Sub !== visitorSub
+        ) {
+          return responseBuilder.forbidden(
+            res,
+            null,
+            'Visitor identity does not match this session',
+          );
+        }
+      }
+    }
+
     const result = await botService.askBot(
       question,
       botId,
