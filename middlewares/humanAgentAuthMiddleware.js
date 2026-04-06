@@ -3,6 +3,7 @@ const HumanAgent = require('../models/HumanAgent');
 const logger = require('../utils/logger');
 const responseBuilder = require('../utils/responseBuilder');
 const { isTokenExpired } = require('../utils/tokenUtils');
+const { verifyAuth0AccessToken } = require('../utils/auth0Verify');
 
 exports.authenticateHumanAgent = async (req, res, next) => {
   try {
@@ -20,81 +21,84 @@ exports.authenticateHumanAgent = async (req, res, next) => {
 
     const token = authHeader.replace('Bearer ', '');
 
-    // Verify token
-    const decoded = jwt.verify(
-      token,
-      process.env.JWT_SECRET || 'your-secret-key'
-    );
+    // 1) Try legacy internal JWT first
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+      if (decoded.type === 'human_agent') {
+        const agent = await HumanAgent.findById(decoded.id);
+        if (!agent) {
+          return responseBuilder.unauthorized(res, null, 'Agent not found');
+        }
 
-    // Check if token is for human agent
-    if (decoded.type !== 'human_agent') {
-      logger.warn('Agent authentication failed - invalid token type', {
-        type: decoded.type,
-      });
-      return responseBuilder.unauthorized(
-        res,
-        null,
-        'Invalid token type'
-      );
+        if (isTokenExpired(agent.agentAuthTokenExpiresAt)) {
+          logger.warn('Agent authentication failed - token expired', {
+            agentId: agent._id,
+            expiresAt: agent.agentAuthTokenExpiresAt,
+          });
+          agent.agentAuthToken = null;
+          agent.agentAuthTokenExpiresAt = null;
+          agent.isOnline = false;
+          agent.availabilityStatus = 'offline';
+          await agent.save();
+          return responseBuilder.unauthorized(res, null, 'Token expired');
+        }
+
+        if (agent.agentAuthToken !== token) {
+          return responseBuilder.unauthorized(res, null, 'Invalid token');
+        }
+
+        if (!agent.isActive) {
+          return responseBuilder.forbidden(res, null, 'Agent account is inactive');
+        }
+
+        req.agent = {
+          id: agent._id,
+          email: agent.email,
+          authProvider: 'internal_jwt',
+        };
+        return next();
+      }
+    } catch (legacyErr) {
+      // Fall through to Auth0 token path.
     }
 
-    // Find the agent
-    const agent = await HumanAgent.findById(decoded.id);
+    // 2) Try Auth0 access token path
+    const auth0Decoded = await verifyAuth0AccessToken(token);
+    if (!auth0Decoded?.sub) {
+      return responseBuilder.unauthorized(res, null, 'Invalid Auth0 token');
+    }
+
+    const auth0Email =
+      typeof auth0Decoded.email === 'string' ? auth0Decoded.email.toLowerCase() : null;
+    let agent = await HumanAgent.findOne({ auth0Id: auth0Decoded.sub });
+    if (!agent && auth0Email) {
+      // Backfill link for already-invited agents on first secured API call.
+      agent = await HumanAgent.findOne({ email: auth0Email });
+      if (agent && !agent.auth0Id) {
+        agent.auth0Id = auth0Decoded.sub;
+        await agent.save();
+      }
+    }
 
     if (!agent) {
-      logger.warn('Agent authentication failed - agent not found', {
-        agentId: decoded.id,
-      });
       return responseBuilder.unauthorized(
         res,
         null,
-        'Agent not found'
+        'No linked human agent account for this Auth0 identity'
       );
     }
 
-    // Check if token is expired in the database
-    if (isTokenExpired(agent.agentAuthTokenExpiresAt)) {
-      logger.warn('Agent authentication failed - token expired', {
-        agentId: agent._id,
-        expiresAt: agent.agentAuthTokenExpiresAt,
-      });
-      // Clear expired token from database
-      agent.agentAuthToken = null;
-      agent.agentAuthTokenExpiresAt = null;
-      agent.isOnline = false;
-      agent.availabilityStatus = 'offline';
-      await agent.save();
-      return responseBuilder.unauthorized(res, null, 'Token expired');
-    }
-
-    // Check if token in header matches token in database
-    if (agent.agentAuthToken !== token) {
-      logger.warn('Agent authentication failed - token mismatch', {
-        agentId: agent._id,
-      });
-      return responseBuilder.unauthorized(res, null, 'Invalid token');
-    }
-
-    // Check if agent is active
     if (!agent.isActive) {
-      logger.warn('Agent authentication failed - agent inactive', {
-        agentId: agent._id,
-        email: agent.email,
-      });
-      return responseBuilder.forbidden(
-        res,
-        null,
-        'Agent account is inactive'
-      );
+      return responseBuilder.forbidden(res, null, 'Agent account is inactive');
     }
 
-    // Attach agent to request
     req.agent = {
       id: agent._id,
       email: agent.email,
+      authProvider: 'auth0',
+      auth0Sub: auth0Decoded.sub,
     };
-
-    next();
+    return next();
   } catch (error) {
     logger.error('Agent authentication error', {
       error: error.message,
