@@ -1,5 +1,4 @@
 const HandoffSession = require('../models/HandoffSession');
-const FlowSession = require('../models/FlowSession');
 const humanHandoffService = require('../services/humanHandoffService');
 const logger = require('../utils/logger');
 const responseBuilder = require('../utils/responseBuilder');
@@ -7,6 +6,7 @@ const {
   enforceVisitorAuth0ForBot,
   enforceVisitorAuth0ForFlowSession,
 } = require('../utils/visitorAuth0Enforce');
+const { consumeAuth0SubRateLimit } = require('../utils/auth0SubRateLimiter');
 
 /**
  * User requests human handoff
@@ -42,6 +42,26 @@ exports.requestHandoff = async (req, res) => {
         res,
         { code: sessionCheck.code || 'unauthorized' },
         sessionCheck.message || 'Unauthorized'
+      );
+    }
+    if (sessionCheck.session.bot.toString() !== botId.toString()) {
+      return responseBuilder.forbidden(
+        res,
+        null,
+        'Flow session does not belong to this bot'
+      );
+    }
+    const limiter = consumeAuth0SubRateLimit({
+      subject: sessionCheck.decoded?.sub,
+      routeKey: 'handoff:request',
+      maxRequests: 20,
+      windowMs: 60 * 1000,
+    });
+    if (!limiter.allowed) {
+      return responseBuilder.badRequest(
+        res,
+        { code: 'rate_limit_exceeded' },
+        'Too many handoff requests. Please wait and try again.'
       );
     }
 
@@ -329,6 +349,19 @@ exports.addClientMessage = async (req, res) => {
         sessionCheck.message || 'Unauthorized'
       );
     }
+    const limiter = consumeAuth0SubRateLimit({
+      subject: sessionCheck.decoded?.sub,
+      routeKey: 'handoff:client-message',
+      maxRequests: 120,
+      windowMs: 60 * 1000,
+    });
+    if (!limiter.allowed) {
+      return responseBuilder.badRequest(
+        res,
+        { code: 'rate_limit_exceeded' },
+        'Too many messages. Please slow down.'
+      );
+    }
 
     const result = await humanHandoffService.addMessageToSession(
       handoffSessionId,
@@ -396,6 +429,19 @@ exports.getClientMessages = async (req, res) => {
         sessionCheck.message || 'Unauthorized'
       );
     }
+    const limiter = consumeAuth0SubRateLimit({
+      subject: sessionCheck.decoded?.sub,
+      routeKey: 'handoff:client-messages',
+      maxRequests: 180,
+      windowMs: 60 * 1000,
+    });
+    if (!limiter.allowed) {
+      return responseBuilder.badRequest(
+        res,
+        { code: 'rate_limit_exceeded' },
+        'Too many polling requests. Please slow down.'
+      );
+    }
 
     logger.info('Client fetched handoff messages', {
       handoffSessionId,
@@ -446,6 +492,19 @@ exports.resolveByClient = async (req, res) => {
         sessionCheck.message || 'Unauthorized'
       );
     }
+    const limiter = consumeAuth0SubRateLimit({
+      subject: sessionCheck.decoded?.sub,
+      routeKey: 'handoff:client-resolve',
+      maxRequests: 20,
+      windowMs: 60 * 1000,
+    });
+    if (!limiter.allowed) {
+      return responseBuilder.badRequest(
+        res,
+        { code: 'rate_limit_exceeded' },
+        'Too many requests. Please wait and try again.'
+      );
+    }
 
     const result = await humanHandoffService.resolveHandoffSessionByClient(
       flowSessionId,
@@ -484,6 +543,19 @@ exports.reopenByClient = async (req, res) => {
         res,
         { code: sessionCheck.code || 'unauthorized' },
         sessionCheck.message || 'Unauthorized'
+      );
+    }
+    const limiter = consumeAuth0SubRateLimit({
+      subject: sessionCheck.decoded?.sub,
+      routeKey: 'handoff:client-reopen',
+      maxRequests: 20,
+      windowMs: 60 * 1000,
+    });
+    if (!limiter.allowed) {
+      return responseBuilder.badRequest(
+        res,
+        { code: 'rate_limit_exceeded' },
+        'Too many requests. Please wait and try again.'
       );
     }
 
@@ -560,6 +632,19 @@ exports.rateByClient = async (req, res) => {
         sessionCheck.message || 'Unauthorized'
       );
     }
+    const limiter = consumeAuth0SubRateLimit({
+      subject: sessionCheck.decoded?.sub,
+      routeKey: 'handoff:rate',
+      maxRequests: 30,
+      windowMs: 60 * 1000,
+    });
+    if (!limiter.allowed) {
+      return responseBuilder.badRequest(
+        res,
+        { code: 'rate_limit_exceeded' },
+        'Too many requests. Please wait and try again.'
+      );
+    }
 
     // Save rating and feedback
     const previousRating = session.userRating || null;
@@ -628,6 +713,19 @@ exports.getSessionRating = async (req, res) => {
         res,
         { code: sessionCheck.code || 'unauthorized' },
         sessionCheck.message || 'Unauthorized'
+      );
+    }
+    const limiter = consumeAuth0SubRateLimit({
+      subject: sessionCheck.decoded?.sub,
+      routeKey: 'handoff:rating',
+      maxRequests: 120,
+      windowMs: 60 * 1000,
+    });
+    if (!limiter.allowed) {
+      return responseBuilder.badRequest(
+        res,
+        { code: 'rate_limit_exceeded' },
+        'Too many requests. Please wait and try again.'
       );
     }
 

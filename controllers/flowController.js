@@ -6,6 +6,7 @@ const {
   enforceVisitorAuth0ForBot,
   enforceVisitorAuth0ForFlowSession,
 } = require('../utils/visitorAuth0Enforce');
+const { consumeAuth0SubRateLimit } = require('../utils/auth0SubRateLimiter');
 
 /**
  * Format outputs into display-ready messages
@@ -70,6 +71,18 @@ exports.startFlow = async (req, res) => {
     }
     const bot = check.bot;
     const decoded = check.decoded;
+    const limiter = consumeAuth0SubRateLimit({
+      subject: decoded?.sub,
+      routeKey: 'flow:start',
+      maxRequests: 40,
+      windowMs: 60 * 1000,
+    });
+    if (!limiter.allowed) {
+      return res.status(429).json({
+        error: 'rate_limit_exceeded',
+        message: 'Too many requests. Please try again shortly.',
+      });
+    }
 
     const ipAddress = req.clientIp;
     const userAgent = req.userAgent || 'Unknown';
@@ -191,6 +204,18 @@ exports.respondToFlow = async (req, res) => {
       });
     }
     const session = enforced.session;
+    const limiter = consumeAuth0SubRateLimit({
+      subject: enforced.decoded?.sub,
+      routeKey: 'flow:respond',
+      maxRequests: 120,
+      windowMs: 60 * 1000,
+    });
+    if (!limiter.allowed) {
+      return res.status(429).json({
+        error: 'rate_limit_exceeded',
+        message: 'Too many messages. Please slow down.',
+      });
+    }
 
     if (session.isFinished) {
       return res.json({
@@ -401,6 +426,17 @@ exports.addSystemMessage = async (req, res) => {
     const session = await FlowSession.findById(sessionId);
     if (!session) {
       return res.status(404).json({ error: 'Flow session not found' });
+    }
+
+    const enforced = await enforceVisitorAuth0ForFlowSession({
+      req,
+      flowSessionId: sessionId,
+    });
+    if (!enforced.ok) {
+      return res.status(enforced.status || 401).json({
+        error: enforced.code || 'unauthorized',
+        message: enforced.message || 'Unauthorized',
+      });
     }
 
     // Create history entry for system message

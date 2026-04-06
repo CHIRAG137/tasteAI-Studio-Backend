@@ -1,12 +1,11 @@
 const botService = require('../services/botService');
-const ChatBot = require('../models/ChatBot');
-const FlowSession = require('../models/FlowSession');
 const logger = require('../utils/logger');
 const responseBuilder = require('../utils/responseBuilder');
 const {
   enforceVisitorAuth0ForBot,
   enforceVisitorAuth0ForFlowSession,
 } = require('../utils/visitorAuth0Enforce');
+const { consumeAuth0SubRateLimit } = require('../utils/auth0SubRateLimiter');
 
 // create chatbot
 exports.createBot = async (req, res) => {
@@ -40,6 +39,19 @@ exports.askBot = async (req, res) => {
         botCheck.message || 'Unauthorized',
       );
     }
+    const limiter = consumeAuth0SubRateLimit({
+      subject: botCheck.decoded?.sub,
+      routeKey: 'bot:ask',
+      maxRequests: 120,
+      windowMs: 60 * 1000,
+    });
+    if (!limiter.allowed) {
+      return responseBuilder.badRequest(
+        res,
+        { code: 'rate_limit_exceeded' },
+        'Too many requests. Please slow down.'
+      );
+    }
 
     if (resolvedSessionId) {
       const sessionCheck = await enforceVisitorAuth0ForFlowSession({
@@ -51,6 +63,13 @@ exports.askBot = async (req, res) => {
           res,
           { code: sessionCheck.code || 'unauthorized' },
           sessionCheck.message || 'Unauthorized',
+        );
+      }
+      if (sessionCheck.session.bot.toString() !== botId.toString()) {
+        return responseBuilder.forbidden(
+          res,
+          null,
+          'Session does not belong to this bot'
         );
       }
     }
@@ -110,6 +129,17 @@ exports.getAllChatBots = async (req, res) => {
 exports.getBotByBotId = async (req, res) => {
   try {
     const botId = req.params.botId;
+    const check = await enforceVisitorAuth0ForBot({ req, botId });
+    if (!check.ok) {
+      if (check.status === 404) {
+        return responseBuilder.notFound(res, null, check.message);
+      }
+      return responseBuilder.unauthorized(
+        res,
+        { code: check.code || 'unauthorized' },
+        check.message || 'Unauthorized'
+      );
+    }
     const bot = await botService.getBotByBotId(botId);
 
     if (!bot) {
@@ -185,6 +215,17 @@ exports.updateBotByBotId = async (req, res) => {
 exports.getBotCustomizationByBotId = async (req, res) => {
   try {
     const { botId } = req.params;
+    const check = await enforceVisitorAuth0ForBot({ req, botId });
+    if (!check.ok) {
+      if (check.status === 404) {
+        return responseBuilder.notFound(res, null, check.message);
+      }
+      return responseBuilder.unauthorized(
+        res,
+        { code: check.code || 'unauthorized' },
+        check.message || 'Unauthorized'
+      );
+    }
     logger.info('Fetching customization', { botId, userId: req.user?.id });
 
     const customization = await botService.getCustomizationByBotId(botId);
