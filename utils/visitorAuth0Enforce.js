@@ -20,6 +20,11 @@ exports.enforceVisitorAuth0ForBot = async ({ req, botId }) => {
     return { ok: false, status: 404, message: 'Bot not found' };
   }
 
+  // If request comes from authenticated dashboard user, allow access.
+  if (req.user) {
+    return { ok: true, decoded: null, bot };
+  }
+
   if (!bot.require_visitor_auth0_identity) {
     return { ok: true, decoded: null, bot };
   }

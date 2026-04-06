@@ -2,7 +2,9 @@ const express = require('express');
 const router = express.Router();
 const flowController = require('../controllers/flowController');
 const { attachIpAddress } = require('../middlewares/ipExtractorMiddleware');
+const { optionalUserAuth } = require('../middlewares/optionalUserAuthMiddleware');
 router.use(attachIpAddress);
+router.use(optionalUserAuth);
 
 // start a new session for a bot
 router.post('/start/:botId', flowController.startFlow);
