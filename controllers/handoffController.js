@@ -1,7 +1,12 @@
 const HandoffSession = require('../models/HandoffSession');
+const FlowSession = require('../models/FlowSession');
 const humanHandoffService = require('../services/humanHandoffService');
 const logger = require('../utils/logger');
 const responseBuilder = require('../utils/responseBuilder');
+const {
+  enforceVisitorAuth0ForBot,
+  enforceVisitorAuth0ForFlowSession,
+} = require('../utils/visitorAuth0Enforce');
 
 /**
  * User requests human handoff
@@ -17,6 +22,26 @@ exports.requestHandoff = async (req, res) => {
         res,
         null,
         'Bot ID and Flow Session ID are required'
+      );
+    }
+
+    const botCheck = await enforceVisitorAuth0ForBot({ req, botId });
+    if (!botCheck.ok) {
+      return responseBuilder.unauthorized(
+        res,
+        { code: botCheck.code || 'unauthorized' },
+        botCheck.message || 'Unauthorized'
+      );
+    }
+    const sessionCheck = await enforceVisitorAuth0ForFlowSession({
+      req,
+      flowSessionId,
+    });
+    if (!sessionCheck.ok) {
+      return responseBuilder.unauthorized(
+        res,
+        { code: sessionCheck.code || 'unauthorized' },
+        sessionCheck.message || 'Unauthorized'
       );
     }
 
@@ -293,6 +318,18 @@ exports.addClientMessage = async (req, res) => {
       );
     }
 
+    const sessionCheck = await enforceVisitorAuth0ForFlowSession({
+      req,
+      flowSessionId,
+    });
+    if (!sessionCheck.ok) {
+      return responseBuilder.unauthorized(
+        res,
+        { code: sessionCheck.code || 'unauthorized' },
+        sessionCheck.message || 'Unauthorized'
+      );
+    }
+
     const result = await humanHandoffService.addMessageToSession(
       handoffSessionId,
       'user',
@@ -348,6 +385,18 @@ exports.getClientMessages = async (req, res) => {
       );
     }
 
+    const sessionCheck = await enforceVisitorAuth0ForFlowSession({
+      req,
+      flowSessionId,
+    });
+    if (!sessionCheck.ok) {
+      return responseBuilder.unauthorized(
+        res,
+        { code: sessionCheck.code || 'unauthorized' },
+        sessionCheck.message || 'Unauthorized'
+      );
+    }
+
     logger.info('Client fetched handoff messages', {
       handoffSessionId,
       flowSessionId,
@@ -386,6 +435,18 @@ exports.resolveByClient = async (req, res) => {
       return responseBuilder.badRequest(res, null, 'Flow Session ID is required');
     }
 
+    const sessionCheck = await enforceVisitorAuth0ForFlowSession({
+      req,
+      flowSessionId,
+    });
+    if (!sessionCheck.ok) {
+      return responseBuilder.unauthorized(
+        res,
+        { code: sessionCheck.code || 'unauthorized' },
+        sessionCheck.message || 'Unauthorized'
+      );
+    }
+
     const result = await humanHandoffService.resolveHandoffSessionByClient(
       flowSessionId,
       handoffSessionId
@@ -412,6 +473,18 @@ exports.reopenByClient = async (req, res) => {
 
     if (!flowSessionId) {
       return responseBuilder.badRequest(res, null, 'Flow Session ID is required');
+    }
+
+    const sessionCheck = await enforceVisitorAuth0ForFlowSession({
+      req,
+      flowSessionId,
+    });
+    if (!sessionCheck.ok) {
+      return responseBuilder.unauthorized(
+        res,
+        { code: sessionCheck.code || 'unauthorized' },
+        sessionCheck.message || 'Unauthorized'
+      );
     }
 
     const result = await humanHandoffService.reopenHandoffSessionByClient(
@@ -476,6 +549,18 @@ exports.rateByClient = async (req, res) => {
       return responseBuilder.forbidden(res, null, 'Not authorized to rate this session');
     }
 
+    const sessionCheck = await enforceVisitorAuth0ForFlowSession({
+      req,
+      flowSessionId,
+    });
+    if (!sessionCheck.ok) {
+      return responseBuilder.unauthorized(
+        res,
+        { code: sessionCheck.code || 'unauthorized' },
+        sessionCheck.message || 'Unauthorized'
+      );
+    }
+
     // Save rating and feedback
     const previousRating = session.userRating || null;
     session.userRating = rating;
@@ -532,6 +617,18 @@ exports.getSessionRating = async (req, res) => {
 
     if (session.flowSession.toString() !== flowSessionId) {
       return responseBuilder.forbidden(res, null, 'Not authorized to view this session');
+    }
+
+    const sessionCheck = await enforceVisitorAuth0ForFlowSession({
+      req,
+      flowSessionId,
+    });
+    if (!sessionCheck.ok) {
+      return responseBuilder.unauthorized(
+        res,
+        { code: sessionCheck.code || 'unauthorized' },
+        sessionCheck.message || 'Unauthorized'
+      );
     }
 
     logger.info('Rating retrieved for handoff session', {

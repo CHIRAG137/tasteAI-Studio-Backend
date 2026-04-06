@@ -2,6 +2,10 @@ const { attachIpAddress } = require('../middlewares/ipExtractorMiddleware');
 const ChatBot = require('../models/ChatBot');
 const FlowSession = require('../models/FlowSession');
 const flowEngine = require('../services/flowEngineService');
+const {
+  enforceVisitorAuth0ForBot,
+  enforceVisitorAuth0ForFlowSession,
+} = require('../utils/visitorAuth0Enforce');
 
 /**
  * Format outputs into display-ready messages
@@ -57,21 +61,15 @@ exports.startFlow = async (req, res) => {
     console.log('Starting flow...');
     const { botId } = req.params;
 
-    const bot = await ChatBot.findById(botId);
-    if (!bot) {
-      return res.status(404).json({ error: 'Bot not found' });
+    const check = await enforceVisitorAuth0ForBot({ req, botId });
+    if (!check.ok) {
+      return res.status(check.status || 401).json({
+        error: check.code || 'unauthorized',
+        message: check.message || 'Unauthorized',
+      });
     }
-
-    const visitorSub = req.get('x-visitor-auth0-sub');
-    const visitorEmail = req.get('x-visitor-email');
-    if (bot.require_visitor_auth0_identity) {
-      if (!visitorSub) {
-        return res.status(401).json({
-          error: 'visitor_identity_required',
-          message: 'Sign in with Auth0 to use this bot.',
-        });
-      }
-    }
+    const bot = check.bot;
+    const decoded = check.decoded;
 
     const ipAddress = req.clientIp;
     const userAgent = req.userAgent || 'Unknown';
@@ -81,8 +79,8 @@ exports.startFlow = async (req, res) => {
       variables: {},
       ipAddress: ipAddress,
       userAgent: userAgent,
-      visitorAuth0Sub: visitorSub || null,
-      visitorEmail: visitorEmail || null,
+      visitorAuth0Sub: decoded?.sub || null,
+      visitorEmail: decoded?.email || null,
     });
 
     // Find the start node
@@ -182,10 +180,17 @@ exports.respondToFlow = async (req, res) => {
     const { sessionId } = req.params;
     const { input, optionIndexOrLabel } = req.body;
 
-    const session = await FlowSession.findById(sessionId);
-    if (!session) {
-      return res.status(404).json({ error: 'Session not found' });
+    const enforced = await enforceVisitorAuth0ForFlowSession({
+      req,
+      flowSessionId: sessionId,
+    });
+    if (!enforced.ok) {
+      return res.status(enforced.status || 401).json({
+        error: enforced.code || 'unauthorized',
+        message: enforced.message || 'Unauthorized',
+      });
     }
+    const session = enforced.session;
 
     if (session.isFinished) {
       return res.json({
@@ -199,22 +204,6 @@ exports.respondToFlow = async (req, res) => {
     const bot = await ChatBot.findById(session.bot);
     if (!bot) {
       return res.status(404).json({ error: 'Bot for session not found' });
-    }
-
-    const visitorSub = req.get('x-visitor-auth0-sub');
-    if (bot.require_visitor_auth0_identity) {
-      if (!visitorSub) {
-        return res.status(401).json({
-          error: 'visitor_identity_required',
-          message: 'Sign in with Auth0 to continue.',
-        });
-      }
-      if (session.visitorAuth0Sub && session.visitorAuth0Sub !== visitorSub) {
-        return res.status(403).json({
-          error: 'visitor_identity_mismatch',
-          message: 'Identity does not match this chat session.',
-        });
-      }
     }
 
     const nodeMap = flowEngine.buildNodeMap(bot.conversationFlow);
