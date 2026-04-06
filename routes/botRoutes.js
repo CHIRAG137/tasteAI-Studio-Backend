@@ -4,6 +4,7 @@ const multer = require('multer');
 const upload = multer({ dest: 'uploads/' });
 const botController = require('../controllers/botController');
 const { authMiddleware } = require('../middlewares/authMiddleware');
+const { optionalUserAuth } = require('../middlewares/optionalUserAuthMiddleware');
 
 /**
  * @route   POST /api/bots/create
@@ -36,7 +37,7 @@ router.get('/', authMiddleware, botController.getAllChatBots);
  * @desc    Get details of a specific chatbot by bot ID
  * @access  Public / Private (depending on usage)
  */
-router.get('/:botId', botController.getBotByBotId);
+router.get('/:botId', optionalUserAuth, botController.getBotByBotId);
 
 /**
  * @route   DELETE /api/bots/:botId
@@ -68,6 +69,7 @@ router.put(
  */
 router.get(
   '/customisation/:botId',
+  optionalUserAuth,
   botController.getBotCustomizationByBotId
 );
 
