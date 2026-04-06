@@ -3,6 +3,10 @@ const ChatBot = require('../models/ChatBot');
 const FlowSession = require('../models/FlowSession');
 const logger = require('../utils/logger');
 const responseBuilder = require('../utils/responseBuilder');
+const {
+  enforceVisitorAuth0ForBot,
+  enforceVisitorAuth0ForFlowSession,
+} = require('../utils/visitorAuth0Enforce');
 
 // create chatbot
 exports.createBot = async (req, res) => {
@@ -28,33 +32,26 @@ exports.askBot = async (req, res) => {
   try {
     const { question, botId, sessionId, flowSessionId } = req.body;
     const resolvedSessionId = sessionId || flowSessionId;
-    const visitorSub = req.get('x-visitor-auth0-sub');
-
-    const bot = await ChatBot.findById(botId);
-    if (!bot) {
-      return responseBuilder.notFound(res, null, 'Bot not found');
+    const botCheck = await enforceVisitorAuth0ForBot({ req, botId });
+    if (!botCheck.ok) {
+      return responseBuilder.unauthorized(
+        res,
+        { code: botCheck.code || 'unauthorized' },
+        botCheck.message || 'Unauthorized',
+      );
     }
 
-    if (bot.require_visitor_auth0_identity) {
-      if (!visitorSub) {
+    if (resolvedSessionId) {
+      const sessionCheck = await enforceVisitorAuth0ForFlowSession({
+        req,
+        flowSessionId: resolvedSessionId,
+      });
+      if (!sessionCheck.ok) {
         return responseBuilder.unauthorized(
           res,
-          { code: 'visitor_identity_required' },
-          'Visitor identity required',
+          { code: sessionCheck.code || 'unauthorized' },
+          sessionCheck.message || 'Unauthorized',
         );
-      }
-      if (resolvedSessionId) {
-        const session = await FlowSession.findById(resolvedSessionId);
-        if (
-          session?.visitorAuth0Sub &&
-          session.visitorAuth0Sub !== visitorSub
-        ) {
-          return responseBuilder.forbidden(
-            res,
-            null,
-            'Visitor identity does not match this session',
-          );
-        }
       }
     }
 
