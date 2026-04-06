@@ -25,6 +25,13 @@ router.post('/set-password', humanAgentController.humanAgentSetPassword);
 router.post('/login', humanAgentController.humanAgentLogin);
 
 /**
+ * @route   POST /api/human-agent/auth0-login
+ * @desc    Exchange Auth0 access token for agent session JWT
+ * @access  Public
+ */
+router.post('/auth0-login', humanAgentController.humanAgentAuth0Login);
+
+/**
  * @route   GET /api/human-agent/bots
  * @desc    Get chatbots by human agent id
  * @access  Private (Human Agent)

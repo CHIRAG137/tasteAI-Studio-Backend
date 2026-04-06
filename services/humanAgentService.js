@@ -8,6 +8,17 @@ const jwt = require('jsonwebtoken');
 const sendEmail = require('../utils/sendEmailUtil');
 const logger = require('../utils/logger');
 const HandoffSession = require('../models/HandoffSession');
+const axios = require('axios');
+const { verifyAuth0AccessToken } = require('../utils/auth0Verify');
+
+async function fetchAuth0UserInfo(accessToken) {
+  const domain = process.env.AUTH0_DOMAIN;
+  const { data } = await axios.get(`https://${domain}/userinfo`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    timeout: 15000,
+  });
+  return data;
+}
 
 // generate invite token function
 function generateToken() {
@@ -270,6 +281,80 @@ exports.humanAgentLogin = async (email, password) => {
     token,
     agent: humanAgent,
   };
+};
+
+// human agent login via Auth0 (must already be an invited agent; same email as invite)
+exports.humanAgentAuth0Login = async (accessToken) => {
+  const decoded = await verifyAuth0AccessToken(accessToken);
+  const auth0Sub = decoded.sub;
+
+  let email = decoded.email;
+  let name = decoded.name || decoded.nickname;
+
+  if (!email) {
+    const info = await fetchAuth0UserInfo(accessToken);
+    email = info.email;
+    name = name || info.name || info.nickname;
+  }
+
+  if (!email) {
+    throw new Error(
+      'Could not resolve email from Auth0 — use openid profile email scopes',
+    );
+  }
+
+  const normalizedEmail = email.toLowerCase();
+  const humanAgent = await HumanAgent.findOne({ email: normalizedEmail });
+
+  if (!humanAgent) {
+    logger.warn('Auth0 agent login — no agent record', { email: normalizedEmail });
+    throw new Error(
+      'No agent account for this email. Ask a bot owner to add you as a human agent.',
+    );
+  }
+
+  if (!humanAgent.isActive) {
+    throw new Error('Agent account is inactive');
+  }
+
+  if (humanAgent.auth0Id && humanAgent.auth0Id !== auth0Sub) {
+    throw new Error(
+      'This agent profile is linked to a different Auth0 account',
+    );
+  }
+
+  if (!humanAgent.auth0Id) {
+    humanAgent.auth0Id = auth0Sub;
+  }
+
+  if (name && !humanAgent.displayName) {
+    humanAgent.displayName = name;
+  }
+
+  humanAgent.lastLoginAt = new Date();
+
+  const token = jwt.sign(
+    {
+      id: humanAgent._id,
+      email: humanAgent.email,
+      type: 'human_agent',
+    },
+    process.env.JWT_SECRET || 'your-secret-key',
+    { expiresIn: '7d' },
+  );
+
+  humanAgent.agentAuthToken = token;
+  humanAgent.agentAuthTokenExpiresAt = new Date(
+    Date.now() + 7 * 24 * 60 * 60 * 1000,
+  );
+  await humanAgent.save();
+
+  logger.info('Agent Auth0 login successful', {
+    agentId: humanAgent._id,
+    email: humanAgent.email,
+  });
+
+  return { token, agent: humanAgent };
 };
 
 // human agent verify invite token

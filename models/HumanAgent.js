@@ -34,6 +34,9 @@ const HumanAgentSchema = new mongoose.Schema(
     // Agent phone number
     phoneNumber: String,
 
+    // Auth0 subject (linked on first Auth0 sign-in for this agent)
+    auth0Id: { type: String, sparse: true, unique: true },
+
     // Agent password hash
     passwordHash: {
       type: String,

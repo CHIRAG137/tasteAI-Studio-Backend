@@ -25,6 +25,12 @@ app.use(
   cors({
     origin: ['http://localhost:8080', 'https://tastebot-studio.onrender.com'],
     credentials: true,
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'X-Visitor-Auth0-Sub',
+      'X-Visitor-Email',
+    ],
   })
 );
 

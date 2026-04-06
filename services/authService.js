@@ -1,9 +1,11 @@
 const bcrypt = require('bcrypt');
+const axios = require('axios');
 const User = require('../models/User');
 const SlackIntegration = require('../models/SlackIntegration');
 const logger = require('../utils/logger');
 const client = require('../config/googleClient');
 const { createToken, getTokenExpiry } = require('../utils/tokenUtils');
+const { verifyAuth0AccessToken } = require('../utils/auth0Verify');
 
 // register user
 exports.registerUser = async (email, password, name) => {
@@ -60,6 +62,64 @@ exports.loginUser = async (email, password) => {
     logger.error('Error in login service', { error: err.message, email });
     throw err;
   }
+};
+
+async function fetchAuth0UserInfo(accessToken) {
+  const domain = process.env.AUTH0_DOMAIN;
+  const { data } = await axios.get(`https://${domain}/userinfo`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    timeout: 15000,
+  });
+  return data;
+}
+
+// login or register via Auth0 (access token from SPA after Universal Login)
+exports.auth0LoginUser = async (accessToken) => {
+  const decoded = await verifyAuth0AccessToken(accessToken);
+  const auth0Id = decoded.sub;
+
+  let email = decoded.email;
+  let name = decoded.name || decoded.nickname;
+
+  if (!email) {
+    try {
+      const info = await fetchAuth0UserInfo(accessToken);
+      email = info.email;
+      name = name || info.name || info.nickname;
+    } catch (e) {
+      logger.error('Auth0 userinfo failed', { error: e.message });
+      throw new Error(
+        'Could not resolve user email — enable openid profile email scopes and/or the /userinfo call',
+      );
+    }
+  }
+
+  if (!email) {
+    throw new Error('Email is required from Auth0 token or userinfo');
+  }
+
+  let user = await User.findOne({ $or: [{ auth0Id }, { email }] });
+  if (!user) {
+    user = await User.create({
+      email,
+      name,
+      auth0Id,
+    });
+    logger.info('New Auth0 user created', { email, auth0Id });
+  } else {
+    if (!user.auth0Id) user.auth0Id = auth0Id;
+    if (name && !user.name) user.name = name;
+    await user.save();
+    logger.info('Auth0 user session', { userId: user._id, email });
+  }
+
+  const token = createToken(user);
+  user.authToken = token;
+  user.authTokenExpiresAt = getTokenExpiry();
+  user.isActive = true;
+  await user.save();
+
+  return { token, user };
 };
 
 // user login via google login

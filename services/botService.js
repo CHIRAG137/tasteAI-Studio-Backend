@@ -45,6 +45,7 @@ exports.createBot = async (req) => {
     voice_id,
     human_handoff_enabled,
     human_handoff_emails,
+    require_visitor_auth0_identity,
   } = req.body;
 
   if (!name || !description) {
@@ -151,6 +152,9 @@ exports.createBot = async (req) => {
     voice_id,
     human_handoff_enabled: human_handoff_enabled === 'true',
     human_handoff_emails: parsedHumanEmails,
+    require_visitor_auth0_identity:
+      require_visitor_auth0_identity === true ||
+      require_visitor_auth0_identity === 'true',
   });
 
   logger.info('Bot created', { botId: bot._id, userId: req.user.id, name });
@@ -618,6 +622,7 @@ exports.updateBotByBotId = async (botId, userId, body, file) => {
     voice_id,
     human_handoff_enabled,
     human_handoff_emails,
+    require_visitor_auth0_identity,
   } = body;
 
   if (!name || !description) {
@@ -737,6 +742,11 @@ exports.updateBotByBotId = async (botId, userId, body, file) => {
     voice_id: voice_id,
     human_handoff_enabled: human_handoff_enabled === 'true',
     human_handoff_emails: parsedHumanEmails || bot.human_handoff_emails,
+    require_visitor_auth0_identity:
+      require_visitor_auth0_identity === undefined
+        ? bot.require_visitor_auth0_identity
+        : require_visitor_auth0_identity === true ||
+          require_visitor_auth0_identity === 'true',
   });
 
   logger.info('Bot fields updated locally', { botId, userId });
