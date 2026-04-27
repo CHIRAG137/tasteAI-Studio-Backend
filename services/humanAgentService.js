@@ -10,6 +10,8 @@ const logger = require('../utils/logger');
 const HandoffSession = require('../models/HandoffSession');
 const axios = require('axios');
 const { verifyAuth0AccessToken } = require('../utils/auth0Verify');
+const googleClient = require('../config/googleClient');
+const { sanitizeBotForResponse, sanitizeBotsForResponse } = require('../utils/botSanitizer');
 
 async function fetchAuth0UserInfo(accessToken) {
   const domain = process.env.AUTH0_DOMAIN;
@@ -357,6 +359,75 @@ exports.humanAgentAuth0Login = async (accessToken) => {
   return { token, agent: humanAgent };
 };
 
+// human agent login via Google
+exports.humanAgentGoogleLogin = async (googleToken) => {
+  try {
+    const ticket = await googleClient.verifyIdToken({
+      idToken: googleToken,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+
+    const payload = ticket.getPayload();
+    const { email, name, sub: googleId } = payload;
+
+    const normalizedEmail = email.toLowerCase();
+    const humanAgent = await HumanAgent.findOne({ email: normalizedEmail });
+
+    if (!humanAgent) {
+      logger.warn('Google agent login — no agent record', { email: normalizedEmail });
+      throw new Error(
+        'No agent account for this email. Ask a bot owner to add you as a human agent.',
+      );
+    }
+
+    if (!humanAgent.isActive) {
+      throw new Error('Agent account is inactive');
+    }
+
+    if (humanAgent.googleId && humanAgent.googleId !== googleId) {
+      throw new Error(
+        'This agent profile is linked to a different Google account',
+      );
+    }
+
+    if (!humanAgent.googleId) {
+      humanAgent.googleId = googleId;
+    }
+
+    if (name && !humanAgent.displayName) {
+      humanAgent.displayName = name;
+    }
+
+    humanAgent.lastLoginAt = new Date();
+
+    const token = jwt.sign(
+      {
+        id: humanAgent._id,
+        email: humanAgent.email,
+        type: 'human_agent',
+      },
+      process.env.JWT_SECRET || 'your-secret-key',
+      { expiresIn: '7d' },
+    );
+
+    humanAgent.agentAuthToken = token;
+    humanAgent.agentAuthTokenExpiresAt = new Date(
+      Date.now() + 7 * 24 * 60 * 60 * 1000,
+    );
+    await humanAgent.save();
+
+    logger.info('Agent Google login successful', {
+      agentId: humanAgent._id,
+      email: humanAgent.email,
+    });
+
+    return { token, agent: humanAgent };
+  } catch (err) {
+    logger.error('Error in Google agent login service', { error: err.message });
+    throw err;
+  }
+};
+
 // human agent verify invite token
 exports.humanAgentVerifyInviteToken = async (token) => {
   logger.info('Verifying invite token', { token: token.substring(0, 8) });
@@ -424,8 +495,8 @@ exports.getBotsByHumanAgentId = async (agentId) => {
   });
 
   return {
-    enabledBots,
-    disabledBots,
+    enabledBots: sanitizeBotsForResponse(enabledBots),
+    disabledBots: sanitizeBotsForResponse(disabledBots),
   };
 };
 

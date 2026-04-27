@@ -8,13 +8,13 @@ const { optionalUserAuth } = require('../middlewares/optionalUserAuthMiddleware'
 
 /**
  * @route   POST /api/bots/create
- * @desc    Create a new chatbot with optional training data (PDF / scraped content)
+ * @desc    Create a new chatbot with optional training files (PDF, TXT, DOC/DOCX, XLS/XLSX) or scraped content
  * @access  Private (Authenticated user)
  */
 router.post(
   '/create',
   authMiddleware,
-  upload.single('file'),
+  upload.array('files'),
   botController.createBot
 );
 
@@ -53,12 +53,13 @@ router.delete(
 /**
  * @route   PUT /api/bots/:botId
  * @desc    Update chatbot details, training data, integrations, or configuration
+ *         Supports new file uploads for PDF, TXT, DOC/DOCX, XLS/XLSX ingestion
  * @access  Private
  */
 router.put(
   '/:botId',
   authMiddleware,
-  upload.single('file'),
+  upload.array('files'),
   botController.updateBotByBotId
 );
 
@@ -104,6 +105,39 @@ router.get(
   '/:botId/history/:sessionId',
   authMiddleware,
   botController.getChatHistoryBySessionId
+);
+
+/**
+ * @route   GET /api/bots/:botId/spreadsheet-config
+ * @desc    Get spreadsheet configuration for a bot
+ * @access  Private
+ */
+router.get(
+  '/:botId/spreadsheet-config',
+  authMiddleware,
+  botController.getSpreadsheetConfig
+);
+
+/**
+ * @route   POST /api/bots/:botId/spreadsheet-config/columns
+ * @desc    Configure output and input columns for spreadsheet analysis
+ * @access  Private
+ */
+router.post(
+  '/:botId/spreadsheet-config/columns',
+  authMiddleware,
+  botController.configureSpreadsheetColumns
+);
+
+/**
+ * @route   GET /api/bots/:botId/spreadsheet-config/suggestions
+ * @desc    Get Gemini's AI suggestions for column configuration
+ * @access  Private
+ */
+router.get(
+  '/:botId/spreadsheet-config/suggestions',
+  authMiddleware,
+  botController.getSuggestedColumnConfiguration
 );
 
 module.exports = router;

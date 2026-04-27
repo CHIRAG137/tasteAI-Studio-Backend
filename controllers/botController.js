@@ -186,13 +186,13 @@ exports.updateBotByBotId = async (req, res) => {
   try {
     const userId = req.user.id;
     const botId = req.params.botId;
-    const file = req.file;
+    const files = req.files;
 
     const updatedBot = await botService.updateBotByBotId(
       botId,
       userId,
       req.body,
-      file
+      files
     );
 
     logger.info('Bot updated successfully', { botId, userId });
@@ -368,6 +368,99 @@ exports.getChatHistoryBySessionId = async (req, res) => {
       res,
       null,
       'Failed to fetch chat history'
+    );
+  }
+};
+
+// get spreadsheet configuration for a bot
+exports.getSpreadsheetConfig = async (req, res) => {
+  const { botId } = req.params;
+  try {
+    logger.info('Fetching spreadsheet configuration', { botId, userId: req.user?.id });
+
+    const result = await botService.getSpreadsheetConfigForBot(botId, req.user?.id);
+
+    return responseBuilder.ok(res, result, 'Spreadsheet configuration fetched successfully');
+  } catch (error) {
+    logger.error('Error fetching spreadsheet configuration', {
+      error: error.message,
+      botId,
+      userId: req.user?.id,
+    });
+
+    return responseBuilder.internalError(
+      res,
+      null,
+      'Failed to fetch spreadsheet configuration'
+    );
+  }
+};
+
+// configure spreadsheet columns for a bot
+exports.configureSpreadsheetColumns = async (req, res) => {
+  const { botId } = req.params;
+  const { outputColumn, inputColumns } = req.body;
+  try {
+    logger.info('Configuring spreadsheet columns', {
+      botId,
+      userId: req.user?.id,
+      outputColumn,
+      inputColumnsCount: inputColumns?.length || 0,
+    });
+
+    if (!outputColumn || !inputColumns || inputColumns.length === 0) {
+      return responseBuilder.badRequest(
+        res,
+        null,
+        'outputColumn and inputColumns are required'
+      );
+    }
+
+    const result = await botService.configureSpreadsheetColumns(
+      botId,
+      req.user?.id,
+      outputColumn,
+      inputColumns
+    );
+
+    logger.info('Spreadsheet columns configured successfully', { botId });
+
+    return responseBuilder.ok(res, result, 'Spreadsheet columns configured successfully');
+  } catch (error) {
+    logger.error('Error configuring spreadsheet columns', {
+      error: error.message,
+      botId,
+      userId: req.user?.id,
+    });
+
+    return responseBuilder.internalError(
+      res,
+      null,
+      'Failed to configure spreadsheet columns'
+    );
+  }
+};
+
+// get Gemini suggestions for column configuration
+exports.getSuggestedColumnConfiguration = async (req, res) => {
+  const { botId } = req.params;
+  try {
+    logger.info('Getting suggested column configuration', { botId, userId: req.user?.id });
+
+    const result = await botService.getSuggestedColumnConfigForBot(botId, req.user?.id);
+
+    return responseBuilder.ok(res, result, 'Column suggestions retrieved successfully');
+  } catch (error) {
+    logger.error('Error getting column suggestions', {
+      error: error.message,
+      botId,
+      userId: req.user?.id,
+    });
+
+    return responseBuilder.internalError(
+      res,
+      null,
+      'Failed to get column suggestions'
     );
   }
 };

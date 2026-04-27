@@ -76,6 +76,16 @@ const ChatBotSchema = new mongoose.Schema(
 
     // when true, visitors must sign in with Auth0 before chatting (public/embed)
     require_visitor_auth0_identity: { type: Boolean, default: false },
+
+    // custom LLM provider selected by user ('gemini' or 'openai')
+    custom_llm_provider: { type: String, enum: ['gemini', 'openai'], default: null },
+
+    // encrypted API key for custom LLM provider
+    // Contains: { encrypted, iv, authTag }
+    encrypted_api_key: { type: mongoose.Schema.Types.Mixed, default: null },
+
+    // custom model name selected by user (e.g., 'gpt-4', 'gemini-pro')
+    custom_model: { type: String, default: null },
   },
   { timestamps: true }
 );

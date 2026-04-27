@@ -29,6 +29,7 @@
     "jsonwebtoken": "^9.0.2",
     "jwks-rsa": "^3.2.2",
     "livekit-server-sdk": "^2.15.0",
+    "mammoth": "^1.12.0",
     "mongoose": "^8.16.5",
     "multer": "^2.0.2",
     "node-cron": "^3.0.3",
@@ -39,7 +40,8 @@
     "streamifier": "^0.1.1",
     "uuid": "^13.0.0",
     "vm": "^0.1.0",
-    "ws": "^8.18.3"
+    "ws": "^8.18.3",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",

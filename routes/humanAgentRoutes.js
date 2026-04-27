@@ -32,6 +32,13 @@ router.post('/login', humanAgentController.humanAgentLogin);
 router.post('/auth0-login', humanAgentController.humanAgentAuth0Login);
 
 /**
+ * @route   POST /api/human-agent/google-login
+ * @desc    Exchange Google ID token for agent session JWT
+ * @access  Public
+ */
+router.post('/google-login', humanAgentController.humanAgentGoogleLogin);
+
+/**
  * @route   GET /api/human-agent/bots
  * @desc    Get chatbots by human agent id
  * @access  Private (Human Agent)
