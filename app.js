@@ -15,6 +15,7 @@ const elevenlabsRoutes = require('./routes/elevenlabsRoutes');
 const imageGenerationRoutes = require('./routes/imageGenerationRoutes');
 const humanAgentRoutes = require('./routes/humanAgentRoutes');
 const handoffRoutes = require('./routes/handoffRoutes');
+const workflowRoutes = require('./routes/workflowRoutes');
 const { startInviteReminderScheduler } = require('./services/inviteReminderScheduler');
 
 require('dotenv').config();
@@ -49,6 +50,7 @@ app.use('/api/bots', botRoutes);
 app.use('/api/scrape', crawlRoutes);
 app.use('/api/slack', slackRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api/workflows', workflowRoutes);
 app.use('/api/flow', flowRoutes);
 app.use('/api/summarize', summarizeRoutes);
 app.use('/api/elevenlabs', elevenlabsRoutes);
