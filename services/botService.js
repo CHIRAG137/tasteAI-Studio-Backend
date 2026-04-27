@@ -4,6 +4,7 @@ const ChatBot = require('../models/ChatBot');
 const QAHistory = require('../models/QAHistory');
 const Customization = require('../models/Customisation');
 const { getEmbedding } = require('../utils/gptUtils');
+const { generateEmbedding } = require('../utils/llmClientUtils');
 const { cosineSimilarity } = require('../utils/embedUtils');
 const logger = require('../utils/logger');
 const FlowSession = require('../models/FlowSession');
@@ -15,8 +16,10 @@ const HumanAgent = require('../models/HumanAgent');
 const BotAgent = require('../models/BotAgent');
 const {
   processMarkdownContent,
-  processPDFContent,
+  processFileContent,
 } = require('../utils/dataProcessingUtils');
+const { encryptApiKey } = require('../utils/encryptionUtils');
+const { sanitizeBotForResponse, sanitizeBotsForResponse } = require('../utils/botSanitizer');
 
 // create chatbot
 exports.createBot = async (req) => {
@@ -46,6 +49,9 @@ exports.createBot = async (req) => {
     human_handoff_enabled,
     human_handoff_emails,
     require_visitor_auth0_identity,
+    custom_llm_provider,
+    custom_api_key,
+    custom_model,
   } = req.body;
 
   if (!name || !description) {
@@ -54,6 +60,26 @@ exports.createBot = async (req) => {
       description,
     });
     throw new Error('Missing required fields: name, or description');
+  }
+
+  // Validate custom LLM configuration
+  let encryptedApiKey = null;
+  if (custom_llm_provider) {
+    if (!['gemini', 'openai'].includes(custom_llm_provider)) {
+      throw new Error('Invalid custom_llm_provider. Must be "gemini" or "openai"');
+    }
+    
+    if (!custom_api_key) {
+      throw new Error('API key is required when custom LLM provider is specified');
+    }
+    
+    try {
+      encryptedApiKey = encryptApiKey(custom_api_key);
+      logger.debug('API key encrypted successfully for bot creation');
+    } catch (err) {
+      logger.error('Failed to encrypt API key', { error: err.message });
+      throw new Error('Failed to encrypt API key. Please check encryption configuration.');
+    }
   }
 
   // Parse supported_languages
@@ -155,6 +181,9 @@ exports.createBot = async (req) => {
     require_visitor_auth0_identity:
       require_visitor_auth0_identity === true ||
       require_visitor_auth0_identity === 'true',
+    custom_llm_provider: custom_llm_provider || null,
+    encrypted_api_key: encryptedApiKey,
+    custom_model: custom_model || null,
   });
 
   logger.info('Bot created', { botId: bot._id, userId: req.user.id, name });
@@ -213,7 +242,8 @@ exports.createBot = async (req) => {
         parsedScrapedContent,
         bot._id,
         name,
-        description
+        description,
+        bot
       ).catch((err) => {
         logger.error('Error in markdown processing', {
           botId: bot._id,
@@ -224,17 +254,22 @@ exports.createBot = async (req) => {
     );
   }
 
-  // 2. Process PDF content (parallel)
-  if (req.file) {
-    processingPromises.push(
-      processPDFContent(req.file, bot._id, name, description).catch((err) => {
-        logger.error('Error in PDF processing', {
-          botId: bot._id,
-          error: err.message,
-        });
-        return 0;
-      })
-    );
+  // 2. Process file content (PDF, TXT, DOC, XLSX, XLS)
+  if (req.files && req.files.length > 0) {
+    req.files.forEach((file) => {
+      processingPromises.push(
+        processFileContent(file, bot._id, name, description, bot)
+          .catch((err) => {
+            logger.error('Error in file processing', {
+              botId: bot._id,
+              filename: file.originalname,
+              error: err.message,
+            });
+            return { success: false, qaCount: 0, metadata: {} };
+          })
+          .then((result) => result.qaCount || 0)
+      );
+    });
   }
 
   // 3. Slack integration (parallel - independent of content processing)
@@ -292,7 +327,7 @@ exports.createBot = async (req) => {
 
   // Calculate total QAs processed
   let markdownQAs = 0;
-  let pdfQAs = 0;
+  let fileQAs = 0;
   let slackJoined = false;
 
   results.forEach((result, index) => {
@@ -300,11 +335,11 @@ exports.createBot = async (req) => {
       if (typeof result.value === 'number') {
         if (parsedScrapedContent.length > 0 && index === 0) {
           markdownQAs = result.value;
-        } else if (
-          req.file &&
-          (parsedScrapedContent.length > 0 ? index === 1 : index === 0)
-        ) {
-          pdfQAs = result.value;
+        } else if (req.files && req.files.length > 0) {
+          const offset = parsedScrapedContent.length > 0 ? 1 : 0;
+          if (index >= offset && index < offset + req.files.length) {
+            fileQAs += result.value;
+          }
         }
       } else if (result.value?.slack !== undefined) {
         slackJoined = result.value.slack;
@@ -335,8 +370,8 @@ exports.createBot = async (req) => {
       `${parsedScrapedContent.length} scraped page(s) (${markdownQAs} Q&As)`
     );
   }
-  if (pdfQAs > 0) {
-    processedSources.push(`PDF upload (${pdfQAs} Q&As)`);
+  if (fileQAs > 0) {
+    processedSources.push(`${req.files.length} uploaded file(s) (${fileQAs} Q&As)`);
   }
   if (processedSources.length > 0) {
     messageParts.push(`trained on ${processedSources.join(' and ')}`);
@@ -369,11 +404,12 @@ exports.createBot = async (req) => {
         pages: parsedScrapedContent.length,
         qas: markdownQAs,
       },
-      pdf: {
-        uploaded: !!req.file,
-        qas: pdfQAs,
+      files: {
+        uploaded: !!(req.files && req.files.length > 0),
+        qas: fileQAs,
+        count: req.files?.length || 0,
       },
-      totalQAs: markdownQAs + pdfQAs,
+      totalQAs: markdownQAs + fileQAs,
     },
     integrations: {
       slack: {
@@ -429,9 +465,10 @@ exports.createBot = async (req) => {
     training_summary: {
       scraped_pages: parsedScrapedContent.length,
       markdown_qas: markdownQAs,
-      pdf_uploaded: !!req.file,
-      pdf_qas: pdfQAs,
-      total_qas: markdownQAs + pdfQAs,
+      files_uploaded: !!(req.files && req.files.length > 0),
+      files_count: req.files?.length || 0,
+      file_qas: fileQAs,
+      total_qas: markdownQAs + fileQAs,
     },
 
     meta: {
@@ -442,7 +479,7 @@ exports.createBot = async (req) => {
 };
 
 // ask query to a chatbot
-exports.askBot = async (question, botId, flowSessionId = null) => {
+exports.askBot = async (question, botId, flowSessionId = null, userId = null) => {
   const bot = await ChatBot.findById(botId);
   if (!bot) {
     logger.error('Bot not found', { botId });
@@ -451,7 +488,22 @@ exports.askBot = async (question, botId, flowSessionId = null) => {
 
   logger.info('Bot asked a question', { botId, question, flowSessionId });
 
-  const inputEmbedding = await getEmbedding(question);
+  // Use custom LLM if configured, otherwise use default
+  let inputEmbedding;
+  if (bot.custom_llm_provider && bot.encrypted_api_key) {
+    try {
+      inputEmbedding = await generateEmbedding(question, botId, userId);
+    } catch (error) {
+      logger.error('Error generating embedding with custom LLM, falling back to default', { 
+        botId, 
+        error: error.message 
+      });
+      inputEmbedding = await getEmbedding(question);
+    }
+  } else {
+    inputEmbedding = await getEmbedding(question);
+  }
+
   const qas = await QAHistory.find({ bot: botId });
 
   let bestMatch = null,
@@ -484,7 +536,72 @@ exports.askBot = async (question, botId, flowSessionId = null) => {
       score: bestScore,
       question,
     });
-    source = 'none';
+
+    // Try to answer from spreadsheet if configured
+    try {
+      const SpreadsheetConfig = require('../models/SpreadsheetConfig');
+      const spreadsheetConfig = await SpreadsheetConfig.findOne({
+        bot: botId,
+        isConfigured: true,
+      });
+
+      if (spreadsheetConfig && spreadsheetConfig.outputColumn) {
+        logger.info('Attempting to answer using spreadsheet data', {
+          botId,
+          outputColumn: spreadsheetConfig.outputColumn,
+        });
+
+        // Use Gemini to analyze the question against spreadsheet data
+        const { getLLMClient } = require('../utils/llmClientUtils');
+        const llmClient = await getLLMClient(botId, userId);
+
+        const dataContext = spreadsheetConfig.data
+          .slice(0, 10) // Use first 10 rows for context
+          .map((row) => JSON.stringify(row))
+          .join('\n');
+
+        const predictionPrompt = `You are an AI assistant analyzing spreadsheet data.
+
+The user is asking: "${question}"
+
+You have access to this spreadsheet data:
+Columns: ${spreadsheetConfig.availableColumns.join(', ')}
+Output Column (to predict): ${spreadsheetConfig.outputColumn}
+Input Columns (features): ${spreadsheetConfig.inputColumns.join(', ')}
+
+Sample data:
+${dataContext}
+
+Based on this data, answer the user's question. If the question appears to be asking for a prediction or analysis of the data, provide an answer based on the patterns in the data. If the question is not related to the spreadsheet data, say you cannot answer based on the available data.`;
+
+        const llmResponse = await llmClient.generateSummary(predictionPrompt);
+
+        if (
+          llmResponse &&
+          !llmResponse.toLowerCase().includes('cannot answer') &&
+          !llmResponse.toLowerCase().includes('not related')
+        ) {
+          answer = llmResponse;
+          source = 'spreadsheet';
+
+          logger.info('Answered using spreadsheet data', {
+            botId,
+            source,
+            questionLength: question.length,
+          });
+        }
+      }
+    } catch (err) {
+      logger.error('Error attempting spreadsheet answer', {
+        botId,
+        error: err.message,
+      });
+      // Don't throw, fall through to 'none'
+    }
+
+    if (!answer) {
+      source = 'none';
+    }
   }
 
   // Save to FlowSession if sessionId is provided
@@ -520,7 +637,7 @@ exports.askBot = async (question, botId, flowSessionId = null) => {
     }
   }
 
-  if (source === 'qa') {
+  if (source === 'qa' || source === 'spreadsheet') {
     return { answer, score: bestScore, source };
   }
 
@@ -549,8 +666,11 @@ exports.getAllChatBots = async (userId, { skip, limit, page }) => {
     totalBots: total,
   });
 
+  // Sanitize bots to remove sensitive fields before sending to frontend
+  const sanitizedBots = sanitizeBotsForResponse(bots);
+
   return {
-    bots,
+    bots: sanitizedBots,
     pagination: {
       page,
       limit,
@@ -570,7 +690,9 @@ exports.getBotByBotId = async (botId) => {
     throw new Error('Bot not found');
   }
   logger.info('Fetched bot by ID', { botId });
-  return bot;
+  
+  // Sanitize bot to remove sensitive fields before returning to frontend
+  return sanitizeBotForResponse(bot);
 };
 
 // delete bot by bot id
@@ -590,7 +712,7 @@ exports.deleteBotByBotId = async (botId, userId) => {
 };
 
 // update bot by bot id
-exports.updateBotByBotId = async (botId, userId, body, file) => {
+exports.updateBotByBotId = async (botId, userId, body, files) => {
   const bot = await ChatBot.findOne({ _id: botId, user: userId });
   if (!bot) {
     logger.warn('Bot not found for update', { botId, userId });
@@ -623,6 +745,9 @@ exports.updateBotByBotId = async (botId, userId, body, file) => {
     human_handoff_enabled,
     human_handoff_emails,
     require_visitor_auth0_identity,
+    custom_llm_provider,
+    custom_api_key,
+    custom_model,
   } = body;
 
   if (!name || !description) {
@@ -633,6 +758,31 @@ exports.updateBotByBotId = async (botId, userId, body, file) => {
       description,
     });
     throw new Error('Missing required fields: name or description');
+  }
+
+  // Validate and encrypt custom LLM configuration
+  let encryptedApiKey = bot.encrypted_api_key;
+  if (custom_llm_provider !== undefined) {
+    if (!custom_llm_provider) {
+      // Clearing custom LLM
+      encryptedApiKey = null;
+    } else {
+      if (!['gemini', 'openai'].includes(custom_llm_provider)) {
+        throw new Error('Invalid custom_llm_provider. Must be "gemini" or "openai"');
+      }
+      
+      if (custom_api_key) {
+        try {
+          encryptedApiKey = encryptApiKey(custom_api_key);
+          logger.debug('API key encrypted successfully for bot update');
+        } catch (err) {
+          logger.error('Failed to encrypt API key', { error: err.message });
+          throw new Error('Failed to encrypt API key. Please check encryption configuration.');
+        }
+      } else if (!bot.encrypted_api_key) {
+        throw new Error('API key is required when custom LLM provider is specified');
+      }
+    }
   }
 
   // Parse supported languages
@@ -747,6 +897,9 @@ exports.updateBotByBotId = async (botId, userId, body, file) => {
         ? bot.require_visitor_auth0_identity
         : require_visitor_auth0_identity === true ||
           require_visitor_auth0_identity === 'true',
+    custom_llm_provider: custom_llm_provider !== undefined ? custom_llm_provider : bot.custom_llm_provider,
+    encrypted_api_key: encryptedApiKey,
+    custom_model: custom_model || bot.custom_model,
   });
 
   logger.info('Bot fields updated locally', { botId, userId });
@@ -880,7 +1033,7 @@ exports.updateBotByBotId = async (botId, userId, body, file) => {
   }
 
   // Handle QA regeneration
-  if (file || urlsChanged) {
+  if ((files && files.length > 0) || urlsChanged) {
     await QAHistory.deleteMany({ bot: bot._id });
     logger.info('Deleted previous QAs before regeneration', { botId });
 
@@ -893,7 +1046,8 @@ exports.updateBotByBotId = async (botId, userId, body, file) => {
           parsedScrapedContent,
           bot._id,
           name,
-          description
+          description,
+          bot
         ).catch((err) => {
           logger.error('Error in markdown reprocessing', {
             botId,
@@ -904,17 +1058,20 @@ exports.updateBotByBotId = async (botId, userId, body, file) => {
       );
     }
 
-    // 2. If new PDF uploaded
-    if (file) {
-      processingPromises.push(
-        processPDFContent(file, bot._id, name, description).catch((err) => {
-          logger.error('Error in PDF reprocessing', {
-            botId,
-            error: err.message,
-          });
-          return 0;
-        })
-      );
+    // 2. If new files uploaded
+    if (files && files.length > 0) {
+      files.forEach((file) => {
+        processingPromises.push(
+          processFileContent(file, bot._id, name, description, bot).catch((err) => {
+            logger.error('Error in file reprocessing', {
+              botId,
+              filename: file.originalname,
+              error: err.message,
+            });
+            return 0;
+          })
+        );
+      });
     }
 
     await Promise.allSettled(processingPromises);
@@ -951,7 +1108,8 @@ exports.updateBotByBotId = async (botId, userId, body, file) => {
     urlsChanged,
   });
 
-  return bot;
+  // Sanitize bot to remove sensitive fields before returning to frontend
+  return sanitizeBotForResponse(bot);
 };
 
 // get customization by bot id
@@ -1102,5 +1260,125 @@ exports.getChatHistoryBySessionId = async (botId, sessionId) => {
     userAgent: session.userAgent,
     createdAt: session.createdAt,
     lastUpdatedAt: session.lastUpdatedAt,
+  };
+};
+
+// Get spreadsheet configuration for a bot
+exports.getSpreadsheetConfigForBot = async (botId, userId) => {
+  const SpreadsheetConfig = require('../models/SpreadsheetConfig');
+  
+  logger.info('Fetching spreadsheet configuration', { botId, userId });
+
+  const bot = await ChatBot.findOne({ _id: botId, user: userId });
+  if (!bot) {
+    throw new Error('Bot not found');
+  }
+
+  const config = await SpreadsheetConfig.findOne({ bot: botId });
+  
+  if (!config) {
+    logger.info('No spreadsheet configuration found for bot', { botId });
+    return { configured: false, config: null };
+  }
+
+  return {
+    configured: config.isConfigured,
+    config: {
+      fileName: config.fileName,
+      sheetName: config.sheetName,
+      availableColumns: config.availableColumns,
+      outputColumn: config.outputColumn || null,
+      inputColumns: config.inputColumns || [],
+      rowCount: config.rowCount,
+      columnCount: config.columnCount,
+    },
+  };
+};
+
+// Configure spreadsheet columns for a bot
+exports.configureSpreadsheetColumns = async (botId, userId, outputColumn, inputColumns) => {
+  const SpreadsheetConfig = require('../models/SpreadsheetConfig');
+  
+  logger.info('Configuring spreadsheet columns', {
+    botId,
+    userId,
+    outputColumn,
+    inputColumnsCount: inputColumns.length,
+  });
+
+  const bot = await ChatBot.findOne({ _id: botId, user: userId });
+  if (!bot) {
+    throw new Error('Bot not found');
+  }
+
+  const config = await SpreadsheetConfig.findOneAndUpdate(
+    { bot: botId },
+    {
+      outputColumn,
+      inputColumns,
+      isConfigured: true,
+      updatedAt: new Date(),
+    },
+    { new: true, runValidators: true }
+  );
+
+  if (!config) {
+    throw new Error('Spreadsheet configuration not found for this bot');
+  }
+
+  logger.info('Spreadsheet columns configured successfully', {
+    botId,
+    outputColumn,
+    inputColumnsCount: inputColumns.length,
+  });
+
+  return {
+    configured: true,
+    config: {
+      fileName: config.fileName,
+      sheetName: config.sheetName,
+      availableColumns: config.availableColumns,
+      outputColumn: config.outputColumn,
+      inputColumns: config.inputColumns,
+      rowCount: config.rowCount,
+      columnCount: config.columnCount,
+    },
+  };
+};
+
+// Get Gemini's suggested column configuration
+exports.getSuggestedColumnConfigForBot = async (botId, userId) => {
+  const SpreadsheetConfig = require('../models/SpreadsheetConfig');
+  const { suggestColumnConfiguration } = require('../utils/dataProcessingUtils');
+  
+  logger.info('Getting suggested column configuration', { botId, userId });
+
+  const bot = await ChatBot.findOne({ _id: botId, user: userId });
+  if (!bot) {
+    throw new Error('Bot not found');
+  }
+
+  const config = await SpreadsheetConfig.findOne({ bot: botId });
+  
+  if (!config) {
+    throw new Error('No spreadsheet configuration found for this bot');
+  }
+
+  const sheetInfo = {
+    columns: config.availableColumns,
+    data: config.data,
+  };
+
+  const suggestions = await suggestColumnConfiguration(sheetInfo, botId);
+
+  logger.info('Column suggestions retrieved', {
+    botId,
+    suggestedOutput: suggestions.suggestedOutputColumn,
+    suggestedInputsCount: suggestions.suggestedInputColumns.length,
+  });
+
+  return {
+    suggestions,
+    availableColumns: config.availableColumns,
   };
 };

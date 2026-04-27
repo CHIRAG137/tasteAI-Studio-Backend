@@ -160,6 +160,52 @@ exports.humanAgentAuth0Login = async (req, res) => {
   }
 };
 
+// human agent login via Google
+exports.humanAgentGoogleLogin = async (req, res) => {
+  try {
+    const googleToken = req.body.token;
+    if (!googleToken) {
+      return responseBuilder.badRequest(res, null, 'token is required');
+    }
+
+    const result = await humanAgentService.humanAgentGoogleLogin(googleToken);
+
+    logger.info('Agent Google login OK', {
+      agentId: result.agent._id,
+      email: result.agent.email,
+    });
+
+    return responseBuilder.ok(
+      res,
+      {
+        token: result.token,
+        agent: {
+          id: result.agent._id,
+          email: result.agent.email,
+          isActive: result.agent.isActive,
+        },
+      },
+      'Login successful',
+    );
+  } catch (error) {
+    logger.warn('Agent Google login failed', { error: error.message });
+
+    if (
+      error.message?.includes('No agent account') ||
+      error.message?.includes('inactive') ||
+      error.message?.includes('linked to a different Google') ||
+      error.message?.includes('Could not resolve email') ||
+      error.message?.includes('GOOGLE') ||
+      error.message?.includes('Google') ||
+      error.message?.includes('jwt')
+    ) {
+      return responseBuilder.unauthorized(res, null, error.message);
+    }
+
+    return responseBuilder.internalError(res, 'Google login failed');
+  }
+};
+
 // human agent verify token
 exports.humanAgentVerifyToken = async (req, res) => {
   try {
