@@ -125,19 +125,32 @@ exports.auth0LoginUser = async (accessToken) => {
 // user login via google login
 exports.googleLoginUser = async (googleToken) => {
   try {
-    const ticket = await client.verifyIdToken({
-      idToken: googleToken,
-      audience: process.env.GOOGLE_CLIENT_ID,
-    });
+    // Try to verify as ID token first (for credential flow)
+    let payload;
+    try {
+      const ticket = await client.verifyIdToken({
+        idToken: googleToken,
+        audience: process.env.GOOGLE_CLIENT_ID,
+      });
+      payload = ticket.getPayload();
+    } catch (err) {
+      // If ID token verification fails, treat as access token and fetch user info
+      const response = await axios.get('https://www.googleapis.com/oauth2/v2/userinfo', {
+        headers: { Authorization: `Bearer ${googleToken}` },
+      });
+      payload = response.data;
+      if (!payload.id) payload.id = payload.userid;
+    }
 
-    const payload = ticket.getPayload();
-    const { email, name, sub: googleId } = payload;
+    const { email, name, sub: googleId, id } = payload;
+    const finalGoogleId = googleId || id;
 
-    let user = await User.findOne({ email });
+    let user = await User.findOne({ $or: [{ email }, { googleId: finalGoogleId }] });
     if (!user) {
-      user = await User.create({ email, name, googleId });
-      logger.info('New Google user created', { email, googleId });
+      user = await User.create({ email, name, googleId: finalGoogleId });
+      logger.info('New Google user created', { email, googleId: finalGoogleId });
     } else {
+      if (!user.googleId && finalGoogleId) user.googleId = finalGoogleId;
       logger.info('Google user logged in', { userId: user._id, email });
     }
 
