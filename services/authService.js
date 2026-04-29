@@ -17,20 +17,31 @@ function setLastLogin(user, method, ip = 'Unknown', device = 'Unknown', deviceId
   };
 }
 
-// register user
+// register user (supports cross-method account linking)
 exports.registerUser = async (email, password, name, loginMeta = {}) => {
   try {
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      logger.warn('Registration attempt with existing email', { email });
-      throw new Error('User already exists');
+    let user = await User.findOne({ email });
+    
+    if (user) {
+      // User exists from another auth method (Auth0 or Google)
+      // Allow cross-method registration by linking password to existing account
+      if (user.password) {
+        // User already has a password from email/password method
+        logger.warn('Registration attempt with existing email and password', { email });
+        throw new Error('User already exists');
+      }
+      // Link password to existing user from OAuth method
+      user.password = await bcrypt.hash(password, 10);
+      if (!user.name && name) user.name = name;
+      logger.info('Cross-method registration: linked password to OAuth user', { userId: user._id, email });
+    } else {
+      // New user registration
+      const hashedPassword = await bcrypt.hash(password, 10);
+      user = await User.create({ email, password: hashedPassword, name });
+      logger.info('New user registered via email/password', { userId: user._id, email });
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const user = await User.create({ email, password: hashedPassword, name });
     const token = createToken(user);
-
-    // Store token, expiry, and last login metadata in database
     user.authToken = token;
     user.authTokenExpiresAt = getTokenExpiry();
     setLastLogin(user, 'email_password', loginMeta.ip, loginMeta.device, loginMeta.deviceId);
@@ -44,13 +55,19 @@ exports.registerUser = async (email, password, name, loginMeta = {}) => {
   }
 };
 
-// login user
+// login user (supports cross-method login)
 exports.loginUser = async (email, password, loginMeta = {}) => {
   try {
     const user = await User.findOne({ email });
-    if (!user || !user.password) {
-      logger.warn('Login failed - invalid credentials', { email });
+    if (!user) {
+      logger.warn('Login failed - user not found', { email });
       throw new Error('Invalid credentials');
+    }
+
+    // If user has no password, they registered via Auth0/Google
+    if (!user.password) {
+      logger.warn('Login failed - user has no password (registered via OAuth)', { email });
+      throw new Error('This email is registered with Auth0 or Google. Please login using your original method.');
     }
 
     const match = await bcrypt.compare(password, user.password);
@@ -112,6 +129,7 @@ exports.auth0LoginUser = async (accessToken, loginMeta = {}) => {
 
   let user = await User.findOne({ $or: [{ auth0Id }, { email }] });
   if (!user) {
+    // New Auth0 user
     user = await User.create({
       email,
       name,
@@ -119,10 +137,14 @@ exports.auth0LoginUser = async (accessToken, loginMeta = {}) => {
     });
     logger.info('New Auth0 user created', { email, auth0Id });
   } else {
-    if (!user.auth0Id) user.auth0Id = auth0Id;
+    // Link Auth0 to existing user or update existing Auth0 user
+    if (!user.auth0Id) {
+      user.auth0Id = auth0Id;
+      logger.info('Cross-method: linked Auth0 to existing user', { userId: user._id, email });
+    }
     if (name && !user.name) user.name = name;
     await user.save();
-    logger.info('Auth0 user session', { userId: user._id, email });
+    logger.info('Auth0 user session (cross-method or existing)', { userId: user._id, email });
   }
 
   const token = createToken(user);
@@ -160,11 +182,17 @@ exports.googleLoginUser = async (googleToken, loginMeta = {}) => {
 
     let user = await User.findOne({ $or: [{ email }, { googleId: finalGoogleId }] });
     if (!user) {
+      // New Google user
       user = await User.create({ email, name, googleId: finalGoogleId });
       logger.info('New Google user created', { email, googleId: finalGoogleId });
     } else {
-      if (!user.googleId && finalGoogleId) user.googleId = finalGoogleId;
-      logger.info('Google user logged in', { userId: user._id, email });
+      // Link Google to existing user or update existing Google user
+      if (!user.googleId && finalGoogleId) {
+        user.googleId = finalGoogleId;
+        logger.info('Cross-method: linked Google to existing user', { userId: user._id, email });
+      }
+      if (name && !user.name) user.name = name;
+      logger.info('Google user logged in (cross-method or existing)', { userId: user._id, email });
     }
 
     const token = createToken(user);
