@@ -2,11 +2,19 @@ const authService = require('../services/authService');
 const logger = require('../utils/logger');
 const responseBuilder = require('../utils/responseBuilder');
 
+function getLoginMeta(req) {
+  return {
+    ip: req.clientIp || req.ip || 'Unknown',
+    device: req.userAgent || req.headers['user-agent'] || 'Unknown',
+    deviceId: req.body?.deviceId || null,
+  };
+}
+
 // register user
 exports.registerUser = async (req, res) => {
   try {
     const { email, password, name } = req.body;
-    const result = await authService.registerUser(email, password, name);
+    const result = await authService.registerUser(email, password, name, getLoginMeta(req));
 
     logger.info('User registered successfully', { email });
     return responseBuilder.created(res, result, 'User registered successfully');
@@ -20,7 +28,7 @@ exports.registerUser = async (req, res) => {
 exports.loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
-    const result = await authService.loginUser(email, password);
+    const result = await authService.loginUser(email, password, getLoginMeta(req));
 
     logger.info('User logged in', { email });
     return responseBuilder.ok(res, result, 'Login successful');
@@ -37,7 +45,7 @@ exports.auth0LoginUser = async (req, res) => {
     if (!accessToken) {
       return responseBuilder.badRequest(res, null, 'accessToken is required');
     }
-    const result = await authService.auth0LoginUser(accessToken);
+    const result = await authService.auth0LoginUser(accessToken, getLoginMeta(req));
     logger.info('Auth0 login successful');
     return responseBuilder.ok(res, result, 'Auth0 login successful');
   } catch (err) {
@@ -50,13 +58,33 @@ exports.auth0LoginUser = async (req, res) => {
 exports.googleLoginUser = async (req, res) => {
   try {
     const googleToken = req.body.token;
-    const result = await authService.googleLoginUser(googleToken);
+    const result = await authService.googleLoginUser(googleToken, getLoginMeta(req));
 
     logger.info('Google login successful');
     return responseBuilder.ok(res, result, 'Google login successful');
   } catch (err) {
     logger.warn('Google login failed', { error: err.message });
     return responseBuilder.unauthorized(res, null, err.message);
+  }
+};
+
+// get last login metadata for a user by email, deviceId, or ip
+exports.getLastLoginInfo = async (req, res) => {
+  try {
+    const { email, deviceId, ip } = req.query;
+    if (!email && !deviceId && !ip) {
+      return responseBuilder.badRequest(res, null, 'email, deviceId, or ip is required');
+    }
+
+    const lastLogin = await authService.getLastLoginInfo({ email, deviceId, ip });
+    if (!lastLogin) {
+      return responseBuilder.notFound(res, null, 'No last login info found');
+    }
+
+    return responseBuilder.ok(res, { lastLogin }, 'Last login info fetched');
+  } catch (err) {
+    logger.error('Error fetching last login info', { error: err.message });
+    return responseBuilder.internalError(res, err.message);
   }
 };
 

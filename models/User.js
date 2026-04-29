@@ -22,6 +22,15 @@ const userSchema = new mongoose.Schema({
   // auth token expiry timestamp
   authTokenExpiresAt: { type: Date, default: null },
 
+  // last login metadata for the user
+  lastLogin: {
+    method: { type: String, enum: ['email_password', 'google', 'auth0'], default: null },
+    ip: { type: String, default: null },
+    device: { type: String, default: null },
+    deviceId: { type: String, default: null },
+    at: { type: Date, default: null },
+  },
+
   // timestamp of when user last logged out
   lastLogoutAt: { type: Date },
 

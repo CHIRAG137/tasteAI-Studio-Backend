@@ -7,8 +7,18 @@ const client = require('../config/googleClient');
 const { createToken, getTokenExpiry } = require('../utils/tokenUtils');
 const { verifyAuth0AccessToken } = require('../utils/auth0Verify');
 
+function setLastLogin(user, method, ip = 'Unknown', device = 'Unknown', deviceId = null) {
+  user.lastLogin = {
+    method,
+    ip,
+    device,
+    deviceId,
+    at: new Date(),
+  };
+}
+
 // register user
-exports.registerUser = async (email, password, name) => {
+exports.registerUser = async (email, password, name, loginMeta = {}) => {
   try {
     const existingUser = await User.findOne({ email });
     if (existingUser) {
@@ -19,10 +29,11 @@ exports.registerUser = async (email, password, name) => {
     const hashedPassword = await bcrypt.hash(password, 10);
     const user = await User.create({ email, password: hashedPassword, name });
     const token = createToken(user);
-    
-    // Store token and expiry in database
+
+    // Store token, expiry, and last login metadata in database
     user.authToken = token;
     user.authTokenExpiresAt = getTokenExpiry();
+    setLastLogin(user, 'email_password', loginMeta.ip, loginMeta.device, loginMeta.deviceId);
     await user.save();
 
     logger.info('User registered in service', { userId: user._id, email });
@@ -34,7 +45,7 @@ exports.registerUser = async (email, password, name) => {
 };
 
 // login user
-exports.loginUser = async (email, password) => {
+exports.loginUser = async (email, password, loginMeta = {}) => {
   try {
     const user = await User.findOne({ email });
     if (!user || !user.password) {
@@ -50,10 +61,11 @@ exports.loginUser = async (email, password) => {
 
     const token = createToken(user);
     
-    // Store token and expiry in database
+    // Store token, expiry, and last login metadata in database
     user.authToken = token;
     user.authTokenExpiresAt = getTokenExpiry();
     user.isActive = true;
+    setLastLogin(user, 'email_password', loginMeta.ip, loginMeta.device, loginMeta.deviceId);
     await user.save();
 
     logger.info('User logged in successfully', { userId: user._id, email });
@@ -74,7 +86,7 @@ async function fetchAuth0UserInfo(accessToken) {
 }
 
 // login or register via Auth0 (access token from SPA after Universal Login)
-exports.auth0LoginUser = async (accessToken) => {
+exports.auth0LoginUser = async (accessToken, loginMeta = {}) => {
   const decoded = await verifyAuth0AccessToken(accessToken);
   const auth0Id = decoded.sub;
 
@@ -117,13 +129,14 @@ exports.auth0LoginUser = async (accessToken) => {
   user.authToken = token;
   user.authTokenExpiresAt = getTokenExpiry();
   user.isActive = true;
+  setLastLogin(user, 'auth0', loginMeta.ip, loginMeta.device, loginMeta.deviceId);
   await user.save();
 
   return { token, user };
 };
 
 // user login via google login
-exports.googleLoginUser = async (googleToken) => {
+exports.googleLoginUser = async (googleToken, loginMeta = {}) => {
   try {
     // Try to verify as ID token first (for credential flow)
     let payload;
@@ -156,15 +169,34 @@ exports.googleLoginUser = async (googleToken) => {
 
     const token = createToken(user);
     
-    // Store token and expiry in database
+    // Store token, expiry, and last login metadata in database
     user.authToken = token;
     user.authTokenExpiresAt = getTokenExpiry();
     user.isActive = true;
+    setLastLogin(user, 'google', loginMeta.ip, loginMeta.device, loginMeta.deviceId);
     await user.save();
 
     return { token, user };
   } catch (err) {
     logger.error('Error in Google login service', { error: err.message });
+    throw err;
+  }
+};
+
+exports.getLastLoginInfo = async ({ email, deviceId, ip }) => {
+  try {
+    let query = {};
+    if (email) {
+      query = { email };
+    } else if (deviceId) {
+      query = { 'lastLogin.deviceId': deviceId };
+    } else if (ip) {
+      query = { 'lastLogin.ip': ip };
+    }
+    const user = await User.findOne(query).select('lastLogin');
+    return user ? user.lastLogin : null;
+  } catch (err) {
+    logger.error('Error fetching last login info', { error: err.message, email, deviceId, ip });
     throw err;
   }
 };
