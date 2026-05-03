@@ -8,7 +8,7 @@ const { optionalUserAuth } = require('../middlewares/optionalUserAuthMiddleware'
 
 /**
  * @route   POST /api/bots/create
- * @desc    Create a new chatbot with optional training files (PDF, TXT, DOC/DOCX, XLS/XLSX) or scraped content
+ * @desc    Create a new chatbot with optional training files (PDF, TXT, DOC/DOCX, XLS/XLSX, CSV) or scraped content
  * @access  Private (Authenticated user)
  */
 router.post(
@@ -53,7 +53,7 @@ router.delete(
 /**
  * @route   PUT /api/bots/:botId
  * @desc    Update chatbot details, training data, integrations, or configuration
- *         Supports new file uploads for PDF, TXT, DOC/DOCX, XLS/XLSX ingestion
+ *         Supports new file uploads for PDF, TXT, DOC/DOCX, XLS/XLSX, CSV ingestion
  * @access  Private
  */
 router.put(

@@ -163,7 +163,7 @@ exports.processPDFContent = async (file, botId, name, description, bot) => {
 }
 
 /**
- * Process generic file content (PDF, TXT, DOC, XLSX, XLS)
+ * Process generic file content (PDF, TXT, DOC, XLSX, XLS, CSV)
  * Routes to appropriate handler based on file type
  */
 exports.processFileContent = async (file, botId, name, description, bot) => {

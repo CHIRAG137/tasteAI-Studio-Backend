@@ -719,7 +719,7 @@ exports.updateBotByBotId = async (botId, userId, body, files) => {
     throw new Error('Bot not found');
   }
 
-  const {
+  let {
     name,
     website_url,
     description,
@@ -766,6 +766,7 @@ exports.updateBotByBotId = async (botId, userId, body, files) => {
     if (!custom_llm_provider) {
       // Clearing custom LLM
       encryptedApiKey = null;
+      custom_llm_provider = null;
     } else {
       if (!['gemini', 'openai'].includes(custom_llm_provider)) {
         throw new Error('Invalid custom_llm_provider. Must be "gemini" or "openai"');
