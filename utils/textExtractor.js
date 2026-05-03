@@ -57,9 +57,9 @@ exports.extractTextFromDOC = async (filePath) => {
 };
 
 /**
- * Extracts structure information from XLSX/XLS file
+ * Extracts structure information from XLSX/XLS/CSV file
  * Returns both raw text and column information for later use
- * @param {string} filePath - Path to the XLSX/XLS file
+ * @param {string} filePath - Path to the XLSX/XLS/CSV file
  * @returns {Promise<{text: string, sheets: Array, firstSheet: {name: string, columns: Array, data: Array}}>}
  */
 exports.extractDataFromSpreadsheet = async (filePath) => {
@@ -72,7 +72,7 @@ exports.extractDataFromSpreadsheet = async (filePath) => {
       return { text: '', sheets: [], firstSheet: null };
     }
 
-    // Get first sheet by default
+    // Get first sheet by default (for CSV, there's typically only one)
     const firstSheetName = sheetNames[0];
     const worksheet = workbook.Sheets[firstSheetName];
     const jsonData = XLSX.utils.sheet_to_json(worksheet);
@@ -122,7 +122,7 @@ exports.extractDataFromSpreadsheet = async (filePath) => {
 /**
  * Generic file extractor that determines file type and extracts accordingly
  * @param {Object} file - Multer file object with path, mimetype, originalname
- * @param {string} fileType - Optional file type override (pdf, txt, doc, xlsx, xls)
+ * @param {string} fileType - Optional file type override (pdf, txt, doc, xlsx, xls, csv)
  * @returns {Promise<Object>} Extracted data with type info
  */
 exports.extractFromFile = async (file, fileType = null) => {
@@ -151,6 +151,7 @@ exports.extractFromFile = async (file, fileType = null) => {
         break;
       case 'xlsx':
       case 'xls':
+      case 'csv':
         const spreadsheetData = await exports.extractDataFromSpreadsheet(file.path);
         result.content = spreadsheetData.text;
         result.metadata = {
@@ -183,6 +184,7 @@ function detectFileType(mimetype, ext) {
   if (ext === '.doc' || ext === '.docx' || mimetype.includes('word')) return 'doc';
   if (ext === '.xlsx' || mimetype.includes('spreadsheetml')) return 'xlsx';
   if (ext === '.xls' || mimetype === 'application/vnd.ms-excel') return 'xls';
+  if (ext === '.csv' || mimetype === 'text/csv' || mimetype === 'application/csv') return 'csv';
   
   // Fallback to extension
   return ext.replace(/^\./, '').toLowerCase();
