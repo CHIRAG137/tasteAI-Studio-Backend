@@ -1,3 +1,5 @@
+const fs = require('fs');
+const crypto = require('crypto');
 const axios = require('axios');
 const SlackIntegration = require('../models/SlackIntegration');
 const ChatBot = require('../models/ChatBot');
@@ -231,6 +233,7 @@ exports.createBot = async (req) => {
   }
 
   // Start parallel data processing and slack integration
+  const trainingFilesMeta = [];
   const processingPromises = [];
 
   // 1. Process scraped markdown content (parallel)
@@ -265,7 +268,19 @@ exports.createBot = async (req) => {
             });
             return { success: false, qaCount: 0, metadata: {} };
           })
-          .then((result) => result.qaCount || 0)
+          .then((result) => {
+            if (result?.metadata?.hash) {
+              trainingFilesMeta.push({
+                originalname: result.metadata.originalname,
+                mimeType: result.metadata.mimeType,
+                size: result.metadata.size,
+                hash: result.metadata.hash,
+                path: result.metadata.path,
+                uploadedAt: new Date(),
+              });
+            }
+            return result.qaCount || 0;
+          })
       );
     });
   }
@@ -322,6 +337,12 @@ exports.createBot = async (req) => {
 
   // Wait for all parallel operations to complete
   const results = await Promise.allSettled(processingPromises);
+
+  // Save training file metadata if any files were uploaded and processed
+  if (trainingFilesMeta.length > 0) {
+    bot.training_files = trainingFilesMeta;
+    await bot.save();
+  }
 
   // Calculate total QAs processed
   let markdownQAs = 0;
@@ -823,9 +844,9 @@ exports.updateBotByBotId = async (botId, userId, body, files) => {
     }
   }
 
-  // Parse scraped URLs
-  let parsedScrapedUrls = [];
-  if (scraped_urls) {
+  // Parse scraped URLs. Preserve existing values if the field was omitted from the update request.
+  let parsedScrapedUrls = Array.isArray(bot.scraped_urls) ? bot.scraped_urls : [];
+  if (scraped_urls !== undefined) {
     try {
       parsedScrapedUrls = JSON.parse(scraped_urls);
       if (!Array.isArray(parsedScrapedUrls)) {
@@ -836,9 +857,34 @@ exports.updateBotByBotId = async (botId, userId, body, files) => {
     }
   }
 
+  // Parse preserved existing training files metadata from update request
+  let preservedTrainingFiles = Array.isArray(bot.training_files) ? bot.training_files : [];
+  if (body.existing_training_files !== undefined) {
+    try {
+      preservedTrainingFiles = typeof body.existing_training_files === 'string'
+        ? JSON.parse(body.existing_training_files)
+        : body.existing_training_files;
+      if (!Array.isArray(preservedTrainingFiles)) {
+        preservedTrainingFiles = [];
+      }
+    } catch {
+      preservedTrainingFiles = [];
+    }
+  }
+
   const oldEmails = Array.isArray(bot.human_handoff_emails)
     ? bot.human_handoff_emails
     : [];
+
+  const oldTrainingFiles = Array.isArray(bot.training_files) ? bot.training_files : [];
+  const preservedFileHashes = new Set(
+    preservedTrainingFiles
+      .map((file) => file.hash)
+      .filter((hash) => typeof hash === 'string' && hash.length > 0)
+  );
+  const removedTrainingFiles = oldTrainingFiles.filter(
+    (file) => !preservedFileHashes.has(file.hash)
+  );
 
   let parsedHumanEmails;
   if (human_handoff_emails !== undefined) {
@@ -1028,16 +1074,35 @@ exports.updateBotByBotId = async (botId, userId, body, files) => {
     }
   }
 
-  // Handle QA regeneration
-  if ((files && files.length > 0) || urlsChanged) {
-    await QAHistory.deleteMany({ bot: bot._id });
-    logger.info('Deleted previous QAs before regeneration', { botId });
+  // Handle QA regeneration. Preserve unchanged training files whenever possible.
+  const shouldProcessFiles = files && files.length > 0;
+  const removedFileHashes = removedTrainingFiles
+    .map((file) => file.hash)
+    .filter((hash) => typeof hash === 'string' && hash.length > 0);
 
-    const processingPromises = [];
+  const processPromises = [];
+  let newTrainingFilesMeta = [];
 
-    // 1. If new scraped content (and URLs changed)
-    if (urlsChanged && parsedScrapedContent.length > 0) {
-      processingPromises.push(
+  const existingFileHashSet = new Set(oldTrainingFiles.map((file) => file.hash).filter(Boolean));
+
+  // If any training file was removed, delete only QAs tied to that file hash.
+  if (removedFileHashes.length > 0) {
+    await QAHistory.deleteMany({
+      bot: bot._id,
+      sourceFileHash: { $in: removedFileHashes },
+    });
+    logger.info('Deleted QAs for removed training files', {
+      botId,
+      removedFileHashes,
+    });
+  }
+
+  // Only delete scraped-content QAs if scraped URLs changed.
+  if (urlsChanged) {
+    await QAHistory.deleteMany({ bot: bot._id, source: 'scrape' });
+    logger.info('Deleted scraped QAs because scraped URLs changed', { botId });
+    if (parsedScrapedContent.length > 0) {
+      processPromises.push(
         processMarkdownContent(
           parsedScrapedContent,
           bot._id,
@@ -1053,25 +1118,75 @@ exports.updateBotByBotId = async (botId, userId, body, files) => {
         })
       );
     }
+  }
 
-    // 2. If new files uploaded
-    if (files && files.length > 0) {
-      files.forEach((file) => {
-        processingPromises.push(
-          processFileContent(file, bot._id, name, description, bot).catch((err) => {
+  // Process uploaded files only when provided.
+  if (shouldProcessFiles) {
+    for (const file of files) {
+      let fileHash;
+      try {
+        const fileBuffer = fs.readFileSync(file.path);
+        fileHash = crypto.createHash('sha256').update(fileBuffer).digest('hex');
+      } catch (err) {
+        logger.error('Error hashing uploaded file', {
+          botId,
+          filename: file.originalname,
+          error: err.message,
+        });
+        continue;
+      }
+
+      if (existingFileHashSet.has(fileHash)) {
+        logger.info('Skipped processing duplicate file upload', {
+          botId,
+          filename: file.originalname,
+          hash: fileHash,
+        });
+
+        if (!preservedFileHashes.has(fileHash)) {
+          const existingMeta = oldTrainingFiles.find((meta) => meta.hash === fileHash);
+          if (existingMeta) {
+            preservedTrainingFiles.push(existingMeta);
+          }
+        }
+        continue;
+      }
+
+      processPromises.push(
+        processFileContent(file, bot._id, name, description, bot)
+          .catch((err) => {
             logger.error('Error in file reprocessing', {
               botId,
               filename: file.originalname,
               error: err.message,
             });
-            return 0;
+            return { success: false, qaCount: 0, metadata: {} };
           })
-        );
-      });
+          .then((result) => {
+            if (result?.metadata?.hash) {
+              newTrainingFilesMeta.push({
+                originalname: result.metadata.originalname,
+                mimeType: result.metadata.mimeType,
+                size: result.metadata.size,
+                hash: result.metadata.hash,
+                path: result.metadata.path,
+                uploadedAt: new Date(),
+              });
+            }
+            return result.qaCount || 0;
+          })
+      );
     }
-
-    await Promise.allSettled(processingPromises);
   }
+
+  if (processPromises.length > 0) {
+    await Promise.allSettled(processPromises);
+  }
+
+  bot.training_files = [
+    ...preservedTrainingFiles.filter((file) => file && file.hash),
+    ...newTrainingFilesMeta,
+  ];
 
   await bot.save();
 

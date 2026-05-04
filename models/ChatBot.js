@@ -83,6 +83,18 @@ const ChatBotSchema = new mongoose.Schema(
 
     // custom model name selected by user (e.g., 'gpt-4', 'gemini-pro')
     custom_model: { type: String, default: null },
+
+    // persisted training files for the bot
+    training_files: [
+      {
+        originalname: String,
+        mimeType: String,
+        size: Number,
+        hash: String,
+        path: String,
+        uploadedAt: { type: Date, default: Date.now },
+      },
+    ],
   },
   { timestamps: true }
 );
