@@ -13,6 +13,11 @@ const QAHistorySchema = new mongoose.Schema(
 
     // embeddings of the question to match the query embedding while finding best question match
     embedding: Buffer,
+
+    // source metadata for the QA, used to retain or remove QAs for specific files
+    source: { type: String, default: 'file' },
+    sourceFileName: String,
+    sourceFileHash: String,
   },
   { timestamps: true }
 );

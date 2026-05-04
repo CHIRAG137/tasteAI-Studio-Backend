@@ -34,9 +34,9 @@ exports.getLLMClient = async (botIdOrBot, userId = null) => {
         });
 
         if (bot.custom_llm_provider === 'openai') {
-          return createOpenAIInterface(decrypted);
+          return createOpenAIInterface(decrypted, bot.custom_model || 'gpt-4');
         } else if (bot.custom_llm_provider === 'gemini') {
-          return createGeminiInterface(decrypted);
+          return createGeminiInterface(decrypted, bot.custom_model || 'gemini-3-pro-preview');
         }
       } catch (err) {
         logger.warn('Failed to decrypt custom API key, using default LLM', {
@@ -73,15 +73,16 @@ function createDefaultLLMInterface() {
       const result = await embeddingModel.embedContent(text);
       return new Float32Array(result.embedding.values);
     },
-    generateQAs: async (textChunk, botName, botDescription) => {
+    generateQAs: async (textChunk, botName, botDescription, personaContext = null) => {
       const systemPrompt = `
 You are an AI assistant that helps generate valuable, context-aware Q&A pairs from user-provided documents.
 
 The chatbot being built is named **${botName}**.
 Its purpose/description is: **${botDescription}**.
+${personaContext ? `Additional context about the bot's persona:\n${personaContext}` : ''}
 
 Based on the chunk of document text provided, extract meaningful questions and answers that reflect the tone and intent of this bot.
-Focus on generating **informative, helpful, and on-topic Q&A pairs** that align with the bot's purpose.
+Focus on generating **informative, helpful, and on-topic Q&A pairs** that align with the bot's purpose and persona.
 Return only a list of 10–15 questions and answers in JSON format like this:
 
 [
@@ -110,7 +111,7 @@ Return only a list of 10–15 questions and answers in JSON format like this:
 /**
  * Create interface for custom OpenAI LLM
  */
-function createOpenAIInterface(apiKey) {
+function createOpenAIInterface(apiKey, modelName = 'gpt-4') {
   const client = new OpenAI({ apiKey });
 
   return {
@@ -121,15 +122,16 @@ function createOpenAIInterface(apiKey) {
       });
       return new Float32Array(result.data[0].embedding);
     },
-    generateQAs: async (textChunk, botName, botDescription) => {
+    generateQAs: async (textChunk, botName, botDescription, personaContext = null) => {
       const systemPrompt = `
 You are an AI assistant that helps generate valuable, context-aware Q&A pairs from user-provided documents.
 
 The chatbot being built is named **${botName}**.
 Its purpose/description is: **${botDescription}**.
+${personaContext ? `Additional context about the bot's persona:\n${personaContext}` : ''}
 
 Based on the chunk of document text provided, extract meaningful questions and answers that reflect the tone and intent of this bot.
-Focus on generating **informative, helpful, and on-topic Q&A pairs** that align with the bot's purpose.
+Focus on generating **informative, helpful, and on-topic Q&A pairs** that align with the bot's purpose and persona.
 Return only a list of 10–15 questions and answers in JSON format like this:
 
 [
@@ -141,7 +143,7 @@ Return only a list of 10–15 questions and answers in JSON format like this:
       const userPrompt = `Here is a chunk of the document:\n\n${textChunk}\n\nGenerate Q&A pairs now.`;
 
       const completion = await client.chat.completions.create({
-        model: 'gpt-4',
+        model: modelName,
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt },
@@ -156,7 +158,7 @@ Return only a list of 10–15 questions and answers in JSON format like this:
     },
     generateSummary: async (prompt) => {
       const completion = await client.chat.completions.create({
-        model: 'gpt-4',
+        model: modelName,
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.7,
       });
@@ -168,9 +170,9 @@ Return only a list of 10–15 questions and answers in JSON format like this:
 /**
  * Create interface for custom Gemini LLM
  */
-function createGeminiInterface(apiKey) {
+function createGeminiInterface(apiKey, modelName = 'gemini-3-pro-preview') {
   const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({ model: 'gemini-3-pro-preview' });
+  const model = genAI.getGenerativeModel({ model: modelName });
   const embeddingModel = genAI.getGenerativeModel({
     model: 'embedding-001',
   });
@@ -180,15 +182,16 @@ function createGeminiInterface(apiKey) {
       const result = await embeddingModel.embedContent(text);
       return new Float32Array(result.embedding.values);
     },
-    generateQAs: async (textChunk, botName, botDescription) => {
+    generateQAs: async (textChunk, botName, botDescription, personaContext = null) => {
       const systemPrompt = `
 You are an AI assistant that helps generate valuable, context-aware Q&A pairs from user-provided documents.
 
 The chatbot being built is named **${botName}**.
 Its purpose/description is: **${botDescription}**.
+${personaContext ? `Additional context about the bot's persona:\n${personaContext}` : ''}
 
 Based on the chunk of document text provided, extract meaningful questions and answers that reflect the tone and intent of this bot.
-Focus on generating **informative, helpful, and on-topic Q&A pairs** that align with the bot's purpose.
+Focus on generating **informative, helpful, and on-topic Q&A pairs** that align with the bot's purpose and persona.
 Return only a list of 10–15 questions and answers in JSON format like this:
 
 [
@@ -233,10 +236,10 @@ exports.generateEmbedding = async (text, botIdOrBot, userId = null) => {
 /**
  * Generate Q&A pairs using appropriate LLM (custom or default)
  */
-exports.generateQAsWithLLM = async (textChunk, botName, botDescription, botIdOrBot, userId = null) => {
+exports.generateQAsWithLLM = async (textChunk, botName, botDescription, botIdOrBot, userId = null, personaContext = null) => {
   try {
     const llmClient = await exports.getLLMClient(botIdOrBot, userId);
-    return await llmClient.generateQAs(textChunk, botName, botDescription);
+    return await llmClient.generateQAs(textChunk, botName, botDescription, personaContext);
   } catch (error) {
     logger.error('Error generating Q&As with LLM', {
       error: error.message,
@@ -244,6 +247,36 @@ exports.generateQAsWithLLM = async (textChunk, botName, botDescription, botIdOrB
     });
     throw error;
   }
+};
+
+exports.testCustomLLMConnection = async (provider, apiKey, model = null) => {
+  const normalizedProvider = typeof provider === 'string' ? provider.toLowerCase() : null;
+  if (!normalizedProvider || !['openai', 'gemini'].includes(normalizedProvider)) {
+    throw new Error('Invalid custom LLM provider. Must be openai or gemini.');
+  }
+
+  if (!apiKey || typeof apiKey !== 'string') {
+    throw new Error('API key is required for custom LLM validation.');
+  }
+
+  const testModel = model || (normalizedProvider === 'openai' ? 'gpt-4' : 'gemini-3-pro-preview');
+  const prompt = 'Please respond with the single word OK to validate your API key.';
+
+  if (normalizedProvider === 'openai') {
+    const llmClient = createOpenAIInterface(apiKey, testModel);
+    const response = await llmClient.generateSummary(prompt);
+    if (!response || !response.toLowerCase().includes('ok')) {
+      throw new Error('Unable to validate OpenAI key and model combination.');
+    }
+    return true;
+  }
+
+  const llmClient = createGeminiInterface(apiKey, testModel);
+  const response = await llmClient.generateSummary(prompt);
+  if (!response || !response.toLowerCase().includes('ok')) {
+    throw new Error('Unable to validate Gemini key and model combination.');
+  }
+  return true;
 };
 
 module.exports = exports;

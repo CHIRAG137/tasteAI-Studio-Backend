@@ -1,6 +1,7 @@
 const botService = require('../services/botService');
 const logger = require('../utils/logger');
 const responseBuilder = require('../utils/responseBuilder');
+const { testCustomLLMConnection } = require('../utils/llmClientUtils');
 const {
   enforceVisitorAuth0ForBot,
   enforceVisitorAuth0ForFlowSession,
@@ -208,6 +209,60 @@ exports.updateBotByBotId = async (req, res) => {
       userId: req.user.id,
     });
     return responseBuilder.internalError(res, 'Failed to update bot');
+  }
+};
+
+const extractErrorMessage = (error) => {
+  let message = 'Unable to validate custom LLM configuration.';
+  if (!error) return message;
+  if (typeof error === 'string') {
+    message = error;
+  } else if (error.message) {
+    message = error.message;
+  } else {
+    message = JSON.stringify(error);
+  }
+
+  // Remove trailing JSON details from provider errors for user-friendly display
+  const cleaned = message.replace(/\s*(\[\{.*|\{.*)$/s, '').trim();
+  return cleaned || message;
+};
+
+// test custom LLM provider connection
+exports.testCustomLLMConnection = async (req, res) => {
+  try {
+    const { custom_llm_provider, custom_api_key, custom_model } = req.body;
+
+    if (!custom_llm_provider || !['openai', 'gemini'].includes(custom_llm_provider)) {
+      return responseBuilder.badRequest(
+        res,
+        null,
+        'Invalid or missing custom_llm_provider. Must be "openai" or "gemini".'
+      );
+    }
+
+    if (!custom_api_key) {
+      return responseBuilder.badRequest(
+        res,
+        null,
+        'API key is required to validate custom LLM configuration.'
+      );
+    }
+
+    await testCustomLLMConnection(custom_llm_provider, custom_api_key, custom_model);
+
+    return responseBuilder.ok(
+      res,
+      { validated: true },
+      'Custom LLM provider and API key validated successfully.'
+    );
+  } catch (error) {
+    logger.error('Error validating custom LLM connection', {
+      error: error.message,
+      userId: req.user?.id,
+    });
+    const message = extractErrorMessage(error);
+    return responseBuilder.badRequest(res, null, message);
   }
 };
 

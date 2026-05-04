@@ -64,10 +64,7 @@ const ChatBotSchema = new mongoose.Schema(
     
     // cloudinary id of the human avatar image that user uploaded that appears on the bot
     video_bot_image_public_id: String,
-    
-    // voice of the human avatar when is_video_bot is enabled
-    voice_id: { type: String, default: 'EXAVITQu4vr4xnSDxMaL' },
-    
+        
     // flag to enabled human handoff(if user wants to enabled human intervention in chatbot)
     human_handoff_enabled: { type: Boolean, default: false },
     
@@ -86,6 +83,18 @@ const ChatBotSchema = new mongoose.Schema(
 
     // custom model name selected by user (e.g., 'gpt-4', 'gemini-pro')
     custom_model: { type: String, default: null },
+
+    // persisted training files for the bot
+    training_files: [
+      {
+        originalname: String,
+        mimeType: String,
+        size: Number,
+        hash: String,
+        path: String,
+        uploadedAt: { type: Date, default: Date.now },
+      },
+    ],
   },
   { timestamps: true }
 );

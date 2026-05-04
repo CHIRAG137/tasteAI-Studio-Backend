@@ -1,3 +1,5 @@
+const fs = require('fs');
+const crypto = require('crypto');
 const QAHistory = require('../models/QAHistory');
 const SpreadsheetConfig = require('../models/SpreadsheetConfig');
 const { extractTextFromPDF, extractTextFromTXT, extractTextFromDOC, extractDataFromSpreadsheet, extractFromFile } = require('./textExtractor');
@@ -6,13 +8,62 @@ const { generateQAsWithLLM, generateEmbedding } = require('./llmClientUtils');
 const { embedText } = require('./embedUtils');
 const logger = require('./logger');
 
-// Helper function to process a single chunk
-async function processChunk(chunk, botId, name, description, source, index, bot) {
+const computeFileHash = (filePath) => {
   try {
+    const data = fs.readFileSync(filePath);
+    return crypto.createHash('sha256').update(data).digest('hex');
+  } catch (err) {
+    logger.error('Error computing file hash', { filePath, error: err.message });
+    return null;
+  }
+};
+
+// Helper function to build persona context from bot configuration
+function buildPersonaContext(bot) {
+  if (!bot) return null;
+  
+  const personaParts = [];
+  
+  if (bot.primary_purpose) {
+    personaParts.push(`Primary Purpose: ${bot.primary_purpose}`);
+  }
+  
+  if (bot.conversation_tone) {
+    personaParts.push(`Conversation Tone: ${bot.conversation_tone}`);
+  }
+  
+  if (bot.response_style) {
+    personaParts.push(`Response Style: ${bot.response_style}`);
+  }
+  
+  if (bot.target_audience) {
+    personaParts.push(`Target Audience: ${bot.target_audience}`);
+  }
+  
+  if (bot.specialisation_area) {
+    personaParts.push(`Specialisation Area: ${bot.specialisation_area}`);
+  }
+  
+  if (bot.key_topics) {
+    personaParts.push(`Key Topics: ${bot.key_topics}`);
+  }
+  
+  if (bot.keywords) {
+    personaParts.push(`Keywords: ${bot.keywords}`);
+  }
+  
+  return personaParts.length > 0 ? personaParts.join('\n') : null;
+}
+
+// Helper function to process a single chunk
+async function processChunk(chunk, botId, name, description, source, index, bot, sourceInfo = {}) {
+  try {
+    const personaContext = buildPersonaContext(bot);
+    
     // Use custom LLM if available, otherwise use default
     const qas = bot?.custom_llm_provider 
-      ? await generateQAsWithLLM(chunk, name, description, bot)
-      : await generateQAsViaGPT(chunk, name, description);
+      ? await generateQAsWithLLM(chunk, name, description, bot, null, personaContext)
+      : await generateQAsViaGPT(chunk, name, description, personaContext);
 
     // Process all Q&As in parallel
     const qaPromises = qas.map(async (qa) => {
@@ -29,6 +80,9 @@ async function processChunk(chunk, botId, name, description, source, index, bot)
           question,
           answer,
           embedding: Buffer.from(embedding.buffer),
+          source: sourceInfo.source || 'file',
+          sourceFileName: sourceInfo.sourceFileName || source,
+          sourceFileHash: sourceInfo.sourceFileHash || null,
         });
 
         return { success: true, question: question.substring(0, 50) + '...' };
@@ -97,7 +151,11 @@ exports.processMarkdownContent = async (markdownArray, botId, name, description,
         description,
         `markdown page ${i + 1}`,
         j + 1,
-        bot
+        bot,
+        {
+          source: 'scrape',
+          sourceFileName: `markdown page ${i + 1}`,
+        }
       )
     );
 
@@ -143,10 +201,24 @@ exports.processPDFContent = async (file, botId, name, description, bot) => {
   }
 
   const chunks = text.match(/.{1,3000}/g) || [];
+  const fileHash = computeFileHash(file.path);
 
   // Process all PDF chunks in parallel
   const chunkPromises = chunks.map((chunk, i) =>
-    processChunk(chunk, botId, name, description, 'PDF', i + 1, bot)
+    processChunk(
+      chunk,
+      botId,
+      name,
+      description,
+      'PDF',
+      i + 1,
+      bot,
+      {
+        source: 'file',
+        sourceFileName: file.originalname,
+        sourceFileHash: fileHash,
+      }
+    )
   );
 
   const results = await Promise.allSettled(chunkPromises);
@@ -181,6 +253,7 @@ exports.processFileContent = async (file, botId, name, description, bot) => {
     // Extract file content
     const extracted = await extractFromFile(file);
     const isSpreadsheet = extracted.metadata.isSpreadsheet;
+    const fileHash = computeFileHash(file.path);
 
     if (isSpreadsheet) {
       // For spreadsheets, store configuration and return metadata
@@ -190,7 +263,8 @@ exports.processFileContent = async (file, botId, name, description, bot) => {
         name,
         description,
         bot,
-        extracted.metadata.firstSheet
+        extracted.metadata.firstSheet,
+        fileHash
       );
     } else {
       // For text files, process normally
@@ -205,7 +279,20 @@ exports.processFileContent = async (file, botId, name, description, bot) => {
 
       // Process all chunks in parallel
       const chunkPromises = chunks.map((chunk, i) =>
-        processChunk(chunk, botId, name, description, file.originalname, i + 1, bot)
+        processChunk(
+          chunk,
+          botId,
+          name,
+          description,
+          file.originalname,
+          i + 1,
+          bot,
+          {
+            source: 'file',
+            sourceFileName: file.originalname,
+            sourceFileHash: fileHash,
+          }
+        )
       );
 
       const results = await Promise.allSettled(chunkPromises);
@@ -219,7 +306,18 @@ exports.processFileContent = async (file, botId, name, description, bot) => {
         totalQAs,
       });
 
-      return { success: true, qaCount: totalQAs, metadata: { fileType: extracted.type } };
+      return {
+        success: true,
+        qaCount: totalQAs,
+        metadata: {
+          fileType: extracted.type,
+          originalname: file.originalname,
+          mimeType: file.mimetype,
+          size: file.size,
+          hash: fileHash,
+          path: file.path,
+        },
+      };
     }
   } catch (err) {
     logger.error('Error processing file content', {
@@ -234,7 +332,7 @@ exports.processFileContent = async (file, botId, name, description, bot) => {
 /**
  * Process spreadsheet content - stores configuration for later use in chatbot
  */
-exports.processSpreadsheetContent = async (file, botId, name, description, bot, sheetInfo) => {
+exports.processSpreadsheetContent = async (file, botId, name, description, bot, sheetInfo, fileHash = null) => {
   if (!sheetInfo || !sheetInfo.data || sheetInfo.data.length === 0) {
     logger.warn('Spreadsheet is empty', { botId, filename: file.originalname });
     return { success: false, qaCount: 0, metadata: { isSpreadsheet: true, empty: true } };
@@ -252,10 +350,12 @@ exports.processSpreadsheetContent = async (file, botId, name, description, bot, 
     // Create Q&A from entire spreadsheet as one unit
     const spreadsheetContext = `Spreadsheet Data:\nFile: ${file.originalname}\nSheet: ${sheetInfo.name}\nColumns: ${sheetInfo.columns.join(', ')}\nRows: ${sheetInfo.rowCount}\n\nData Summary:\n${sheetInfo.data.map((row) => JSON.stringify(row)).slice(0, 5).join('\n')}`;
 
+    const personaContext = buildPersonaContext(bot);
+
     // Generate Q&As for the spreadsheet
     const qas = bot?.custom_llm_provider
-      ? await generateQAsWithLLM(spreadsheetContext, name, description, bot)
-      : await generateQAsViaGPT(spreadsheetContext, name, description);
+      ? await generateQAsWithLLM(spreadsheetContext, name, description, bot, null, personaContext)
+      : await generateQAsViaGPT(spreadsheetContext, name, description, personaContext);
 
     // Store Q&As
     let qaCount = 0;
@@ -272,6 +372,9 @@ exports.processSpreadsheetContent = async (file, botId, name, description, bot, 
           question,
           answer,
           embedding: Buffer.from(embedding.buffer),
+          source: 'file',
+          sourceFileName: file.originalname,
+          sourceFileHash: fileHash,
         });
 
         qaCount++;
@@ -306,6 +409,11 @@ exports.processSpreadsheetContent = async (file, botId, name, description, bot, 
         columns: sheetInfo.columns,
         rowCount: sheetInfo.rowCount,
         needsConfiguration: true, // Signal frontend to configure columns
+        originalname: file.originalname,
+        mimeType: file.mimetype,
+        size: file.size,
+        hash: fileHash,
+        path: file.path,
       },
     };
   } catch (err) {

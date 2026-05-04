@@ -64,16 +64,17 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
  * @param {string} botDescription - Description of the bot
  * @returns {Promise<Array<{question: string, answer: string}>>}
  */
-exports.generateQAsViaGPT = async (textChunk, botName, botDescription) => {
+exports.generateQAsViaGPT = async (textChunk, botName, botDescription, personaContext = null) => {
   try {
     const systemPrompt = `
 You are an AI assistant that helps generate valuable, context-aware Q&A pairs from user-provided documents.
 
 The chatbot being built is named **${botName}**.
 Its purpose/description is: **${botDescription}**.
+${personaContext ? `Additional context about the bot's persona:\n${personaContext}` : ''}
 
 Based on the chunk of document text provided, extract meaningful questions and answers that reflect the tone and intent of this bot.
-Focus on generating **informative, helpful, and on-topic Q&A pairs** that align with the bot's purpose.
+Focus on generating **informative, helpful, and on-topic Q&A pairs** that align with the bot's purpose and persona.
 Return only a list of 10–15 questions and answers in JSON format like this:
 
 [

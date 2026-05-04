@@ -19,6 +19,17 @@ router.post(
 );
 
 /**
+ * @route   POST /api/bots/test-custom-llm
+ * @desc    Validate a custom LLM provider, API key, and model before saving
+ * @access  Private
+ */
+router.post(
+  '/test-custom-llm',
+  authMiddleware,
+  botController.testCustomLLMConnection
+);
+
+/**
  * @route   POST /api/bots/ask
  * @desc    Ask a question to a chatbot (public inference endpoint)
  * @access  Public
