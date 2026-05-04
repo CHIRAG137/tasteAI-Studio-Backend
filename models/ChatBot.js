@@ -64,10 +64,7 @@ const ChatBotSchema = new mongoose.Schema(
     
     // cloudinary id of the human avatar image that user uploaded that appears on the bot
     video_bot_image_public_id: String,
-    
-    // voice of the human avatar when is_video_bot is enabled
-    voice_id: { type: String, default: 'EXAVITQu4vr4xnSDxMaL' },
-    
+        
     // flag to enabled human handoff(if user wants to enabled human intervention in chatbot)
     human_handoff_enabled: { type: Boolean, default: false },
     

@@ -6,13 +6,52 @@ const { generateQAsWithLLM, generateEmbedding } = require('./llmClientUtils');
 const { embedText } = require('./embedUtils');
 const logger = require('./logger');
 
+// Helper function to build persona context from bot configuration
+function buildPersonaContext(bot) {
+  if (!bot) return null;
+  
+  const personaParts = [];
+  
+  if (bot.primary_purpose) {
+    personaParts.push(`Primary Purpose: ${bot.primary_purpose}`);
+  }
+  
+  if (bot.conversation_tone) {
+    personaParts.push(`Conversation Tone: ${bot.conversation_tone}`);
+  }
+  
+  if (bot.response_style) {
+    personaParts.push(`Response Style: ${bot.response_style}`);
+  }
+  
+  if (bot.target_audience) {
+    personaParts.push(`Target Audience: ${bot.target_audience}`);
+  }
+  
+  if (bot.specialisation_area) {
+    personaParts.push(`Specialisation Area: ${bot.specialisation_area}`);
+  }
+  
+  if (bot.key_topics) {
+    personaParts.push(`Key Topics: ${bot.key_topics}`);
+  }
+  
+  if (bot.keywords) {
+    personaParts.push(`Keywords: ${bot.keywords}`);
+  }
+  
+  return personaParts.length > 0 ? personaParts.join('\n') : null;
+}
+
 // Helper function to process a single chunk
 async function processChunk(chunk, botId, name, description, source, index, bot) {
   try {
+    const personaContext = buildPersonaContext(bot);
+    
     // Use custom LLM if available, otherwise use default
     const qas = bot?.custom_llm_provider 
-      ? await generateQAsWithLLM(chunk, name, description, bot)
-      : await generateQAsViaGPT(chunk, name, description);
+      ? await generateQAsWithLLM(chunk, name, description, bot, null, personaContext)
+      : await generateQAsViaGPT(chunk, name, description, personaContext);
 
     // Process all Q&As in parallel
     const qaPromises = qas.map(async (qa) => {
@@ -252,10 +291,12 @@ exports.processSpreadsheetContent = async (file, botId, name, description, bot, 
     // Create Q&A from entire spreadsheet as one unit
     const spreadsheetContext = `Spreadsheet Data:\nFile: ${file.originalname}\nSheet: ${sheetInfo.name}\nColumns: ${sheetInfo.columns.join(', ')}\nRows: ${sheetInfo.rowCount}\n\nData Summary:\n${sheetInfo.data.map((row) => JSON.stringify(row)).slice(0, 5).join('\n')}`;
 
+    const personaContext = buildPersonaContext(bot);
+
     // Generate Q&As for the spreadsheet
     const qas = bot?.custom_llm_provider
-      ? await generateQAsWithLLM(spreadsheetContext, name, description, bot)
-      : await generateQAsViaGPT(spreadsheetContext, name, description);
+      ? await generateQAsWithLLM(spreadsheetContext, name, description, bot, null, personaContext)
+      : await generateQAsViaGPT(spreadsheetContext, name, description, personaContext);
 
     // Store Q&As
     let qaCount = 0;

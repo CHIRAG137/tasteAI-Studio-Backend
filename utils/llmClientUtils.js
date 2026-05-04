@@ -73,15 +73,16 @@ function createDefaultLLMInterface() {
       const result = await embeddingModel.embedContent(text);
       return new Float32Array(result.embedding.values);
     },
-    generateQAs: async (textChunk, botName, botDescription) => {
+    generateQAs: async (textChunk, botName, botDescription, personaContext = null) => {
       const systemPrompt = `
 You are an AI assistant that helps generate valuable, context-aware Q&A pairs from user-provided documents.
 
 The chatbot being built is named **${botName}**.
 Its purpose/description is: **${botDescription}**.
+${personaContext ? `Additional context about the bot's persona:\n${personaContext}` : ''}
 
 Based on the chunk of document text provided, extract meaningful questions and answers that reflect the tone and intent of this bot.
-Focus on generating **informative, helpful, and on-topic Q&A pairs** that align with the bot's purpose.
+Focus on generating **informative, helpful, and on-topic Q&A pairs** that align with the bot's purpose and persona.
 Return only a list of 10–15 questions and answers in JSON format like this:
 
 [
@@ -121,15 +122,16 @@ function createOpenAIInterface(apiKey) {
       });
       return new Float32Array(result.data[0].embedding);
     },
-    generateQAs: async (textChunk, botName, botDescription) => {
+    generateQAs: async (textChunk, botName, botDescription, personaContext = null) => {
       const systemPrompt = `
 You are an AI assistant that helps generate valuable, context-aware Q&A pairs from user-provided documents.
 
 The chatbot being built is named **${botName}**.
 Its purpose/description is: **${botDescription}**.
+${personaContext ? `Additional context about the bot's persona:\n${personaContext}` : ''}
 
 Based on the chunk of document text provided, extract meaningful questions and answers that reflect the tone and intent of this bot.
-Focus on generating **informative, helpful, and on-topic Q&A pairs** that align with the bot's purpose.
+Focus on generating **informative, helpful, and on-topic Q&A pairs** that align with the bot's purpose and persona.
 Return only a list of 10–15 questions and answers in JSON format like this:
 
 [
@@ -180,15 +182,16 @@ function createGeminiInterface(apiKey) {
       const result = await embeddingModel.embedContent(text);
       return new Float32Array(result.embedding.values);
     },
-    generateQAs: async (textChunk, botName, botDescription) => {
+    generateQAs: async (textChunk, botName, botDescription, personaContext = null) => {
       const systemPrompt = `
 You are an AI assistant that helps generate valuable, context-aware Q&A pairs from user-provided documents.
 
 The chatbot being built is named **${botName}**.
 Its purpose/description is: **${botDescription}**.
+${personaContext ? `Additional context about the bot's persona:\n${personaContext}` : ''}
 
 Based on the chunk of document text provided, extract meaningful questions and answers that reflect the tone and intent of this bot.
-Focus on generating **informative, helpful, and on-topic Q&A pairs** that align with the bot's purpose.
+Focus on generating **informative, helpful, and on-topic Q&A pairs** that align with the bot's purpose and persona.
 Return only a list of 10–15 questions and answers in JSON format like this:
 
 [
@@ -233,10 +236,10 @@ exports.generateEmbedding = async (text, botIdOrBot, userId = null) => {
 /**
  * Generate Q&A pairs using appropriate LLM (custom or default)
  */
-exports.generateQAsWithLLM = async (textChunk, botName, botDescription, botIdOrBot, userId = null) => {
+exports.generateQAsWithLLM = async (textChunk, botName, botDescription, botIdOrBot, userId = null, personaContext = null) => {
   try {
     const llmClient = await exports.getLLMClient(botIdOrBot, userId);
-    return await llmClient.generateQAs(textChunk, botName, botDescription);
+    return await llmClient.generateQAs(textChunk, botName, botDescription, personaContext);
   } catch (error) {
     logger.error('Error generating Q&As with LLM', {
       error: error.message,
