@@ -5,7 +5,7 @@ const responseBuilder = require('../utils/responseBuilder');
 // summarize session conversion using gemini
 exports.summarizeSessionConversation = async (req, res) => {
   try {
-    const { messages, botName } = req.body;
+    const { messages, botName, sessionId, botId } = req.body;
 
     // Validation
     if (!Array.isArray(messages) || messages.length === 0) {
@@ -24,6 +24,7 @@ exports.summarizeSessionConversation = async (req, res) => {
     logger.info('Starting conversation summarization', {
       botName,
       messageCount: messages.length,
+      sessionId,
     });
 
     const summary = await summarizerService.summarizeConversationWithGemini(
@@ -31,10 +32,33 @@ exports.summarizeSessionConversation = async (req, res) => {
       botName
     );
 
+    // Save summary to session if sessionId and botId are provided
+    if (sessionId && botId) {
+      try {
+        const FlowSession = require('../models/FlowSession');
+        await FlowSession.updateOne(
+          { _id: sessionId, bot: botId },
+          {
+            summary,
+            summaryGeneratedAt: new Date(),
+          }
+        );
+        logger.info('Summary saved to FlowSession', { sessionId, botId });
+      } catch (updateError) {
+        logger.warn('Failed to save summary to session', {
+          sessionId,
+          botId,
+          error: updateError.message,
+        });
+        // Continue without failing the response
+      }
+    }
+
     logger.info('Conversation summarization completed', {
       botName,
       messageCount: messages.length,
       summaryLength: summary?.length || 0,
+      sessionId,
     });
 
     return responseBuilder.ok(res, {

@@ -1369,6 +1369,8 @@ exports.getChatHistoryBySessionId = async (botId, sessionId) => {
     isFinished: session.isFinished,
     ipAddress: session.ipAddress,
     userAgent: session.userAgent,
+    summary: session.summary || null,
+    summaryGeneratedAt: session.summaryGeneratedAt || null,
     createdAt: session.createdAt,
     lastUpdatedAt: session.lastUpdatedAt,
   };
