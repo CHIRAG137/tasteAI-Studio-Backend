@@ -71,8 +71,7 @@ const ChatBotSchema = new mongoose.Schema(
     // emails of the person who act as agents to respond to user query if human_handoff_enabled is enabled 
     human_handoff_emails: { type: [String], default: [] },
 
-    // when true, visitors must sign in with Auth0 before chatting (public/embed)
-    require_visitor_auth0_identity: { type: Boolean, default: false },
+
 
     // custom LLM provider selected by user ('gemini' or 'openai')
     custom_llm_provider: { type: String, enum: ['gemini', 'openai'], default: null },

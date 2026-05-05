@@ -25,45 +25,6 @@ exports.requestHandoff = async (req, res) => {
       );
     }
 
-    const botCheck = await enforceVisitorAuth0ForBot({ req, botId });
-    if (!botCheck.ok) {
-      return responseBuilder.unauthorized(
-        res,
-        { code: botCheck.code || 'unauthorized' },
-        botCheck.message || 'Unauthorized'
-      );
-    }
-    const sessionCheck = await enforceVisitorAuth0ForFlowSession({
-      req,
-      flowSessionId,
-    });
-    if (!sessionCheck.ok) {
-      return responseBuilder.unauthorized(
-        res,
-        { code: sessionCheck.code || 'unauthorized' },
-        sessionCheck.message || 'Unauthorized'
-      );
-    }
-    if (sessionCheck.session.bot.toString() !== botId.toString()) {
-      return responseBuilder.forbidden(
-        res,
-        null,
-        'Flow session does not belong to this bot'
-      );
-    }
-    const limiter = consumeAuth0SubRateLimit({
-      subject: sessionCheck.decoded?.sub,
-      routeKey: 'handoff:request',
-      maxRequests: 20,
-      windowMs: 60 * 1000,
-    });
-    if (!limiter.allowed) {
-      return responseBuilder.badRequest(
-        res,
-        { code: 'rate_limit_exceeded' },
-        'Too many handoff requests. Please wait and try again.'
-      );
-    }
 
     const result = await humanHandoffService.requestHumanHandoff({
       botId,
@@ -338,31 +299,6 @@ exports.addClientMessage = async (req, res) => {
       );
     }
 
-    const sessionCheck = await enforceVisitorAuth0ForFlowSession({
-      req,
-      flowSessionId,
-    });
-    if (!sessionCheck.ok) {
-      return responseBuilder.unauthorized(
-        res,
-        { code: sessionCheck.code || 'unauthorized' },
-        sessionCheck.message || 'Unauthorized'
-      );
-    }
-    const limiter = consumeAuth0SubRateLimit({
-      subject: sessionCheck.decoded?.sub,
-      routeKey: 'handoff:client-message',
-      maxRequests: 120,
-      windowMs: 60 * 1000,
-    });
-    if (!limiter.allowed) {
-      return responseBuilder.badRequest(
-        res,
-        { code: 'rate_limit_exceeded' },
-        'Too many messages. Please slow down.'
-      );
-    }
-
     const result = await humanHandoffService.addMessageToSession(
       handoffSessionId,
       'user',
@@ -418,31 +354,6 @@ exports.getClientMessages = async (req, res) => {
       );
     }
 
-    const sessionCheck = await enforceVisitorAuth0ForFlowSession({
-      req,
-      flowSessionId,
-    });
-    if (!sessionCheck.ok) {
-      return responseBuilder.unauthorized(
-        res,
-        { code: sessionCheck.code || 'unauthorized' },
-        sessionCheck.message || 'Unauthorized'
-      );
-    }
-    const limiter = consumeAuth0SubRateLimit({
-      subject: sessionCheck.decoded?.sub,
-      routeKey: 'handoff:client-messages',
-      maxRequests: 180,
-      windowMs: 60 * 1000,
-    });
-    if (!limiter.allowed) {
-      return responseBuilder.badRequest(
-        res,
-        { code: 'rate_limit_exceeded' },
-        'Too many polling requests. Please slow down.'
-      );
-    }
-
     logger.info('Client fetched handoff messages', {
       handoffSessionId,
       flowSessionId,
@@ -481,31 +392,6 @@ exports.resolveByClient = async (req, res) => {
       return responseBuilder.badRequest(res, null, 'Flow Session ID is required');
     }
 
-    const sessionCheck = await enforceVisitorAuth0ForFlowSession({
-      req,
-      flowSessionId,
-    });
-    if (!sessionCheck.ok) {
-      return responseBuilder.unauthorized(
-        res,
-        { code: sessionCheck.code || 'unauthorized' },
-        sessionCheck.message || 'Unauthorized'
-      );
-    }
-    const limiter = consumeAuth0SubRateLimit({
-      subject: sessionCheck.decoded?.sub,
-      routeKey: 'handoff:client-resolve',
-      maxRequests: 20,
-      windowMs: 60 * 1000,
-    });
-    if (!limiter.allowed) {
-      return responseBuilder.badRequest(
-        res,
-        { code: 'rate_limit_exceeded' },
-        'Too many requests. Please wait and try again.'
-      );
-    }
-
     const result = await humanHandoffService.resolveHandoffSessionByClient(
       flowSessionId,
       handoffSessionId
@@ -532,31 +418,6 @@ exports.reopenByClient = async (req, res) => {
 
     if (!flowSessionId) {
       return responseBuilder.badRequest(res, null, 'Flow Session ID is required');
-    }
-
-    const sessionCheck = await enforceVisitorAuth0ForFlowSession({
-      req,
-      flowSessionId,
-    });
-    if (!sessionCheck.ok) {
-      return responseBuilder.unauthorized(
-        res,
-        { code: sessionCheck.code || 'unauthorized' },
-        sessionCheck.message || 'Unauthorized'
-      );
-    }
-    const limiter = consumeAuth0SubRateLimit({
-      subject: sessionCheck.decoded?.sub,
-      routeKey: 'handoff:client-reopen',
-      maxRequests: 20,
-      windowMs: 60 * 1000,
-    });
-    if (!limiter.allowed) {
-      return responseBuilder.badRequest(
-        res,
-        { code: 'rate_limit_exceeded' },
-        'Too many requests. Please wait and try again.'
-      );
     }
 
     const result = await humanHandoffService.reopenHandoffSessionByClient(
@@ -621,31 +482,6 @@ exports.rateByClient = async (req, res) => {
       return responseBuilder.forbidden(res, null, 'Not authorized to rate this session');
     }
 
-    const sessionCheck = await enforceVisitorAuth0ForFlowSession({
-      req,
-      flowSessionId,
-    });
-    if (!sessionCheck.ok) {
-      return responseBuilder.unauthorized(
-        res,
-        { code: sessionCheck.code || 'unauthorized' },
-        sessionCheck.message || 'Unauthorized'
-      );
-    }
-    const limiter = consumeAuth0SubRateLimit({
-      subject: sessionCheck.decoded?.sub,
-      routeKey: 'handoff:rate',
-      maxRequests: 30,
-      windowMs: 60 * 1000,
-    });
-    if (!limiter.allowed) {
-      return responseBuilder.badRequest(
-        res,
-        { code: 'rate_limit_exceeded' },
-        'Too many requests. Please wait and try again.'
-      );
-    }
-
     // Save rating and feedback
     const previousRating = session.userRating || null;
     session.userRating = rating;
@@ -702,31 +538,6 @@ exports.getSessionRating = async (req, res) => {
 
     if (session.flowSession.toString() !== flowSessionId) {
       return responseBuilder.forbidden(res, null, 'Not authorized to view this session');
-    }
-
-    const sessionCheck = await enforceVisitorAuth0ForFlowSession({
-      req,
-      flowSessionId,
-    });
-    if (!sessionCheck.ok) {
-      return responseBuilder.unauthorized(
-        res,
-        { code: sessionCheck.code || 'unauthorized' },
-        sessionCheck.message || 'Unauthorized'
-      );
-    }
-    const limiter = consumeAuth0SubRateLimit({
-      subject: sessionCheck.decoded?.sub,
-      routeKey: 'handoff:rating',
-      maxRequests: 120,
-      windowMs: 60 * 1000,
-    });
-    if (!limiter.allowed) {
-      return responseBuilder.badRequest(
-        res,
-        { code: 'rate_limit_exceeded' },
-        'Too many requests. Please wait and try again.'
-      );
     }
 
     logger.info('Rating retrieved for handoff session', {
