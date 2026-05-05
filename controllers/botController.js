@@ -2,11 +2,6 @@ const botService = require('../services/botService');
 const logger = require('../utils/logger');
 const responseBuilder = require('../utils/responseBuilder');
 const { testCustomLLMConnection } = require('../utils/llmClientUtils');
-const {
-  enforceVisitorAuth0ForBot,
-  enforceVisitorAuth0ForFlowSession,
-} = require('../utils/visitorAuth0Enforce');
-const { consumeAuth0SubRateLimit } = require('../utils/auth0SubRateLimiter');
 
 // create chatbot
 exports.createBot = async (req, res) => {
@@ -32,48 +27,6 @@ exports.askBot = async (req, res) => {
   try {
     const { question, botId, sessionId, flowSessionId } = req.body;
     const resolvedSessionId = sessionId || flowSessionId;
-    const botCheck = await enforceVisitorAuth0ForBot({ req, botId });
-    if (!botCheck.ok) {
-      return responseBuilder.unauthorized(
-        res,
-        { code: botCheck.code || 'unauthorized' },
-        botCheck.message || 'Unauthorized',
-      );
-    }
-    const limiter = consumeAuth0SubRateLimit({
-      subject: botCheck.decoded?.sub,
-      routeKey: 'bot:ask',
-      maxRequests: 120,
-      windowMs: 60 * 1000,
-    });
-    if (!limiter.allowed) {
-      return responseBuilder.badRequest(
-        res,
-        { code: 'rate_limit_exceeded' },
-        'Too many requests. Please slow down.'
-      );
-    }
-
-    if (resolvedSessionId) {
-      const sessionCheck = await enforceVisitorAuth0ForFlowSession({
-        req,
-        flowSessionId: resolvedSessionId,
-      });
-      if (!sessionCheck.ok) {
-        return responseBuilder.unauthorized(
-          res,
-          { code: sessionCheck.code || 'unauthorized' },
-          sessionCheck.message || 'Unauthorized',
-        );
-      }
-      if (sessionCheck.session.bot.toString() !== botId.toString()) {
-        return responseBuilder.forbidden(
-          res,
-          null,
-          'Session does not belong to this bot'
-        );
-      }
-    }
 
     const result = await botService.askBot(
       question,
@@ -130,17 +83,6 @@ exports.getAllChatBots = async (req, res) => {
 exports.getBotByBotId = async (req, res) => {
   try {
     const botId = req.params.botId;
-    const check = await enforceVisitorAuth0ForBot({ req, botId });
-    if (!check.ok) {
-      if (check.status === 404) {
-        return responseBuilder.notFound(res, null, check.message);
-      }
-      return responseBuilder.unauthorized(
-        res,
-        { code: check.code || 'unauthorized' },
-        check.message || 'Unauthorized'
-      );
-    }
     const bot = await botService.getBotByBotId(botId);
 
     if (!bot) {
@@ -270,18 +212,6 @@ exports.testCustomLLMConnection = async (req, res) => {
 exports.getBotCustomizationByBotId = async (req, res) => {
   try {
     const { botId } = req.params;
-    const check = await enforceVisitorAuth0ForBot({ req, botId });
-    if (!check.ok) {
-      if (check.status === 404) {
-        return responseBuilder.notFound(res, null, check.message);
-      }
-      return responseBuilder.unauthorized(
-        res,
-        { code: check.code || 'unauthorized' },
-        check.message || 'Unauthorized'
-      );
-    }
-    logger.info('Fetching customization', { botId, userId: req.user?.id });
 
     const customization = await botService.getCustomizationByBotId(botId);
 

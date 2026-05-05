@@ -178,9 +178,7 @@ exports.createBot = async (req) => {
     video_bot_image_public_id,
     human_handoff_enabled: human_handoff_enabled === 'true',
     human_handoff_emails: parsedHumanEmails,
-    require_visitor_auth0_identity:
-      require_visitor_auth0_identity === true ||
-      require_visitor_auth0_identity === 'true',
+
     custom_llm_provider: custom_llm_provider || null,
     encrypted_api_key: encryptedApiKey,
     custom_model: custom_model || null,
@@ -934,11 +932,7 @@ exports.updateBotByBotId = async (botId, userId, body, files) => {
     video_bot_image_public_id: video_bot_image_public_id,
     human_handoff_enabled: human_handoff_enabled === 'true',
     human_handoff_emails: parsedHumanEmails || bot.human_handoff_emails,
-    require_visitor_auth0_identity:
-      require_visitor_auth0_identity === undefined
-        ? bot.require_visitor_auth0_identity
-        : require_visitor_auth0_identity === true ||
-          require_visitor_auth0_identity === 'true',
+
     custom_llm_provider: custom_llm_provider !== undefined ? custom_llm_provider : bot.custom_llm_provider,
     encrypted_api_key: encryptedApiKey,
     custom_model: custom_model || bot.custom_model,

@@ -61,27 +61,9 @@ exports.startFlow = async (req, res) => {
   try {
     console.log('Starting flow...');
     const { botId } = req.params;
-
-    const check = await enforceVisitorAuth0ForBot({ req, botId });
-    if (!check.ok) {
-      return res.status(check.status || 401).json({
-        error: check.code || 'unauthorized',
-        message: check.message || 'Unauthorized',
-      });
-    }
-    const bot = check.bot;
-    const decoded = check.decoded;
-    const limiter = consumeAuth0SubRateLimit({
-      subject: decoded?.sub,
-      routeKey: 'flow:start',
-      maxRequests: 40,
-      windowMs: 60 * 1000,
-    });
-    if (!limiter.allowed) {
-      return res.status(429).json({
-        error: 'rate_limit_exceeded',
-        message: 'Too many requests. Please try again shortly.',
-      });
+    const bot = await ChatBot.findById(botId).lean();
+    if (!bot) {
+      return { ok: false, status: 404, message: 'Bot not found' };
     }
 
     const ipAddress = req.clientIp;
@@ -92,8 +74,6 @@ exports.startFlow = async (req, res) => {
       variables: {},
       ipAddress: ipAddress,
       userAgent: userAgent,
-      visitorAuth0Sub: decoded?.sub || null,
-      visitorEmail: decoded?.email || null,
     });
 
     // Find the start node
@@ -193,28 +173,9 @@ exports.respondToFlow = async (req, res) => {
     const { sessionId } = req.params;
     const { input, optionIndexOrLabel } = req.body;
 
-    const enforced = await enforceVisitorAuth0ForFlowSession({
-      req,
-      flowSessionId: sessionId,
-    });
-    if (!enforced.ok) {
-      return res.status(enforced.status || 401).json({
-        error: enforced.code || 'unauthorized',
-        message: enforced.message || 'Unauthorized',
-      });
-    }
-    const session = enforced.session;
-    const limiter = consumeAuth0SubRateLimit({
-      subject: enforced.decoded?.sub,
-      routeKey: 'flow:respond',
-      maxRequests: 120,
-      windowMs: 60 * 1000,
-    });
-    if (!limiter.allowed) {
-      return res.status(429).json({
-        error: 'rate_limit_exceeded',
-        message: 'Too many messages. Please slow down.',
-      });
+    const session = await FlowSession.findById(sessionId);
+    if (!session) {
+      return { ok: false, status: 404, message: 'Session not found' };
     }
 
     if (session.isFinished) {
@@ -417,7 +378,11 @@ exports.respondToFlow = async (req, res) => {
 exports.addSystemMessage = async (req, res) => {
   try {
     const { sessionId } = req.params;
-    const { message, messageType = 'system', handoffSessionId = null } = req.body;
+    const {
+      message,
+      messageType = 'system',
+      handoffSessionId = null,
+    } = req.body;
 
     if (!message) {
       return res.status(400).json({ error: 'Message is required' });
@@ -426,17 +391,6 @@ exports.addSystemMessage = async (req, res) => {
     const session = await FlowSession.findById(sessionId);
     if (!session) {
       return res.status(404).json({ error: 'Flow session not found' });
-    }
-
-    const enforced = await enforceVisitorAuth0ForFlowSession({
-      req,
-      flowSessionId: sessionId,
-    });
-    if (!enforced.ok) {
-      return res.status(enforced.status || 401).json({
-        error: enforced.code || 'unauthorized',
-        message: enforced.message || 'Unauthorized',
-      });
     }
 
     // Create history entry for system message
@@ -469,4 +423,3 @@ exports.addSystemMessage = async (req, res) => {
     return res.status(500).json({ error: err.message });
   }
 };
-

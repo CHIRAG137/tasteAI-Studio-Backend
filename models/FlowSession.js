@@ -31,9 +31,6 @@ const FlowSessionSchema = new mongoose.Schema({
   ipAddress: { type: String, default: null },
   userAgent: { type: String, default: null },
 
-  // Visitor identity (Auth0) when bot.require_visitor_auth0_identity is enabled
-  visitorAuth0Sub: { type: String, default: null },
-  visitorEmail: { type: String, default: null },
   isFinished: { type: Boolean, default: false },
 
   // Store conversation summary to avoid regenerating it
