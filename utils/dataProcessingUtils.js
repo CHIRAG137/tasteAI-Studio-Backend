@@ -330,7 +330,110 @@ exports.processFileContent = async (file, botId, name, description, bot) => {
 };
 
 /**
- * Process spreadsheet content - stores configuration for later use in chatbot
+ * Generate dataset description and field descriptions using LLM
+ * Analyzes the data structure to understand what the dataset is about
+ */
+async function generateDatasetMetadata(sheetInfo, botId, fileName, bot) {
+  try {
+    const { getLLMClient } = require('./llmClientUtils');
+    const llmClient = await getLLMClient(botId);
+
+    // Get sample data for analysis
+    const sampleRows = sheetInfo.data.slice(0, Math.min(5, sheetInfo.data.length));
+    
+    const prompt = `Analyze this dataset and provide metadata about it.
+
+File: ${fileName}
+Sheet: ${sheetInfo.name}
+Columns: ${sheetInfo.columns.join(', ')}
+Total Rows: ${sheetInfo.rowCount}
+
+Sample Data (first few rows):
+${sampleRows.map((row) => JSON.stringify(row)).join('\n')}
+
+Provide a JSON response with this structure:
+{
+  "datasetDescription": "A concise description of what this dataset contains and its purpose (2-3 sentences)",
+  "fieldDescriptions": {
+    "column_name1": "Description of what this column contains and its purpose",
+    "column_name2": "Description of what this column contains and its purpose"
+  }
+}
+
+Return ONLY valid JSON, no markdown or extra text.`;
+
+    const response = await llmClient.generateSummary(prompt);
+    
+    // Parse the JSON response
+    try {
+      const jsonMatch = response.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        return {
+          datasetDescription: parsed.datasetDescription || 'Dataset containing business information',
+          fieldDescriptions: parsed.fieldDescriptions || {}
+        };
+      }
+    } catch (parseErr) {
+      logger.warn('Could not parse dataset metadata response', { error: parseErr.message });
+    }
+
+    // Fallback metadata
+    return {
+      datasetDescription: `Dataset from ${fileName} containing ${sheetInfo.rowCount} rows and ${sheetInfo.columns.length} columns with the following fields: ${sheetInfo.columns.join(', ')}`,
+      fieldDescriptions: sheetInfo.columns.reduce((acc, col) => {
+        acc[col] = `Column containing data for ${col}`;
+        return acc;
+      }, {})
+    };
+  } catch (err) {
+    logger.error('Error generating dataset metadata', {
+      botId,
+      error: err.message,
+    });
+    
+    // Return default metadata
+    return {
+      datasetDescription: `Dataset containing ${sheetInfo.rowCount} rows of data`,
+      fieldDescriptions: {}
+    };
+  }
+}
+
+/**
+ * Convert spreadsheet data to formatted string for LLM context
+ * Creates a readable string representation of the entire dataset
+ */
+function convertDatasetToString(sheetInfo, datasetDescription) {
+  let datasetString = `## Dataset: ${datasetDescription}\n\n`;
+  datasetString += `**File**: ${sheetInfo.fileName || 'Unknown'}\n`;
+  datasetString += `**Sheet**: ${sheetInfo.name}\n`;
+  datasetString += `**Rows**: ${sheetInfo.rowCount}\n`;
+  datasetString += `**Columns**: ${sheetInfo.columns.length}\n\n`;
+  
+  datasetString += `**Field Names**: ${sheetInfo.columns.join(', ')}\n\n`;
+  
+  datasetString += `**Data**:\n`;
+  
+  // Add column headers
+  datasetString += `| ${sheetInfo.columns.join(' | ')} |\n`;
+  datasetString += `| ${sheetInfo.columns.map(() => '---').join(' | ')} |\n`;
+  
+  // Add all data rows
+  sheetInfo.data.forEach((row) => {
+    const values = sheetInfo.columns.map(col => {
+      const val = row[col];
+      return val !== null && val !== undefined ? String(val).substring(0, 50) : '-';
+    });
+    datasetString += `| ${values.join(' | ')} |\n`;
+  });
+  
+  return datasetString;
+}
+
+/**
+ * Process spreadsheet content - stores configuration and dataset in SpreadsheetConfig
+ * Stores entire dataset as string along with metadata for later LLM analysis
  */
 exports.processSpreadsheetContent = async (file, botId, name, description, bot, sheetInfo, fileHash = null) => {
   if (!sheetInfo || !sheetInfo.data || sheetInfo.data.length === 0) {
@@ -347,73 +450,59 @@ exports.processSpreadsheetContent = async (file, botId, name, description, bot, 
       rows: sheetInfo.rowCount,
     });
 
-    // Create Q&A from entire spreadsheet as one unit
-    const spreadsheetContext = `Spreadsheet Data:\nFile: ${file.originalname}\nSheet: ${sheetInfo.name}\nColumns: ${sheetInfo.columns.join(', ')}\nRows: ${sheetInfo.rowCount}\n\nData Summary:\n${sheetInfo.data.map((row) => JSON.stringify(row)).slice(0, 5).join('\n')}`;
+    // Generate dataset metadata (description and field descriptions)
+    const metadata = await generateDatasetMetadata(sheetInfo, botId, file.originalname, bot);
+    
+    // Convert entire dataset to formatted string
+    const datasetDataAsString = convertDatasetToString(sheetInfo, metadata.datasetDescription);
+    
+    logger.info('Generated dataset metadata and string representation', {
+      botId,
+      datasetDescriptionLength: metadata.datasetDescription.length,
+      datasetStringLength: datasetDataAsString.length,
+      fieldCount: Object.keys(metadata.fieldDescriptions).length,
+    });
 
-    const personaContext = buildPersonaContext(bot);
-
-    // Generate Q&As for the spreadsheet
-    const qas = bot?.custom_llm_provider
-      ? await generateQAsWithLLM(spreadsheetContext, name, description, bot, null, personaContext)
-      : await generateQAsViaGPT(spreadsheetContext, name, description, personaContext);
-
-    // Store Q&As
-    let qaCount = 0;
-    for (const qa of qas) {
-      const { question, answer } = qa;
-
-      if (question && answer) {
-        const embedding = bot?.custom_llm_provider
-          ? await generateEmbedding(question, bot)
-          : await embedText(question);
-
-        await QAHistory.create({
-          bot: botId,
-          question,
-          answer,
-          embedding: Buffer.from(embedding.buffer),
-          source: 'file',
-          sourceFileName: file.originalname,
-          sourceFileHash: fileHash,
-        });
-
-        qaCount++;
-      }
-    }
-
-    // Store spreadsheet configuration for later prediction queries
-    await SpreadsheetConfig.create({
+    // Store spreadsheet configuration with all dataset information
+    // All data is stored here - no separate QNA document created
+    const spreadsheetConfig = await SpreadsheetConfig.create({
       bot: botId,
       fileName: file.originalname,
       sheetName: sheetInfo.name,
       availableColumns: sheetInfo.columns,
       data: sheetInfo.data,
+      datasetDataAsString: datasetDataAsString,
+      datasetDescription: metadata.datasetDescription,
+      fieldDescriptions: metadata.fieldDescriptions,
       rowCount: sheetInfo.rowCount,
       columnCount: sheetInfo.columns.length,
-      isConfigured: false, // Will be configured by user later
+      isConfigured: false, // Will be configured by user later if needed
     });
 
-    logger.info('Spreadsheet stored for configuration', {
+    logger.info('Spreadsheet stored with dataset metadata', {
       botId,
+      configId: spreadsheetConfig._id,
       columns: sheetInfo.columns.length,
       rows: sheetInfo.rowCount,
-      qasGenerated: qaCount,
+      datasetMetadataStored: true,
     });
 
     return {
       success: true,
-      qaCount,
+      qaCount: 0, // No Q&As created - all data in SpreadsheetConfig
       metadata: {
         isSpreadsheet: true,
         sheetName: sheetInfo.name,
         columns: sheetInfo.columns,
         rowCount: sheetInfo.rowCount,
-        needsConfiguration: true, // Signal frontend to configure columns
+        needsConfiguration: true,
         originalname: file.originalname,
         mimeType: file.mimetype,
         size: file.size,
         hash: fileHash,
         path: file.path,
+        datasetDescription: metadata.datasetDescription,
+        datasetMetadataStored: true,
       },
     };
   } catch (err) {
@@ -421,6 +510,7 @@ exports.processSpreadsheetContent = async (file, botId, name, description, bot, 
       botId,
       filename: file.originalname,
       error: err.message,
+      stack: err.stack,
     });
     return { success: false, qaCount: 0, metadata: { isSpreadsheet: true }, error: err.message };
   }

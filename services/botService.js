@@ -524,9 +524,11 @@ exports.askBot = async (question, botId, flowSessionId = null, userId = null, ch
 
   let bestMatch = null,
     bestScore = -1;
+  
   for (let qa of qas) {
     const storedEmbedding = new Float32Array(qa.embedding.buffer);
     const score = cosineSimilarity(inputEmbedding, storedEmbedding);
+    
     if (score > bestScore) {
       bestScore = score;
       bestMatch = qa;
@@ -546,30 +548,115 @@ exports.askBot = async (question, botId, flowSessionId = null, userId = null, ch
       question,
     });
 
-    // Try to answer from spreadsheet if configured
+    // Try to answer using dataset from SpreadsheetConfig if available
     try {
       const SpreadsheetConfig = require('../models/SpreadsheetConfig');
-      const spreadsheetConfig = await SpreadsheetConfig.findOne({
-        bot: botId,
-        isConfigured: true,
-      });
+      const spreadsheetConfig = await SpreadsheetConfig.findOne({ bot: botId });
 
-      if (spreadsheetConfig && spreadsheetConfig.outputColumn) {
-        logger.info('Attempting to answer using spreadsheet data', {
+      if (spreadsheetConfig && spreadsheetConfig.datasetDataAsString) {
+        logger.info('Attempting to answer using dataset from SpreadsheetConfig', {
           botId,
-          outputColumn: spreadsheetConfig.outputColumn,
+          datasetDescription: spreadsheetConfig.datasetDescription?.substring(0, 50),
+          hasDataset: !!spreadsheetConfig.datasetDataAsString,
         });
 
-        // Use Gemini to analyze the question against spreadsheet data
         const { getLLMClient } = require('../utils/llmClientUtils');
         const llmClient = await getLLMClient(botId, userId);
 
-        const dataContext = spreadsheetConfig.data
-          .slice(0, 10) // Use first 10 rows for context
-          .map((row) => JSON.stringify(row))
-          .join('\n');
+        // Build the dataset-aware prompt with complete context
+        const chatHistoryText = chatHistory && chatHistory.length > 0
+          ? chatHistory.map((msg) => `${msg.from || 'User'}: ${msg.text}`).join('\n')
+          : 'No previous chat history';
 
-        const predictionPrompt = `You are an AI assistant analyzing spreadsheet data.
+        const fieldDescriptionsText = spreadsheetConfig.fieldDescriptions && Object.keys(spreadsheetConfig.fieldDescriptions).length > 0
+          ? Object.entries(spreadsheetConfig.fieldDescriptions)
+              .map(([field, desc]) => `- ${field}: ${desc}`)
+              .join('\n')
+          : 'Field descriptions not available';
+
+        const datasetPrompt = `You are an AI assistant with specialized knowledge about a dataset.
+
+## Dataset Information
+**Description**: ${spreadsheetConfig.datasetDescription || 'Dataset containing business information'}
+
+**Field Descriptions**:
+${fieldDescriptionsText}
+
+${spreadsheetConfig.availableColumns && spreadsheetConfig.availableColumns.length > 0 
+  ? `**Available Fields**: ${spreadsheetConfig.availableColumns.join(', ')}` 
+  : ''}
+
+## Complete Dataset
+${spreadsheetConfig.datasetDataAsString}
+
+## Conversation Context
+
+**Chat History**:
+${chatHistoryText}
+
+**User's Current Question**: "${question}"
+
+**User's Tone/Preference**: ${userEmotion || 'neutral'} (adjust response detail and tone accordingly)
+
+## Instructions
+Based on the dataset information, field descriptions, chat history, and the complete dataset provided above:
+1. Determine if the user's question is related to this dataset
+2. If related, analyze the data and provide a comprehensive answer using the actual data
+3. If not related to the dataset, clearly state that the question cannot be answered using this dataset
+4. Always reference specific data points or patterns from the dataset in your answer
+5. Adjust your response length and detail based on the user's tone/preference
+6. If asking for predictions or analysis, explain your reasoning based on the data patterns`;
+
+        const llmResponse = await llmClient.generateSummary(datasetPrompt);
+
+        if (
+          llmResponse &&
+          !llmResponse.toLowerCase().includes('cannot answer') &&
+          !llmResponse.toLowerCase().includes('cannot be answered') &&
+          !llmResponse.toLowerCase().includes('not related to')
+        ) {
+          answer = llmResponse;
+          source = 'dataset';
+
+          logger.info('Answered using dataset context', {
+            botId,
+            source,
+            questionLength: question.length,
+          });
+        }
+      }
+    } catch (err) {
+      logger.error('Error attempting dataset answer', {
+        botId,
+        error: err.message,
+      });
+      // Don't throw, fall through to other options
+    }
+
+    // Fallback: Try configured spreadsheet analysis (if outputColumn is configured)
+    if (!answer) {
+      try {
+        const SpreadsheetConfig = require('../models/SpreadsheetConfig');
+        const spreadsheetConfig = await SpreadsheetConfig.findOne({
+          bot: botId,
+          isConfigured: true,
+        });
+
+        if (spreadsheetConfig && spreadsheetConfig.outputColumn) {
+          logger.info('Attempting to answer using spreadsheet prediction configuration', {
+            botId,
+            outputColumn: spreadsheetConfig.outputColumn,
+          });
+
+          const { getLLMClient } = require('../utils/llmClientUtils');
+          const llmClient = await getLLMClient(botId, userId);
+
+          const dataContext = spreadsheetConfig.data
+            .slice(0, 10) // Use first 10 rows for context
+            .map((row) => JSON.stringify(row))
+            .join('\n');
+
+          const predictionPrompt = `You are an AI assistant analyzing spreadsheet data.
 
 The user is asking: "${question}"
 
@@ -583,29 +670,30 @@ ${dataContext}
 
 Based on this data, answer the user's question. If the question appears to be asking for a prediction or analysis of the data, provide an answer based on the patterns in the data. If the question is not related to the spreadsheet data, say you cannot answer based on the available data.`;
 
-        const llmResponse = await llmClient.generateSummary(predictionPrompt);
+          const llmResponse = await llmClient.generateSummary(predictionPrompt);
 
-        if (
-          llmResponse &&
-          !llmResponse.toLowerCase().includes('cannot answer') &&
-          !llmResponse.toLowerCase().includes('not related')
-        ) {
-          answer = llmResponse;
-          source = 'spreadsheet';
+          if (
+            llmResponse &&
+            !llmResponse.toLowerCase().includes('cannot answer') &&
+            !llmResponse.toLowerCase().includes('not related')
+          ) {
+            answer = llmResponse;
+            source = 'spreadsheet';
 
-          logger.info('Answered using spreadsheet data', {
-            botId,
-            source,
-            questionLength: question.length,
-          });
+            logger.info('Answered using spreadsheet prediction data', {
+              botId,
+              source,
+              questionLength: question.length,
+            });
+          }
         }
+      } catch (err) {
+        logger.error('Error attempting spreadsheet analysis', {
+          botId,
+          error: err.message,
+        });
+        // Don't throw, fall through to 'none'
       }
-    } catch (err) {
-      logger.error('Error attempting spreadsheet answer', {
-        botId,
-        error: err.message,
-      });
-      // Don't throw, fall through to 'none'
     }
 
     if (!answer) {

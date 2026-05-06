@@ -26,6 +26,18 @@ const SpreadsheetConfigSchema = new mongoose.Schema(
     inputColumns: [String],
     // Raw spreadsheet data for reference
     data: [mongoose.Schema.Types.Mixed],
+    // Entire dataset stored as a single string for LLM context
+    // Format: CSV-like or formatted string containing all data
+    datasetDataAsString: String,
+    // Description of what the dataset is about
+    // e.g., "Sales data for Q4 2024 with customer information and transaction amounts"
+    datasetDescription: String,
+    // Field descriptions for each column
+    // Maps column name to its description
+    fieldDescriptions: {
+      type: Map,
+      of: String,
+    },
     // Metadata about the spreadsheet
     rowCount: Number,
     columnCount: Number,
