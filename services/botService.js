@@ -495,7 +495,7 @@ exports.createBot = async (req) => {
 };
 
 // ask query to a chatbot
-exports.askBot = async (question, botId, flowSessionId = null, userId = null) => {
+exports.askBot = async (question, botId, flowSessionId = null, userId = null, chatHistory = [], matchedAnswer = null, userEmotion = null) => {
   const bot = await ChatBot.findById(botId);
   if (!bot) {
     logger.error('Bot not found', { botId });
@@ -538,13 +538,6 @@ exports.askBot = async (question, botId, flowSessionId = null, userId = null) =>
 
   if (bestScore > 0.85 && bestMatch) {
     answer = bestMatch.answer;
-    await QAHistory.create({
-      bot: botId,
-      question,
-      answer: bestMatch.answer,
-      embedding: Buffer.from(inputEmbedding.buffer),
-    });
-
     logger.info('Best QA match found', { botId, score: bestScore, question });
   } else {
     logger.warn('No strong QA match found', {
@@ -653,11 +646,77 @@ Based on this data, answer the user's question. If the question appears to be as
     }
   }
 
-  if (source === 'qa' || source === 'spreadsheet') {
-    return { answer, score: bestScore, source };
+  // Always generate a response using LLM with context
+  const { getLLMClient } = require('../utils/llmClientUtils');
+  const llmClient = await getLLMClient(botId, userId);
+
+  // Prepare context
+  const context = {
+    chatHistory: chatHistory || [],
+    matchedAnswer: matchedAnswer || answer,
+    userEmotion: userEmotion || 'neutral',
+    botPersona: {
+      primaryPurpose: bot.primary_purpose,
+      conversationalTone: bot.conversation_tone,
+      responseStyle: bot.response_style,
+      targetAudience: bot.target_audience,
+      specializationArea: bot.specialisation_area,
+      keyTopics: bot.key_topics,
+      keywords: bot.keywords,
+      customInstructions: bot.custom_instructions,
+    }
+  };
+
+  const prompt = `You are an AI assistant with the following persona:
+- Primary Purpose: ${context.botPersona.primaryPurpose || 'General assistance'}
+- Conversational Tone: ${context.botPersona.conversationalTone || 'Professional'}
+- Response Style: ${context.botPersona.responseStyle || 'Concise'}
+- Target Audience: ${context.botPersona.targetAudience || 'General users'}
+- Specialization Area: ${context.botPersona.specializationArea || 'General'}
+- Key Topics: ${context.botPersona.keyTopics || 'Various'}
+- Keywords: ${context.botPersona.keywords || 'None'}
+- Custom Instructions: ${context.botPersona.customInstructions || 'None'}
+
+Chat History:
+${context.chatHistory.map((msg) => `${msg.from}: ${msg.text}`).join('\n')}
+
+Matched Answer from Knowledge Base: ${context.matchedAnswer || 'No direct match found'}
+
+User's Current Question: "${question}"
+
+User's Emotion/Preference: ${context.userEmotion} (e.g., wants detailed answer, short answer, etc.)
+
+Based on the chat history, matched answer, and user's emotion, provide the best possible response. If the matched answer is relevant, incorporate it naturally. Adjust the response length and detail based on the user's emotion/preference.`;
+
+  try {
+    const llmResponse = await llmClient.generateSummary(prompt);
+    answer = llmResponse || answer || 'I apologize, but I cannot provide an answer at this time.';
+    source = 'llm';
+    logger.info('Generated LLM response with context', { botId, question, answer });
+  } catch (error) {
+    logger.error('Error generating LLM response', { botId, error: error.message });
+    // Fallback to matched answer or default
+    answer = answer || 'I apologize, but I cannot provide an answer at this time.';
   }
 
-  return { message: 'No match found.', score: bestScore, source };
+  // Save the final LLM answer to QAHistory (only the generated response)
+  try {
+    await QAHistory.create({
+      bot: botId,
+      question,
+      answer: answer,
+      embedding: Buffer.from(inputEmbedding.buffer),
+    });
+    logger.info('Final answer saved to QAHistory', { botId, question });
+  } catch (error) {
+    logger.error('Error saving final answer to QAHistory', {
+      botId,
+      error: error.message,
+    });
+  }
+
+  // Return the final answer
+  return { answer, score: bestScore, source };
 };
 
 // get all the chatbots(paginated)

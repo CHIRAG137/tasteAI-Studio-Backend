@@ -25,13 +25,17 @@ exports.createBot = async (req, res) => {
 // ask a query to a bot
 exports.askBot = async (req, res) => {
   try {
-    const { question, botId, sessionId, flowSessionId } = req.body;
+    const { question, botId, sessionId, flowSessionId, chatHistory, matchedAnswer, userEmotion } = req.body;
     const resolvedSessionId = sessionId || flowSessionId;
 
     const result = await botService.askBot(
       question,
       botId,
-      resolvedSessionId
+      resolvedSessionId,
+      null, // userId
+      chatHistory,
+      matchedAnswer,
+      userEmotion
     );
 
     logger.info('Bot answered question', { botId, question, sessionId: resolvedSessionId });
