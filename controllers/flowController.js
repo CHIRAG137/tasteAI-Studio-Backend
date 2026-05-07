@@ -7,6 +7,7 @@ const {
   enforceVisitorAuth0ForFlowSession,
 } = require('../utils/visitorAuth0Enforce');
 const { consumeAuth0SubRateLimit } = require('../utils/auth0SubRateLimiter');
+const { enforceVisitorEmailVerificationForBot } = require('../utils/visitorEmailOtpEnforce');
 
 /**
  * Format outputs into display-ready messages
@@ -65,6 +66,9 @@ exports.startFlow = async (req, res) => {
     if (!bot) {
       return { ok: false, status: 404, message: 'Bot not found' };
     }
+
+    const ok = await enforceVisitorEmailVerificationForBot(req, res, bot);
+    if (!ok) return;
 
     const ipAddress = req.clientIp;
     const userAgent = req.userAgent || 'Unknown';
@@ -191,6 +195,9 @@ exports.respondToFlow = async (req, res) => {
     if (!bot) {
       return res.status(404).json({ error: 'Bot for session not found' });
     }
+
+    const ok = await enforceVisitorEmailVerificationForBot(req, res, bot);
+    if (!ok) return;
 
     const nodeMap = flowEngine.buildNodeMap(bot.conversationFlow);
 

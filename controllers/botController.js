@@ -2,6 +2,8 @@ const botService = require('../services/botService');
 const logger = require('../utils/logger');
 const responseBuilder = require('../utils/responseBuilder');
 const { testCustomLLMConnection } = require('../utils/llmClientUtils');
+const ChatBot = require('../models/ChatBot');
+const { enforceVisitorEmailVerificationForBot } = require('../utils/visitorEmailOtpEnforce');
 
 // create chatbot
 exports.createBot = async (req, res) => {
@@ -27,6 +29,12 @@ exports.askBot = async (req, res) => {
   try {
     const { question, botId, sessionId, flowSessionId, chatHistory, matchedAnswer, userEmotion } = req.body;
     const resolvedSessionId = sessionId || flowSessionId;
+
+    const bot = await ChatBot.findById(botId).lean();
+    if (bot) {
+      const ok = await enforceVisitorEmailVerificationForBot(req, res, bot);
+      if (!ok) return;
+    }
 
     const result = await botService.askBot(
       question,

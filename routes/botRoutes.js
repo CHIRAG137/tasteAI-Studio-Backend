@@ -5,6 +5,9 @@ const upload = multer({ dest: 'uploads/' });
 const botController = require('../controllers/botController');
 const { authMiddleware } = require('../middlewares/authMiddleware');
 const { optionalUserAuth } = require('../middlewares/optionalUserAuthMiddleware');
+const { attachIpAddress } = require('../middlewares/ipExtractorMiddleware');
+
+router.use(attachIpAddress);
 
 /**
  * @route   POST /api/bots/create
@@ -34,7 +37,7 @@ router.post(
  * @desc    Ask a question to a chatbot (public inference endpoint)
  * @access  Public
  */
-router.post('/ask', botController.askBot);
+router.post('/ask', optionalUserAuth, botController.askBot);
 
 /**
  * @route   GET /api/bots
