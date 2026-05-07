@@ -23,6 +23,52 @@ const {
 const { encryptApiKey } = require('../utils/encryptionUtils');
 const { sanitizeBotForResponse, sanitizeBotsForResponse } = require('../utils/botSanitizer');
 
+const DEFAULT_EMBED_CUSTOMIZATION = {
+  // Chat defaults
+  headerTitle: 'Chat Assistant',
+  headerSubtitle: 'Online',
+  placeholder: 'Type your message...',
+  primaryColor: '#3b82f6',
+  backgroundColor: '#ffffff',
+  messageBackgroundColor: '#f1f5f9',
+  userMessageColor: '#3b82f6',
+  botMessageColor: '#f1f5f9',
+  textColor: '#1e293b',
+  borderRadius: 8,
+  fontFamily: 'Inter, sans-serif',
+  headerBackground: '#ffffff',
+  chatCustomCSS: '',
+  useChatCustomCSS: false,
+
+  // Button defaults (match schema defaults)
+  buttonBackground: 'linear-gradient(135deg, #9b5de5, #f15bb5)',
+  buttonColor: '#ffffff',
+  buttonSize: '56',
+  buttonBorderRadius: '50',
+  buttonPosition: 'bottom-right',
+  buttonBottom: '20',
+  buttonRight: '20',
+  buttonLeft: '20',
+  buttonCustomCSS: '',
+  useButtonCustomCSS: false,
+
+  // Button features
+  buttonText: 'Chat with us',
+  buttonShowText: false,
+  buttonTextPosition: 'left',
+  buttonIcon: 'chat',
+  buttonIconType: 'default',
+  buttonCustomIcon: '',
+  buttonIconSize: '24',
+  buttonAnimation: 'none',
+  buttonHoverAnimation: 'scale',
+  buttonPulse: false,
+  buttonShadow: '0 4px 10px rgba(0,0,0,0.3)',
+  buttonTextColor: '#1e293b',
+  buttonTextSize: '14',
+  buttonPadding: '12',
+};
+
 // create chatbot
 exports.createBot = async (req) => {
   const {
@@ -52,6 +98,7 @@ exports.createBot = async (req) => {
     require_visitor_auth0_identity,
     require_visitor_email_verification,
     custom_llm_provider,
+    custom_api_key_source,
     custom_api_key,
     custom_model,
   } = req.body;
@@ -70,17 +117,28 @@ exports.createBot = async (req) => {
     if (!['gemini', 'openai'].includes(custom_llm_provider)) {
       throw new Error('Invalid custom_llm_provider. Must be "gemini" or "openai"');
     }
-    
-    if (!custom_api_key) {
-      throw new Error('API key is required when custom LLM provider is specified');
+
+    const keySource =
+      custom_api_key_source && typeof custom_api_key_source === 'string'
+        ? custom_api_key_source.toLowerCase()
+        : 'bot';
+
+    if (keySource !== 'bot' && keySource !== 'user') {
+      throw new Error('Invalid custom_api_key_source. Must be "bot" or "user".');
     }
-    
-    try {
-      encryptedApiKey = encryptApiKey(custom_api_key);
-      logger.debug('API key encrypted successfully for bot creation');
-    } catch (err) {
-      logger.error('Failed to encrypt API key', { error: err.message });
-      throw new Error('Failed to encrypt API key. Please check encryption configuration.');
+
+    if (keySource === 'bot') {
+      if (!custom_api_key) {
+        throw new Error('API key is required when custom_api_key_source is "bot"');
+      }
+
+      try {
+        encryptedApiKey = encryptApiKey(custom_api_key);
+        logger.debug('API key encrypted successfully for bot creation');
+      } catch (err) {
+        logger.error('Failed to encrypt API key', { error: err.message });
+        throw new Error('Failed to encrypt API key. Please check encryption configuration.');
+      }
     }
   }
 
@@ -182,11 +240,27 @@ exports.createBot = async (req) => {
     require_visitor_email_verification: require_visitor_email_verification === 'true',
 
     custom_llm_provider: custom_llm_provider || null,
+    custom_api_key_source: custom_llm_provider ? (custom_api_key_source || 'bot') : 'bot',
     encrypted_api_key: encryptedApiKey,
     custom_model: custom_model || null,
   });
 
   logger.info('Bot created', { botId: bot._id, userId: req.user.id, name });
+
+  // Ensure a customization document exists so embed/chat UI never renders with empty values.
+  // This is safe even if the caller never opens the customization screen.
+  try {
+    await Customization.findOneAndUpdate(
+      { botId: bot._id },
+      { ...DEFAULT_EMBED_CUSTOMIZATION, botId: bot._id, headerTitle: name || DEFAULT_EMBED_CUSTOMIZATION.headerTitle },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+  } catch (e) {
+    logger.warn('Failed to create default customization for new bot', {
+      botId: bot._id,
+      error: e?.message,
+    });
+  }
 
   // sync human and bot agents models
   if (human_handoff_enabled === 'true' && parsedHumanEmails.length > 0) {
@@ -508,7 +582,7 @@ exports.askBot = async (question, botId, flowSessionId = null, userId = null, ch
 
   // Use custom LLM if configured, otherwise use default
   let inputEmbedding;
-  if (bot.custom_llm_provider && bot.encrypted_api_key) {
+  if (bot.custom_llm_provider && (bot.encrypted_api_key || bot.custom_api_key_source === 'user')) {
     try {
       inputEmbedding = await generateEmbedding(question, botId, userId);
     } catch (error) {
@@ -911,6 +985,7 @@ exports.updateBotByBotId = async (botId, userId, body, files) => {
     require_visitor_auth0_identity,
     require_visitor_email_verification,
     custom_llm_provider,
+    custom_api_key_source,
     custom_api_key,
     custom_model,
   } = body;
@@ -932,21 +1007,37 @@ exports.updateBotByBotId = async (botId, userId, body, files) => {
       // Clearing custom LLM
       encryptedApiKey = null;
       custom_llm_provider = null;
+      custom_api_key_source = 'bot';
     } else {
       if (!['gemini', 'openai'].includes(custom_llm_provider)) {
         throw new Error('Invalid custom_llm_provider. Must be "gemini" or "openai"');
       }
-      
-      if (custom_api_key) {
-        try {
-          encryptedApiKey = encryptApiKey(custom_api_key);
-          logger.debug('API key encrypted successfully for bot update');
-        } catch (err) {
-          logger.error('Failed to encrypt API key', { error: err.message });
-          throw new Error('Failed to encrypt API key. Please check encryption configuration.');
+
+      const nextKeySource =
+        custom_api_key_source && typeof custom_api_key_source === 'string'
+          ? custom_api_key_source.toLowerCase()
+          : bot.custom_api_key_source || 'bot';
+
+      if (nextKeySource !== 'bot' && nextKeySource !== 'user') {
+        throw new Error('Invalid custom_api_key_source. Must be "bot" or "user".');
+      }
+
+      if (nextKeySource === 'user') {
+        encryptedApiKey = null;
+        custom_api_key_source = 'user';
+      } else {
+        custom_api_key_source = 'bot';
+        if (custom_api_key) {
+          try {
+            encryptedApiKey = encryptApiKey(custom_api_key);
+            logger.debug('API key encrypted successfully for bot update');
+          } catch (err) {
+            logger.error('Failed to encrypt API key', { error: err.message });
+            throw new Error('Failed to encrypt API key. Please check encryption configuration.');
+          }
+        } else if (!bot.encrypted_api_key) {
+          throw new Error('API key is required when custom_api_key_source is "bot"');
         }
-      } else if (!bot.encrypted_api_key) {
-        throw new Error('API key is required when custom LLM provider is specified');
       }
     }
   }
@@ -1088,6 +1179,10 @@ exports.updateBotByBotId = async (botId, userId, body, files) => {
         : bot.require_visitor_email_verification,
 
     custom_llm_provider: custom_llm_provider !== undefined ? custom_llm_provider : bot.custom_llm_provider,
+    custom_api_key_source:
+      custom_llm_provider !== undefined
+        ? (custom_llm_provider ? (custom_api_key_source || bot.custom_api_key_source || 'bot') : 'bot')
+        : (bot.custom_api_key_source || 'bot'),
     encrypted_api_key: encryptedApiKey,
     custom_model: custom_model || bot.custom_model,
   });
@@ -1380,14 +1475,16 @@ exports.getCustomizationByBotId = async (botId) => {
 
   logger.info('Fetching customization', { botId });
 
-  const customization = await Customization.findOne({ botId });
+  let customization = await Customization.findOne({ botId });
 
   if (customization) {
     logger.info('Customization fetched successfully', { botId });
-  } else {
-    logger.warn('No customization found', { botId });
+    return customization;
   }
 
+  // If missing, create it with defaults so clients (embed/widget) always get a full object.
+  logger.warn('No customization found; creating defaults', { botId });
+  customization = await Customization.create({ ...DEFAULT_EMBED_CUSTOMIZATION, botId });
   return customization;
 };
 

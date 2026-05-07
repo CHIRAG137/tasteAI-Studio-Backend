@@ -107,6 +107,21 @@ exports.getUserDetailsByUserId = async (req, res) => {
   }
 };
 
+// update my profile (currently supports name)
+exports.updateMyProfile = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { name } = req.body || {};
+
+    const result = await authService.updateMyProfile(userId, { name });
+    logger.info('Updated my profile', { userId });
+    return responseBuilder.ok(res, result, 'Profile updated successfully');
+  } catch (err) {
+    logger.warn('Error updating my profile', { error: err.message, userId: req.user?._id });
+    return responseBuilder.badRequest(res, null, err.message);
+  }
+};
+
 // logout agent user
 exports.logoutAgent = async (req, res) => {
   try {

@@ -265,6 +265,44 @@ exports.getUserDetailsByUserId = async (userId) => {
   }
 };
 
+function normalizeName(name) {
+  if (typeof name !== 'string') return null;
+  const trimmed = name.trim().replace(/\s+/g, ' ');
+  if (!trimmed) return '';
+  return trimmed;
+}
+
+// update my profile fields (currently supports name)
+exports.updateMyProfile = async (userId, { name } = {}) => {
+  try {
+    const nextName = normalizeName(name);
+    if (nextName === null) {
+      throw new Error('name must be a string');
+    }
+    if (nextName.length > 80) {
+      throw new Error('name must be 80 characters or fewer');
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      logger.warn('User not found in updateMyProfile', { userId });
+      throw new Error('User not found');
+    }
+
+    user.name = nextName;
+    await user.save();
+
+    const safeUser = await User.findById(userId).select('-password');
+    return { user: safeUser };
+  } catch (err) {
+    logger.error('Error in updateMyProfile service', {
+      error: err.message,
+      userId,
+    });
+    throw err;
+  }
+};
+
 // logout agent user
 exports.logoutAgent = async (userId) => {
   try {

@@ -3,6 +3,7 @@ const { OpenAI } = require('openai');
 const { decryptApiKey } = require('./encryptionUtils');
 const logger = require('./logger');
 const ChatBot = require('../models/ChatBot');
+const UserApiKey = require('../models/UserApiKey');
 
 /**
  * Get LLM client based on bot configuration or return default
@@ -23,14 +24,31 @@ exports.getLLMClient = async (botIdOrBot, userId = null) => {
       bot = botIdOrBot;
     }
 
-    // Check if bot has custom LLM configured
-    if (bot.custom_llm_provider && bot.encrypted_api_key) {
+    // Check if bot has custom LLM configured (bot key or saved user key)
+    if (bot.custom_llm_provider && (bot.encrypted_api_key || bot.custom_api_key_source === 'user')) {
       try {
-        const decrypted = decryptApiKey(bot.encrypted_api_key);
+        let decrypted = null;
+
+        if (bot.custom_api_key_source === 'user') {
+          const ownerId = bot.user?._id || bot.user;
+          const keyDoc = await UserApiKey.findOne({
+            user: ownerId,
+            provider: bot.custom_llm_provider,
+          }).lean();
+
+          if (!keyDoc?.encrypted_api_key) {
+            throw new Error('No saved API key found for bot owner');
+          }
+
+          decrypted = decryptApiKey(keyDoc.encrypted_api_key);
+        } else {
+          decrypted = decryptApiKey(bot.encrypted_api_key);
+        }
 
         logger.debug('Using custom LLM for bot', {
           botId: bot._id,
           provider: bot.custom_llm_provider,
+          keySource: bot.custom_api_key_source || 'bot',
         });
 
         if (bot.custom_llm_provider === 'openai') {

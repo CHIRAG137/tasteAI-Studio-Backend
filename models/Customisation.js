@@ -10,18 +10,54 @@ const customizationSchema = new mongoose.Schema(
     },
 
     // Chat window customization
-    headerTitle: String,
-    headerSubtitle: String,
-    placeholder: String,
-    primaryColor: String,
-    backgroundColor: String,
-    headerBackground: String,
-    userMessageColor: String,
-    botMessageColor: String,
-    messageBackgroundColor: String,
-    textColor: String,
-    fontFamily: String,
-    borderRadius: Number,
+    headerTitle: {
+      type: String,
+      default: 'Chat Assistant',
+    },
+    headerSubtitle: {
+      type: String,
+      default: 'Online',
+    },
+    placeholder: {
+      type: String,
+      default: 'Type your message...',
+    },
+    primaryColor: {
+      type: String,
+      default: '#3b82f6',
+    },
+    backgroundColor: {
+      type: String,
+      default: '#ffffff',
+    },
+    headerBackground: {
+      type: String,
+      default: '#ffffff',
+    },
+    userMessageColor: {
+      type: String,
+      default: '#3b82f6',
+    },
+    botMessageColor: {
+      type: String,
+      default: '#f1f5f9',
+    },
+    messageBackgroundColor: {
+      type: String,
+      default: '#f1f5f9',
+    },
+    textColor: {
+      type: String,
+      default: '#1e293b',
+    },
+    fontFamily: {
+      type: String,
+      default: 'Inter, sans-serif',
+    },
+    borderRadius: {
+      type: Number,
+      default: 8,
+    },
     chatCustomCSS: {
       type: String,
       default: '',
