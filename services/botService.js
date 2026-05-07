@@ -23,6 +23,52 @@ const {
 const { encryptApiKey } = require('../utils/encryptionUtils');
 const { sanitizeBotForResponse, sanitizeBotsForResponse } = require('../utils/botSanitizer');
 
+const DEFAULT_EMBED_CUSTOMIZATION = {
+  // Chat defaults
+  headerTitle: 'Chat Assistant',
+  headerSubtitle: 'Online',
+  placeholder: 'Type your message...',
+  primaryColor: '#3b82f6',
+  backgroundColor: '#ffffff',
+  messageBackgroundColor: '#f1f5f9',
+  userMessageColor: '#3b82f6',
+  botMessageColor: '#f1f5f9',
+  textColor: '#1e293b',
+  borderRadius: 8,
+  fontFamily: 'Inter, sans-serif',
+  headerBackground: '#ffffff',
+  chatCustomCSS: '',
+  useChatCustomCSS: false,
+
+  // Button defaults (match schema defaults)
+  buttonBackground: 'linear-gradient(135deg, #9b5de5, #f15bb5)',
+  buttonColor: '#ffffff',
+  buttonSize: '56',
+  buttonBorderRadius: '50',
+  buttonPosition: 'bottom-right',
+  buttonBottom: '20',
+  buttonRight: '20',
+  buttonLeft: '20',
+  buttonCustomCSS: '',
+  useButtonCustomCSS: false,
+
+  // Button features
+  buttonText: 'Chat with us',
+  buttonShowText: false,
+  buttonTextPosition: 'left',
+  buttonIcon: 'chat',
+  buttonIconType: 'default',
+  buttonCustomIcon: '',
+  buttonIconSize: '24',
+  buttonAnimation: 'none',
+  buttonHoverAnimation: 'scale',
+  buttonPulse: false,
+  buttonShadow: '0 4px 10px rgba(0,0,0,0.3)',
+  buttonTextColor: '#1e293b',
+  buttonTextSize: '14',
+  buttonPadding: '12',
+};
+
 // create chatbot
 exports.createBot = async (req) => {
   const {
@@ -187,6 +233,21 @@ exports.createBot = async (req) => {
   });
 
   logger.info('Bot created', { botId: bot._id, userId: req.user.id, name });
+
+  // Ensure a customization document exists so embed/chat UI never renders with empty values.
+  // This is safe even if the caller never opens the customization screen.
+  try {
+    await Customization.findOneAndUpdate(
+      { botId: bot._id },
+      { ...DEFAULT_EMBED_CUSTOMIZATION, botId: bot._id, headerTitle: name || DEFAULT_EMBED_CUSTOMIZATION.headerTitle },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+  } catch (e) {
+    logger.warn('Failed to create default customization for new bot', {
+      botId: bot._id,
+      error: e?.message,
+    });
+  }
 
   // sync human and bot agents models
   if (human_handoff_enabled === 'true' && parsedHumanEmails.length > 0) {
@@ -1380,14 +1441,16 @@ exports.getCustomizationByBotId = async (botId) => {
 
   logger.info('Fetching customization', { botId });
 
-  const customization = await Customization.findOne({ botId });
+  let customization = await Customization.findOne({ botId });
 
   if (customization) {
     logger.info('Customization fetched successfully', { botId });
-  } else {
-    logger.warn('No customization found', { botId });
+    return customization;
   }
 
+  // If missing, create it with defaults so clients (embed/widget) always get a full object.
+  logger.warn('No customization found; creating defaults', { botId });
+  customization = await Customization.create({ ...DEFAULT_EMBED_CUSTOMIZATION, botId });
   return customization;
 };
 
