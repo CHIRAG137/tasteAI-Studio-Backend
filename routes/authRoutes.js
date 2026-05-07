@@ -59,6 +59,15 @@ router.post(
  */
 router.get('/me', authMiddleware, authController.getUserDetailsByUserId);
 
+/**
+ * @route   PATCH /api/auth/me
+ * @desc    Update currently authenticated user's profile (name)
+ * @access  Private
+ * @headers Authorization: Bearer <JWT>
+ * @body    { name: string }
+ */
+router.patch('/me', authMiddleware, authController.updateMyProfile);
+
 // logout routes
 router.post('/logout/agent', authMiddleware, authController.logoutAgent);
 router.post('/logout/bot', authMiddleware, authController.logoutBot);
