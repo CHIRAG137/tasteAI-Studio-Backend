@@ -19,6 +19,9 @@ const ChatBotSchema = new mongoose.Schema(
     
     // flag to check if the user wants to enable the bot for slack
     is_slack_enabled: { type: Boolean, default: false },
+
+    // Require visitors (public/embed) to verify email via OTP before chatting
+    require_visitor_email_verification: { type: Boolean, default: false },
     
     // slack channel id in which the bot will be enabled if is_slack_enabled is set to true 
     slack_channel_id: String,

@@ -17,6 +17,7 @@ const humanAgentRoutes = require('./routes/humanAgentRoutes');
 const handoffRoutes = require('./routes/handoffRoutes');
 const workflowRoutes = require('./routes/workflowRoutes');
 const issueReportRoutes = require('./routes/issueReportRoutes');
+const visitorAuthRoutes = require('./routes/visitorAuthRoutes');
 const { startInviteReminderScheduler } = require('./services/inviteReminderScheduler');
 
 require('dotenv').config();
@@ -32,6 +33,8 @@ app.use(
       'Authorization',
       'X-Visitor-Auth0-Sub',
       'X-Visitor-Email',
+      'X-Visitor-Verification-Token',
+      'X-Visitor-Device-Id',
     ],
   })
 );
@@ -59,6 +62,7 @@ app.use('/api/human', imageGenerationRoutes);
 app.use('/api/human-agent', humanAgentRoutes);
 app.use('/api/handoff', handoffRoutes);
 app.use('/api/issue-reports', issueReportRoutes);
+app.use('/api/visitor-auth', visitorAuthRoutes);
 app.get('/widget.js', (req, res) => {
   res.sendFile(path.join(__dirname, 'public/widget.js'));
 });

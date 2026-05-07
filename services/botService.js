@@ -50,6 +50,7 @@ exports.createBot = async (req) => {
     human_handoff_enabled,
     human_handoff_emails,
     require_visitor_auth0_identity,
+    require_visitor_email_verification,
     custom_llm_provider,
     custom_api_key,
     custom_model,
@@ -178,6 +179,7 @@ exports.createBot = async (req) => {
     video_bot_image_public_id,
     human_handoff_enabled: human_handoff_enabled === 'true',
     human_handoff_emails: parsedHumanEmails,
+    require_visitor_email_verification: require_visitor_email_verification === 'true',
 
     custom_llm_provider: custom_llm_provider || null,
     encrypted_api_key: encryptedApiKey,
@@ -907,6 +909,7 @@ exports.updateBotByBotId = async (botId, userId, body, files) => {
     human_handoff_enabled,
     human_handoff_emails,
     require_visitor_auth0_identity,
+    require_visitor_email_verification,
     custom_llm_provider,
     custom_api_key,
     custom_model,
@@ -1079,6 +1082,10 @@ exports.updateBotByBotId = async (botId, userId, body, files) => {
     video_bot_image_public_id: video_bot_image_public_id,
     human_handoff_enabled: human_handoff_enabled === 'true',
     human_handoff_emails: parsedHumanEmails || bot.human_handoff_emails,
+    require_visitor_email_verification:
+      require_visitor_email_verification !== undefined
+        ? require_visitor_email_verification === 'true'
+        : bot.require_visitor_email_verification,
 
     custom_llm_provider: custom_llm_provider !== undefined ? custom_llm_provider : bot.custom_llm_provider,
     encrypted_api_key: encryptedApiKey,
