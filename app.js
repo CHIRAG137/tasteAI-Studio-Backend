@@ -5,6 +5,7 @@ const mongoose = require('mongoose');
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const path = require('path');
+const rateLimit = require('express-rate-limit');
 const botRoutes = require('./routes/botRoutes');
 const crawlRoutes = require('./routes/crawlRoutes');
 const slackRoutes = require('./routes/slackRoutes');
@@ -42,6 +43,65 @@ app.use(
 
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
+
+// Rate limiting middleware
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per windowMs
+  message: {
+    error: 'Too many requests from this IP, please try again later.',
+    retryAfter: Math.ceil((15 * 60 * 1000) / 1000) // seconds
+  },
+  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+});
+
+// Apply rate limiting to all API routes
+app.use('/api/', limiter);
+
+// Stricter rate limiting for authentication routes
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 2, // limit each IP to 10 auth requests per windowMs
+  message: {
+    error: 'Too many authentication attempts, please try again later.',
+    retryAfter: Math.ceil((15 * 60 * 1000) / 1000)
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+app.use('/api/auth/', authLimiter);
+
+// Stricter rate limiting for chatbot interactions to prevent abuse
+const chatbotLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 20, // limit each IP to 20 chatbot questions per windowMs
+  message: {
+    error: 'Too many chatbot requests from this IP, please try again later.',
+    retryAfter: Math.ceil((15 * 60 * 1000) / 1000)
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Apply strict rate limiting to chatbot ask endpoint
+app.use('/api/bots/ask', chatbotLimiter);
+
+// Stricter rate limiting for embed chatbot (flow) interactions
+const embedChatbotLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 50, // limit each IP to 50 flow interactions per windowMs
+  message: {
+    error: 'Too many embed chatbot requests from this IP, please try again later.',
+    retryAfter: Math.ceil((15 * 60 * 1000) / 1000)
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Apply strict rate limiting to flow (embed chatbot) endpoints
+app.use('/api/flow/', embedChatbotLimiter);
 
 mongoose
   .connect(process.env.MONGO_URI, {
