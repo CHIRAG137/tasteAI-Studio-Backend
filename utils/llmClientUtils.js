@@ -6,6 +6,71 @@ const ChatBot = require('../models/ChatBot');
 const UserApiKey = require('../models/UserApiKey');
 
 /**
+ * Gemma via OpenRouter uses OpenAI-compatible API
+ * So we can reuse OpenAI client with OpenRouter base URL
+ */
+function createOpenRouterInterface(apiKey, modelName = 'google/gemma-4-31b-it') {
+  const client = new OpenAI({
+    apiKey: apiKey,
+    baseURL: 'https://openrouter.ai/api/v1',
+  });
+
+  return {
+    getEmbedding: async (text) => {
+      // OpenRouter doesn't provide embedding models, use default
+      const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+      const embeddingModel = genAI.getGenerativeModel({
+        model: 'embedding-001',
+      });
+      const result = await embeddingModel.embedContent(text);
+      return new Float32Array(result.embedding.values);
+    },
+    generateQAs: async (textChunk, botName, botDescription, personaContext = null) => {
+      const systemPrompt = `
+You are an AI assistant that helps generate valuable, context-aware Q&A pairs from user-provided documents.
+
+The chatbot being built is named **${botName}**.
+Its purpose/description is: **${botDescription}**.
+${personaContext ? `Additional context about the bot's persona:\n${personaContext}` : ''}
+
+Based on the chunk of document text provided, extract meaningful questions and answers that reflect the tone and intent of this bot.
+Focus on generating **informative, helpful, and on-topic Q&A pairs** that align with the bot's purpose and persona.
+Return only a list of 10–15 questions and answers in JSON format like this:
+
+[
+  { "question": "...", "answer": "..." },
+  ...
+]
+`;
+
+      const userPrompt = `Here is a chunk of the document:\n\n${textChunk}\n\nGenerate Q&A pairs now.`;
+
+      const completion = await client.chat.completions.create({
+        model: modelName,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+        temperature: 0.7,
+      });
+
+      const responseText = completion.choices[0].message.content;
+      const jsonMatch = responseText.match(/\[[\s\S]*\]/);
+      const qas = jsonMatch ? JSON.parse(jsonMatch[0]) : [];
+      return Array.isArray(qas) ? qas : [];
+    },
+    generateSummary: async (prompt) => {
+      const completion = await client.chat.completions.create({
+        model: modelName,
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.7,
+      });
+      return completion.choices[0].message.content;
+    },
+  };
+}
+
+/**
  * Get LLM client based on bot configuration or return default
  * Supports being called with bot object or fetching bot by ID
  */
@@ -55,6 +120,8 @@ exports.getLLMClient = async (botIdOrBot, userId = null) => {
           return createOpenAIInterface(decrypted, bot.custom_model || 'gpt-4');
         } else if (bot.custom_llm_provider === 'gemini') {
           return createGeminiInterface(decrypted, bot.custom_model || 'gemini-3-pro-preview');
+        } else if (bot.custom_llm_provider === 'gemma') {
+          return createOpenRouterInterface(decrypted, bot.custom_model || 'google/gemma-4-31b-it');
         }
       } catch (err) {
         logger.warn('Failed to decrypt custom API key, using default LLM', {
@@ -269,15 +336,20 @@ exports.generateQAsWithLLM = async (textChunk, botName, botDescription, botIdOrB
 
 exports.testCustomLLMConnection = async (provider, apiKey, model = null) => {
   const normalizedProvider = typeof provider === 'string' ? provider.toLowerCase() : null;
-  if (!normalizedProvider || !['openai', 'gemini'].includes(normalizedProvider)) {
-    throw new Error('Invalid custom LLM provider. Must be openai or gemini.');
+  if (!normalizedProvider || !['openai', 'gemini', 'openrouter', 'gemma'].includes(normalizedProvider)) {
+    throw new Error('Invalid custom LLM provider. Must be openai, gemini, openrouter, or gemma.');
   }
 
   if (!apiKey || typeof apiKey !== 'string') {
     throw new Error('API key is required for custom LLM validation.');
   }
 
-  const testModel = model || (normalizedProvider === 'openai' ? 'gpt-4' : 'gemini-3-pro-preview');
+  const testModel = model || 
+    (normalizedProvider === 'openai' 
+      ? 'gpt-4' 
+      : (normalizedProvider === 'gemini' 
+        ? 'gemini-3-pro-preview' 
+        : 'google/gemma-4-31b-it'));
   const prompt = 'Please respond with the single word OK to validate your API key.';
 
   if (normalizedProvider === 'openai') {
@@ -285,6 +357,15 @@ exports.testCustomLLMConnection = async (provider, apiKey, model = null) => {
     const response = await llmClient.generateSummary(prompt);
     if (!response || !response.toLowerCase().includes('ok')) {
       throw new Error('Unable to validate OpenAI key and model combination.');
+    }
+    return true;
+  }
+
+  if (normalizedProvider === 'openrouter' || normalizedProvider === 'gemma') {
+    const llmClient = createOpenRouterInterface(apiKey, testModel);
+    const response = await llmClient.generateSummary(prompt);
+    if (!response || !response.toLowerCase().includes('ok')) {
+      throw new Error('Unable to validate OpenRouter/Gemma key and model combination.');
     }
     return true;
   }

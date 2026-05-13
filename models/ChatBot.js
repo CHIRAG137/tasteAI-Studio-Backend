@@ -76,8 +76,8 @@ const ChatBotSchema = new mongoose.Schema(
 
 
 
-    // custom LLM provider selected by user ('gemini' or 'openai')
-    custom_llm_provider: { type: String, enum: ['gemini', 'openai'], default: null },
+    // custom LLM provider selected by user ('gemini', 'openai', or 'gemma')
+    custom_llm_provider: { type: String, enum: ['gemini', 'openai', 'gemma'], default: null },
 
     // where to source the API key from: bot-specific key or saved user key
     custom_api_key_source: { type: String, enum: ['bot', 'user'], default: 'bot' },

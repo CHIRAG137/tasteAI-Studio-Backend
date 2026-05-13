@@ -5,7 +5,7 @@ const logger = require('../utils/logger');
 
 function normalizeProvider(provider) {
   const p = typeof provider === 'string' ? provider.toLowerCase().trim() : '';
-  if (!['openai', 'gemini'].includes(p)) return null;
+  if (!['openai', 'gemini', 'openrouter'].includes(p)) return null;
   return p;
 }
 
@@ -25,7 +25,7 @@ exports.listMyApiKeys = async (userId) => {
   const keys = await UserApiKey.find({ user: userId }).lean();
   const byProvider = new Map(keys.map((k) => [k.provider, k]));
 
-  const providers = ['openai', 'gemini'];
+  const providers = ['openai', 'gemini', 'openrouter'];
   return {
     keys: providers.map((provider) => {
       const k = byProvider.get(provider);
@@ -69,7 +69,7 @@ exports.upsertMyApiKey = async (userId, provider, apiKey) => {
 
 exports.deleteMyApiKey = async (userId, provider) => {
   const p = normalizeProvider(provider);
-  if (!p) throw new Error('Invalid provider. Must be openai or gemini.');
+  if (!p) throw new Error('Invalid provider. Must be openai, gemini, or openrouter.');
 
   await UserApiKey.deleteOne({ user: userId, provider: p });
   logger.info('User API key deleted', { userId, provider: p });
@@ -78,7 +78,7 @@ exports.deleteMyApiKey = async (userId, provider) => {
 
 exports.testMyApiKey = async (userId, provider, model = null) => {
   const p = normalizeProvider(provider);
-  if (!p) throw new Error('Invalid provider. Must be openai or gemini.');
+  if (!p) throw new Error('Invalid provider. Must be openai, gemini, or openrouter.');
 
   const keyDoc = await UserApiKey.findOne({ user: userId, provider: p }).lean();
   if (!keyDoc?.encrypted_api_key) {
@@ -93,7 +93,7 @@ exports.testMyApiKey = async (userId, provider, model = null) => {
 
 exports.getDecryptedApiKeyForUser = async (userId, provider) => {
   const p = normalizeProvider(provider);
-  if (!p) throw new Error('Invalid provider. Must be openai or gemini.');
+  if (!p) throw new Error('Invalid provider. Must be openai, gemini, or openrouter.');
 
   const keyDoc = await UserApiKey.findOne({ user: userId, provider: p }).lean();
   if (!keyDoc?.encrypted_api_key) return null;
