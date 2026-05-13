@@ -46,7 +46,16 @@ exports.askBot = async (req, res) => {
       userEmotion
     );
 
-    logger.info('Bot answered question', { botId, question, sessionId: resolvedSessionId });
+    const llmType = bot?.custom_llm_provider 
+      ? `custom (${bot.custom_llm_provider}, model: ${bot.custom_model || 'default'})`
+      : 'default';
+    
+    logger.info('Bot answered question', { 
+      botId, 
+      question, 
+      sessionId: resolvedSessionId,
+      llmProvider: llmType
+    });
     return responseBuilder.ok(res, result, 'Bot responded successfully');
   } catch (error) {
     logger.error('Ask bot error', { error: error.message, stack: error.stack });
@@ -187,11 +196,11 @@ exports.testCustomLLMConnection = async (req, res) => {
   try {
     const { custom_llm_provider, custom_api_key, custom_model } = req.body;
 
-    if (!custom_llm_provider || !['openai', 'gemini'].includes(custom_llm_provider)) {
+    if (!custom_llm_provider || !['openai', 'gemini', 'gemma'].includes(custom_llm_provider)) {
       return responseBuilder.badRequest(
         res,
         null,
-        'Invalid or missing custom_llm_provider. Must be "openai" or "gemini".'
+        'Invalid or missing custom_llm_provider. Must be "openai", "gemini", or "gemma".'
       );
     }
 

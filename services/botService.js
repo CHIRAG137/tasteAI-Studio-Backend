@@ -114,8 +114,8 @@ exports.createBot = async (req) => {
   // Validate custom LLM configuration
   let encryptedApiKey = null;
   if (custom_llm_provider) {
-    if (!['gemini', 'openai'].includes(custom_llm_provider)) {
-      throw new Error('Invalid custom_llm_provider. Must be "gemini" or "openai"');
+    if (!['gemini', 'openai', 'gemma'].includes(custom_llm_provider)) {
+      throw new Error('Invalid custom_llm_provider. Must be "gemini", "openai", or "gemma"');
     }
 
     const keySource =
@@ -578,21 +578,33 @@ exports.askBot = async (question, botId, flowSessionId = null, userId = null, ch
     throw new Error('Bot not found');
   }
 
-  logger.info('Bot asked a question', { botId, question, flowSessionId });
+  // Log which LLM is being used
+  const llmType = bot.custom_llm_provider 
+    ? `custom (${bot.custom_llm_provider}, source: ${bot.custom_api_key_source}, model: ${bot.custom_model || 'default'})`
+    : 'default';
+  
+  logger.info('Bot asked a question', { botId, question, flowSessionId, llmProvider: llmType });
 
   // Use custom LLM if configured, otherwise use default
   let inputEmbedding;
   if (bot.custom_llm_provider && (bot.encrypted_api_key || bot.custom_api_key_source === 'user')) {
     try {
+      logger.debug('Using custom LLM for embedding generation', {
+        botId,
+        provider: bot.custom_llm_provider,
+        keySource: bot.custom_api_key_source,
+      });
       inputEmbedding = await generateEmbedding(question, botId, userId);
     } catch (error) {
       logger.error('Error generating embedding with custom LLM, falling back to default', { 
-        botId, 
+        botId,
+        provider: bot.custom_llm_provider,
         error: error.message 
       });
       inputEmbedding = await getEmbedding(question);
     }
   } else {
+    logger.debug('Using default LLM for embedding generation', { botId });
     inputEmbedding = await getEmbedding(question);
   }
 
@@ -638,6 +650,13 @@ exports.askBot = async (question, botId, flowSessionId = null, userId = null, ch
 
         const { getLLMClient } = require('../utils/llmClientUtils');
         const llmClient = await getLLMClient(botId, userId);
+
+        logger.info('Using LLM for dataset-based answer', {
+          botId,
+          llmProvider: bot.custom_llm_provider || 'default',
+          customLLMModel: bot.custom_model || null,
+          keySource: bot.custom_api_key_source || 'bot',
+        });
 
         // Build the dataset-aware prompt with complete context
         const chatHistoryText = chatHistory && chatHistory.length > 0
@@ -727,6 +746,14 @@ Based on the dataset information, field descriptions, chat history, and the comp
           const { getLLMClient } = require('../utils/llmClientUtils');
           const llmClient = await getLLMClient(botId, userId);
 
+          logger.info('Using LLM for spreadsheet prediction answer', {
+            botId,
+            llmProvider: bot.custom_llm_provider || 'default',
+            customLLMModel: bot.custom_model || null,
+            keySource: bot.custom_api_key_source || 'bot',
+            outputColumn: spreadsheetConfig.outputColumn,
+          });
+
           const dataContext = spreadsheetConfig.data
             .slice(0, 10) // Use first 10 rows for context
             .map((row) => JSON.stringify(row))
@@ -813,6 +840,14 @@ Based on this data, answer the user's question. If the question appears to be as
   // Always generate a response using LLM with context
   const { getLLMClient } = require('../utils/llmClientUtils');
   const llmClient = await getLLMClient(botId, userId);
+
+  logger.info('Using LLM for final response generation', {
+    botId,
+    llmProvider: bot.custom_llm_provider || 'default',
+    customLLMModel: bot.custom_model || null,
+    keySource: bot.custom_api_key_source || 'bot',
+    answerSource: source,
+  });
 
   // Prepare context
   const context = {
@@ -1009,8 +1044,8 @@ exports.updateBotByBotId = async (botId, userId, body, files) => {
       custom_llm_provider = null;
       custom_api_key_source = 'bot';
     } else {
-      if (!['gemini', 'openai'].includes(custom_llm_provider)) {
-        throw new Error('Invalid custom_llm_provider. Must be "gemini" or "openai"');
+      if (!['gemini', 'openai', 'gemma'].includes(custom_llm_provider)) {
+        throw new Error('Invalid custom_llm_provider. Must be "gemini", "openai", or "gemma"');
       }
 
       const nextKeySource =
