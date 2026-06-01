@@ -1,5 +1,11 @@
 const dns = require('dns');
 dns.setDefaultResultOrder('ipv4first');
+require('dotenv').config();
+const {
+  initPhoenixTracing,
+  shutdownPhoenixTracing,
+} = require('./config/phoenixTracing');
+initPhoenixTracing();
 const express = require('express');
 const mongoose = require('mongoose');
 const bodyParser = require('body-parser');
@@ -21,8 +27,6 @@ const issueReportRoutes = require('./routes/issueReportRoutes');
 const visitorAuthRoutes = require('./routes/visitorAuthRoutes');
 const userRoutes = require('./routes/userRoutes');
 const { startInviteReminderScheduler } = require('./services/inviteReminderScheduler');
-
-require('dotenv').config();
 
 const app = express();
 
@@ -143,4 +147,14 @@ app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   // Start the invite reminder scheduler (runs every hour)
   startInviteReminderScheduler('0 * * * *');
+});
+
+process.on('SIGTERM', async () => {
+  await shutdownPhoenixTracing();
+  process.exit(0);
+});
+
+process.on('SIGINT', async () => {
+  await shutdownPhoenixTracing();
+  process.exit(0);
 });

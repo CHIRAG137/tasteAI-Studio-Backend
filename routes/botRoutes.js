@@ -154,4 +154,15 @@ router.get(
   botController.getSuggestedColumnConfiguration
 );
 
+/**
+ * @route   GET /api/bots/:botId/observability
+ * @desc    Get Arize/Phoenix MCP setup and bot self-improvement insights
+ * @access  Private
+ */
+router.get(
+  '/:botId/observability',
+  authMiddleware,
+  botController.getBotObservabilityInsights
+);
+
 module.exports = router;

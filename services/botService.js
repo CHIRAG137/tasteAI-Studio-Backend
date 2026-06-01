@@ -22,6 +22,10 @@ const {
 } = require('../utils/dataProcessingUtils');
 const { encryptApiKey } = require('../utils/encryptionUtils');
 const { sanitizeBotForResponse, sanitizeBotsForResponse } = require('../utils/botSanitizer');
+const {
+  runPhoenixSpan,
+  setPhoenixSpanAttributes,
+} = require('../config/phoenixTracing');
 
 const DEFAULT_EMBED_CUSTOMIZATION = {
   // Chat defaults
@@ -570,8 +574,7 @@ exports.createBot = async (req) => {
   };
 };
 
-// ask query to a chatbot
-exports.askBot = async (question, botId, flowSessionId = null, userId = null, chatHistory = [], matchedAnswer = null, userEmotion = null) => {
+async function askBotImpl(question, botId, flowSessionId = null, userId = null, chatHistory = [], matchedAnswer = null, userEmotion = null) {
   const bot = await ChatBot.findById(botId);
   if (!bot) {
     logger.error('Bot not found', { botId });
@@ -905,6 +908,7 @@ Based on the chat history, matched answer, and user's emotion, provide the best 
       question,
       answer: answer,
       embedding: Buffer.from(inputEmbedding.buffer),
+      source,
     });
     logger.info('Final answer saved to QAHistory', { botId, question });
   } catch (error) {
@@ -916,6 +920,43 @@ Based on the chat history, matched answer, and user's emotion, provide the best 
 
   // Return the final answer
   return { answer, score: bestScore, source };
+}
+
+// ask query to a chatbot
+exports.askBot = async (question, botId, flowSessionId = null, userId = null, chatHistory = [], matchedAnswer = null, userEmotion = null) => {
+  return runPhoenixSpan(
+    'bot.answer_question',
+    'AGENT',
+    {
+      'bot.id': String(botId),
+      'session.id': flowSessionId ? String(flowSessionId) : undefined,
+      'user.id': userId ? String(userId) : undefined,
+      'input.value': question,
+      'input.mime_type': 'text/plain',
+      'metadata.chat_history_count': Array.isArray(chatHistory) ? chatHistory.length : 0,
+      'metadata.user_emotion': userEmotion || 'neutral',
+    },
+    async (span) => {
+      const result = await askBotImpl(
+        question,
+        botId,
+        flowSessionId,
+        userId,
+        chatHistory,
+        matchedAnswer,
+        userEmotion
+      );
+
+      setPhoenixSpanAttributes(span, {
+        'output.value': result?.answer,
+        'output.mime_type': 'text/plain',
+        'metadata.answer_source': result?.source,
+        'metadata.match_score': result?.score,
+      });
+
+      return result;
+    }
+  );
 };
 
 // get all the chatbots(paginated)

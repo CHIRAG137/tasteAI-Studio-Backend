@@ -46,7 +46,7 @@ ${conversationText}
         });
         // Fallback to default Gemini
         const model = genAIClient.getGenerativeModel({
-          model: 'gemini-3-pro-preview',
+          model: 'gemini-3.1-pro-preview',
         });
         const result = await model.generateContent(prompt);
         text = result.response.text();
@@ -54,7 +54,7 @@ ${conversationText}
     } else {
       // Use default Gemini
       const model = genAIClient.getGenerativeModel({
-        model: 'gemini-3-pro-preview',
+        model: 'gemini-3.1-pro-preview',
       });
       const result = await model.generateContent(prompt);
       text = result.response.text();

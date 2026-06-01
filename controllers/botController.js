@@ -4,6 +4,7 @@ const responseBuilder = require('../utils/responseBuilder');
 const { testCustomLLMConnection } = require('../utils/llmClientUtils');
 const ChatBot = require('../models/ChatBot');
 const { enforceVisitorEmailVerificationForBot } = require('../utils/visitorEmailOtpEnforce');
+const arizeInsightService = require('../services/arizeInsightService');
 
 // create chatbot
 exports.createBot = async (req, res) => {
@@ -467,6 +468,40 @@ exports.getSuggestedColumnConfiguration = async (req, res) => {
       res,
       null,
       'Failed to get column suggestions'
+    );
+  }
+};
+
+// get Arize/Phoenix observability insights for a bot
+exports.getBotObservabilityInsights = async (req, res) => {
+  const { botId } = req.params;
+
+  try {
+    const result = await arizeInsightService.getBotObservabilityInsights(
+      botId,
+      req.user?.id
+    );
+
+    return responseBuilder.ok(
+      res,
+      result,
+      'Bot observability insights fetched successfully'
+    );
+  } catch (error) {
+    logger.error('Error fetching bot observability insights', {
+      error: error.message,
+      botId,
+      userId: req.user?.id,
+    });
+
+    if (error.message === 'Bot not found') {
+      return responseBuilder.notFound(res, null, 'Bot not found');
+    }
+
+    return responseBuilder.internalError(
+      res,
+      null,
+      'Failed to fetch bot observability insights'
     );
   }
 };
