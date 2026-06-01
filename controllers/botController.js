@@ -505,3 +505,85 @@ exports.getBotObservabilityInsights = async (req, res) => {
     );
   }
 };
+
+// get self-improvement inbox for a bot
+exports.getBotSelfImprovementDashboard = async (req, res) => {
+  const { botId } = req.params;
+
+  try {
+    const result = await arizeInsightService.getBotSelfImprovementDashboard(
+      botId,
+      req.user?.id
+    );
+
+    return responseBuilder.ok(
+      res,
+      result,
+      'Bot self-improvement dashboard fetched successfully'
+    );
+  } catch (error) {
+    logger.error('Error fetching bot self-improvement dashboard', {
+      error: error.message,
+      botId,
+      userId: req.user?.id,
+    });
+
+    if (error.message === 'Bot not found') {
+      return responseBuilder.notFound(res, null, 'Bot not found');
+    }
+
+    return responseBuilder.internalError(
+      res,
+      null,
+      'Failed to fetch bot self-improvement dashboard'
+    );
+  }
+};
+
+// apply action to a self-improvement item
+exports.applyBotImprovementAction = async (req, res) => {
+  const { botId } = req.params;
+  const { itemKey, action, item } = req.body || {};
+
+  if (!itemKey || !action) {
+    return responseBuilder.badRequest(
+      res,
+      null,
+      'itemKey and action are required'
+    );
+  }
+
+  try {
+    const result = await arizeInsightService.applyImprovementAction({
+      botId,
+      userId: req.user?.id,
+      itemKey,
+      action,
+      item,
+    });
+
+    return responseBuilder.ok(
+      res,
+      result,
+      'Bot improvement action applied successfully'
+    );
+  } catch (error) {
+    logger.error('Error applying bot improvement action', {
+      error: error.message,
+      botId,
+      itemKey,
+      action,
+      userId: req.user?.id,
+    });
+
+    if (error.message === 'Bot not found') {
+      return responseBuilder.notFound(res, null, 'Bot not found');
+    }
+
+    return responseBuilder.badRequest(
+      res,
+      null,
+      error.message || 'Failed to apply bot improvement action'
+    );
+  }
+};

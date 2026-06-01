@@ -26,6 +26,7 @@ const {
   runPhoenixSpan,
   setPhoenixSpanAttributes,
 } = require('../config/phoenixTracing');
+const BotInteractionMetric = require('../models/BotInteractionMetric');
 
 const DEFAULT_EMBED_CUSTOMIZATION = {
   // Chat defaults
@@ -924,6 +925,7 @@ Based on the chat history, matched answer, and user's emotion, provide the best 
 
 // ask query to a chatbot
 exports.askBot = async (question, botId, flowSessionId = null, userId = null, chatHistory = [], matchedAnswer = null, userEmotion = null) => {
+  const startedAt = Date.now();
   return runPhoenixSpan(
     'bot.answer_question',
     'AGENT',
@@ -937,21 +939,66 @@ exports.askBot = async (question, botId, flowSessionId = null, userId = null, ch
       'metadata.user_emotion': userEmotion || 'neutral',
     },
     async (span) => {
-      const result = await askBotImpl(
-        question,
-        botId,
-        flowSessionId,
-        userId,
-        chatHistory,
-        matchedAnswer,
-        userEmotion
-      );
+      let result;
+      try {
+        result = await askBotImpl(
+          question,
+          botId,
+          flowSessionId,
+          userId,
+          chatHistory,
+          matchedAnswer,
+          userEmotion
+        );
+      } finally {
+        const latencyMs = Date.now() - startedAt;
+        if (result) {
+          const confidence =
+            typeof result.score === 'number' && Number.isFinite(result.score)
+              ? Math.max(0, Math.min(1, result.score))
+              : null;
+          const usedFallback =
+            result.source === 'none' ||
+            !result.answer ||
+            result.answer.toLowerCase().includes('cannot provide an answer') ||
+            result.answer.toLowerCase().includes('no match found');
+          const hallucinationRisk =
+            confidence === null
+              ? usedFallback
+                ? 0.8
+                : 0.45
+              : Math.max(0, Math.min(1, 1 - confidence));
+
+          BotInteractionMetric.create({
+            bot: botId,
+            flowSession: flowSessionId || null,
+            question,
+            answer: result.answer || '',
+            source: result.source || 'unknown',
+            confidence,
+            latencyMs,
+            usedFallback,
+            groundednessScore: Math.max(0, Math.min(1, 1 - hallucinationRisk)),
+            hallucinationRisk,
+            userEmotion: userEmotion || 'neutral',
+            metadata: {
+              chatHistoryCount: Array.isArray(chatHistory) ? chatHistory.length : 0,
+            },
+          }).catch((error) => {
+            logger.warn('Failed to save bot interaction metric', {
+              botId,
+              error: error.message,
+            });
+          });
+        }
+      }
 
       setPhoenixSpanAttributes(span, {
         'output.value': result?.answer,
         'output.mime_type': 'text/plain',
         'metadata.answer_source': result?.source,
         'metadata.match_score': result?.score,
+        'metadata.latency_ms': Date.now() - startedAt,
       });
 
       return result;

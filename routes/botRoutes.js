@@ -165,4 +165,26 @@ router.get(
   botController.getBotObservabilityInsights
 );
 
+/**
+ * @route   GET /api/bots/:botId/improvements
+ * @desc    Get bot health and self-improvement inbox items
+ * @access  Private
+ */
+router.get(
+  '/:botId/improvements',
+  authMiddleware,
+  botController.getBotSelfImprovementDashboard
+);
+
+/**
+ * @route   POST /api/bots/:botId/improvements/actions
+ * @desc    Apply an action to a bot self-improvement item
+ * @access  Private
+ */
+router.post(
+  '/:botId/improvements/actions',
+  authMiddleware,
+  botController.applyBotImprovementAction
+);
+
 module.exports = router;
