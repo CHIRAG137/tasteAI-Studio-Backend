@@ -3,10 +3,11 @@ const FlowSession = require('../models/FlowSession');
 const QAHistory = require('../models/QAHistory');
 const HandoffSession = require('../models/HandoffSession');
 const BotEvalDatasetItem = require('../models/BotEvalDatasetItem');
+const BotEvalRun = require('../models/BotEvalRun');
 const BotInteractionMetric = require('../models/BotInteractionMetric');
 const BotImprovementAction = require('../models/BotImprovementAction');
 const humanHandoffService = require('./humanHandoffService');
-const { generateEmbedding } = require('../utils/llmClientUtils');
+const { generateEmbedding, getLLMClient } = require('../utils/llmClientUtils');
 const { buildPhoenixMcpConfig } = require('../config/phoenixTracing');
 
 function getQuestionText(entry) {
@@ -189,6 +190,60 @@ function normalizeKey(value) {
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '')
     .slice(0, 80);
+}
+
+function datasetNameForSource(sourceType) {
+  const names = {
+    low_confidence_traces: 'Low Confidence Traces',
+    handoff_sessions: 'Handoff Sessions',
+    negative_feedback: 'Negative Feedback',
+    unanswered_questions: 'Unanswered Questions',
+  };
+  return names[sourceType] || 'Production Conversations';
+}
+
+function buildDatasetRecord({ botId, sourceType, itemKey, question, answer, metadata, userId }) {
+  return {
+    bot: botId,
+    itemKey,
+    datasetName: datasetNameForSource(sourceType),
+    sourceType,
+    question,
+    expectedAnswer: '',
+    actualAnswer: answer || '',
+    source: sourceType,
+    metadata: metadata || {},
+    createdBy: userId,
+  };
+}
+
+function parseJudgeJson(text) {
+  try {
+    const match = String(text || '').match(/\{[\s\S]*\}/);
+    return match ? JSON.parse(match[0]) : null;
+  } catch {
+    return null;
+  }
+}
+
+function normalizeJudgeScore(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return 0.5;
+  if (number > 1) return Math.max(0, Math.min(1, number / 100));
+  return Math.max(0, Math.min(1, number));
+}
+
+async function upsertDatasetItems(records) {
+  const results = [];
+  for (const record of records) {
+    const saved = await BotEvalDatasetItem.findOneAndUpdate(
+      { bot: record.bot, itemKey: record.itemKey },
+      record,
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+    results.push(saved);
+  }
+  return results;
 }
 
 function buildImprovementItem(type, metric, overrides = {}) {
@@ -520,6 +575,8 @@ exports.applyImprovementAction = async ({
       {
         bot: botId,
         itemKey,
+        datasetName: 'Self Improvement',
+        sourceType: 'self_improvement',
         question: item.question,
         expectedAnswer: '',
         actualAnswer: item.answer || '',
@@ -632,4 +689,310 @@ exports.applyImprovementAction = async ({
     status: record.status,
     payload: record.payload,
   };
+};
+
+exports.buildEvalDatasetFromProduction = async ({ botId, userId, sourceType }) => {
+  const bot = await ChatBot.findOne({ _id: botId, user: userId }).lean();
+  if (!bot) {
+    throw new Error('Bot not found');
+  }
+
+  const validSources = [
+    'low_confidence_traces',
+    'handoff_sessions',
+    'negative_feedback',
+    'unanswered_questions',
+  ];
+
+  if (!validSources.includes(sourceType)) {
+    throw new Error('Invalid dataset source type');
+  }
+
+  let records = [];
+
+  if (sourceType === 'low_confidence_traces') {
+    const metrics = await BotInteractionMetric.find({
+      bot: botId,
+      $or: [{ confidence: { $lt: 0.85 } }, { confidence: null }],
+    })
+      .sort({ createdAt: -1 })
+      .limit(100)
+      .lean();
+
+    records = metrics.map((metric) =>
+      buildDatasetRecord({
+        botId,
+        sourceType,
+        itemKey: `${sourceType}:${metric._id}`,
+        question: metric.question || 'Untitled question',
+        answer: metric.answer || '',
+        userId,
+        metadata: {
+          confidence: metric.confidence,
+          latencyMs: metric.latencyMs,
+          flowSession: metric.flowSession,
+          source: metric.source,
+        },
+      })
+    );
+  }
+
+  if (sourceType === 'unanswered_questions') {
+    const metrics = await BotInteractionMetric.find({
+      bot: botId,
+      $or: [{ usedFallback: true }, { source: 'none' }],
+    })
+      .sort({ createdAt: -1 })
+      .limit(100)
+      .lean();
+
+    records = metrics.map((metric) =>
+      buildDatasetRecord({
+        botId,
+        sourceType,
+        itemKey: `${sourceType}:${metric._id}`,
+        question: metric.question || 'Untitled question',
+        answer: metric.answer || '',
+        userId,
+        metadata: {
+          confidence: metric.confidence,
+          usedFallback: metric.usedFallback,
+          flowSession: metric.flowSession,
+        },
+      })
+    );
+  }
+
+  if (sourceType === 'handoff_sessions') {
+    const handoffs = await HandoffSession.find({ bot: botId })
+      .sort({ requestedAt: -1 })
+      .limit(100)
+      .lean();
+
+    records = handoffs.map((handoff) =>
+      buildDatasetRecord({
+        botId,
+        sourceType,
+        itemKey: `${sourceType}:${handoff._id}`,
+        question:
+          handoff.userQuestion ||
+          handoff.messages?.find((message) => message.sender === 'user')?.message ||
+          'Human handoff session',
+        answer: handoff.agentNotes || '',
+        userId,
+        metadata: {
+          handoffSession: handoff._id,
+          status: handoff.status,
+          escalated: handoff.escalated,
+          userRating: handoff.userRating,
+        },
+      })
+    );
+  }
+
+  if (sourceType === 'negative_feedback') {
+    const handoffs = await HandoffSession.find({
+      bot: botId,
+      $or: [
+        { userRating: { $lte: 2 } },
+        { userFeedback: { $exists: true, $ne: '' } },
+      ],
+    })
+      .sort({ requestedAt: -1 })
+      .limit(100)
+      .lean();
+
+    records = handoffs.map((handoff) =>
+      buildDatasetRecord({
+        botId,
+        sourceType,
+        itemKey: `${sourceType}:${handoff._id}`,
+        question:
+          handoff.userQuestion ||
+          handoff.messages?.find((message) => message.sender === 'user')?.message ||
+          'Negative feedback session',
+        answer: handoff.agentNotes || handoff.userFeedback || '',
+        userId,
+        metadata: {
+          handoffSession: handoff._id,
+          userRating: handoff.userRating,
+          userFeedback: handoff.userFeedback,
+          status: handoff.status,
+        },
+      })
+    );
+  }
+
+  const saved = await upsertDatasetItems(
+    records.filter((record) => record.question && record.question.trim())
+  );
+
+  return {
+    sourceType,
+    datasetName: datasetNameForSource(sourceType),
+    createdCount: saved.length,
+    items: saved,
+  };
+};
+
+exports.getEvalDatasets = async (botId, userId) => {
+  const bot = await ChatBot.findOne({ _id: botId, user: userId }).lean();
+  if (!bot) {
+    throw new Error('Bot not found');
+  }
+
+  const [items, runs] = await Promise.all([
+    BotEvalDatasetItem.find({ bot: botId }).sort({ createdAt: -1 }).limit(300).lean(),
+    BotEvalRun.find({ bot: botId }).sort({ createdAt: -1 }).limit(10).lean(),
+  ]);
+
+  const datasets = Object.values(
+    items.reduce((acc, item) => {
+      const key = item.datasetName || 'Default Eval Dataset';
+      if (!acc[key]) {
+        acc[key] = {
+          datasetName: key,
+          sourceTypes: new Set(),
+          itemCount: 0,
+          latestItemAt: item.createdAt,
+        };
+      }
+      acc[key].itemCount += 1;
+      acc[key].sourceTypes.add(item.sourceType || item.source);
+      if (new Date(item.createdAt) > new Date(acc[key].latestItemAt)) {
+        acc[key].latestItemAt = item.createdAt;
+      }
+      return acc;
+    }, {})
+  ).map((dataset) => ({
+    ...dataset,
+    sourceTypes: Array.from(dataset.sourceTypes),
+  }));
+
+  return {
+    datasets,
+    items,
+    runs,
+  };
+};
+
+exports.runLLMJudgeForBot = async ({ botId, userId, datasetName }) => {
+  const bot = await ChatBot.findOne({ _id: botId, user: userId }).lean();
+  if (!bot) {
+    throw new Error('Bot not found');
+  }
+
+  const query = { bot: botId };
+  if (datasetName && datasetName !== 'all') {
+    query.datasetName = datasetName;
+  }
+
+  const items = await BotEvalDatasetItem.find(query)
+    .sort({ createdAt: -1 })
+    .limit(30)
+    .lean();
+
+  if (!items.length) {
+    throw new Error('No eval dataset items found for this bot');
+  }
+
+  const run = await BotEvalRun.create({
+    bot: botId,
+    datasetName: datasetName || 'all',
+    status: 'running',
+    judgeModel: bot.custom_model || 'gemini-3.1-pro-preview',
+  });
+
+  try {
+    const llmClient = await getLLMClient(bot, userId);
+    const explanations = [];
+
+    for (const item of items) {
+      const prompt = `
+You are an LLM-as-a-Judge evaluator for a production chatbot.
+
+Bot persona:
+- Name: ${bot.name || 'Bot'}
+- Description: ${bot.description || 'Not provided'}
+- Tone: ${bot.conversation_tone || 'Professional'}
+- Response style: ${bot.response_style || 'Helpful'}
+- Custom instructions: ${bot.custom_instructions || 'None'}
+- Human handoff enabled: ${bot.human_handoff_enabled ? 'yes' : 'no'}
+
+Evaluate the actual bot answer against the user question and any expected answer.
+
+User question:
+${item.question}
+
+Actual bot answer:
+${item.actualAnswer || '(empty)'}
+
+Expected answer or reviewer note:
+${item.expectedAnswer || '(not provided)'}
+
+Return only JSON:
+{
+  "scores": {
+    "relevance": 0-1,
+    "helpfulness": 0-1,
+    "groundedness": 0-1,
+    "toneMatch": 0-1,
+    "instructionFollowing": 0-1,
+    "handoffCorrectness": 0-1,
+    "refusalCorrectness": 0-1,
+    "responseLengthFit": 0-1
+  },
+  "explanation": "short practical explanation"
+}`;
+
+      const raw = await llmClient.generateSummary(prompt);
+      const parsed = parseJudgeJson(raw) || {};
+      const scores = parsed.scores || {};
+      const normalizedScores = {
+        relevance: normalizeJudgeScore(scores.relevance),
+        helpfulness: normalizeJudgeScore(scores.helpfulness),
+        groundedness: normalizeJudgeScore(scores.groundedness),
+        toneMatch: normalizeJudgeScore(scores.toneMatch),
+        instructionFollowing: normalizeJudgeScore(scores.instructionFollowing),
+        handoffCorrectness: normalizeJudgeScore(scores.handoffCorrectness),
+        refusalCorrectness: normalizeJudgeScore(scores.refusalCorrectness),
+        responseLengthFit: normalizeJudgeScore(scores.responseLengthFit),
+      };
+
+      explanations.push({
+        itemId: item._id,
+        question: item.question,
+        scores: normalizedScores,
+        explanation: parsed.explanation || 'Judge completed without explanation.',
+      });
+    }
+
+    const criteria = Object.keys(explanations[0].scores).reduce((acc, key) => {
+      acc[key] =
+        explanations.reduce((sum, item) => sum + item.scores[key], 0) /
+        explanations.length;
+      return acc;
+    }, {});
+
+    const overallScore =
+      Object.values(criteria).reduce((sum, value) => sum + value, 0) /
+      Object.values(criteria).length;
+
+    await BotEvalRun.findByIdAndUpdate(run._id, {
+      status: 'completed',
+      criteria,
+      overallScore,
+      explanations,
+      completedAt: new Date(),
+    });
+
+    return BotEvalRun.findById(run._id).lean();
+  } catch (error) {
+    await BotEvalRun.findByIdAndUpdate(run._id, {
+      status: 'failed',
+      error: error.message,
+      completedAt: new Date(),
+    });
+    throw error;
+  }
 };

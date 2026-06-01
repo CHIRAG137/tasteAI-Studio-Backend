@@ -187,4 +187,37 @@ router.post(
   botController.applyBotImprovementAction
 );
 
+/**
+ * @route   GET /api/bots/:botId/eval-datasets
+ * @desc    List eval datasets and judge runs for a bot
+ * @access  Private
+ */
+router.get(
+  '/:botId/eval-datasets',
+  authMiddleware,
+  botController.getBotEvalDatasets
+);
+
+/**
+ * @route   POST /api/bots/:botId/eval-datasets/build
+ * @desc    Build a Phoenix-ready eval dataset from production conversations
+ * @access  Private
+ */
+router.post(
+  '/:botId/eval-datasets/build',
+  authMiddleware,
+  botController.buildBotEvalDataset
+);
+
+/**
+ * @route   POST /api/bots/:botId/evals/judge
+ * @desc    Run LLM-as-a-Judge grading over a bot eval dataset
+ * @access  Private
+ */
+router.post(
+  '/:botId/evals/judge',
+  authMiddleware,
+  botController.runBotLLMJudge
+);
+
 module.exports = router;

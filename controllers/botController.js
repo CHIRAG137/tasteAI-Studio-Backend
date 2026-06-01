@@ -587,3 +587,100 @@ exports.applyBotImprovementAction = async (req, res) => {
     );
   }
 };
+
+exports.buildBotEvalDataset = async (req, res) => {
+  const { botId } = req.params;
+  const { sourceType } = req.body || {};
+
+  if (!sourceType) {
+    return responseBuilder.badRequest(res, null, 'sourceType is required');
+  }
+
+  try {
+    const result = await arizeInsightService.buildEvalDatasetFromProduction({
+      botId,
+      userId: req.user?.id,
+      sourceType,
+    });
+
+    return responseBuilder.ok(res, result, 'Eval dataset created successfully');
+  } catch (error) {
+    logger.error('Error building bot eval dataset', {
+      error: error.message,
+      botId,
+      sourceType,
+      userId: req.user?.id,
+    });
+
+    if (error.message === 'Bot not found') {
+      return responseBuilder.notFound(res, null, 'Bot not found');
+    }
+
+    return responseBuilder.badRequest(
+      res,
+      null,
+      error.message || 'Failed to build eval dataset'
+    );
+  }
+};
+
+exports.getBotEvalDatasets = async (req, res) => {
+  const { botId } = req.params;
+
+  try {
+    const result = await arizeInsightService.getEvalDatasets(
+      botId,
+      req.user?.id
+    );
+
+    return responseBuilder.ok(res, result, 'Eval datasets fetched successfully');
+  } catch (error) {
+    logger.error('Error fetching bot eval datasets', {
+      error: error.message,
+      botId,
+      userId: req.user?.id,
+    });
+
+    if (error.message === 'Bot not found') {
+      return responseBuilder.notFound(res, null, 'Bot not found');
+    }
+
+    return responseBuilder.internalError(
+      res,
+      null,
+      'Failed to fetch eval datasets'
+    );
+  }
+};
+
+exports.runBotLLMJudge = async (req, res) => {
+  const { botId } = req.params;
+  const { datasetName = 'all' } = req.body || {};
+
+  try {
+    const result = await arizeInsightService.runLLMJudgeForBot({
+      botId,
+      userId: req.user?.id,
+      datasetName,
+    });
+
+    return responseBuilder.ok(res, result, 'LLM-as-a-Judge eval completed');
+  } catch (error) {
+    logger.error('Error running bot LLM judge', {
+      error: error.message,
+      botId,
+      datasetName,
+      userId: req.user?.id,
+    });
+
+    if (error.message === 'Bot not found') {
+      return responseBuilder.notFound(res, null, 'Bot not found');
+    }
+
+    return responseBuilder.badRequest(
+      res,
+      null,
+      error.message || 'Failed to run LLM-as-a-Judge eval'
+    );
+  }
+};
