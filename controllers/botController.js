@@ -4,6 +4,7 @@ const responseBuilder = require('../utils/responseBuilder');
 const { testCustomLLMConnection } = require('../utils/llmClientUtils');
 const ChatBot = require('../models/ChatBot');
 const { enforceVisitorEmailVerificationForBot } = require('../utils/visitorEmailOtpEnforce');
+const arizeInsightService = require('../services/arizeInsightService');
 
 // create chatbot
 exports.createBot = async (req, res) => {
@@ -467,6 +468,309 @@ exports.getSuggestedColumnConfiguration = async (req, res) => {
       res,
       null,
       'Failed to get column suggestions'
+    );
+  }
+};
+
+// get Arize/Phoenix observability insights for a bot
+exports.getBotObservabilityInsights = async (req, res) => {
+  const { botId } = req.params;
+
+  try {
+    const result = await arizeInsightService.getBotObservabilityInsights(
+      botId,
+      req.user?.id
+    );
+
+    return responseBuilder.ok(
+      res,
+      result,
+      'Bot observability insights fetched successfully'
+    );
+  } catch (error) {
+    logger.error('Error fetching bot observability insights', {
+      error: error.message,
+      botId,
+      userId: req.user?.id,
+    });
+
+    if (error.message === 'Bot not found') {
+      return responseBuilder.notFound(res, null, 'Bot not found');
+    }
+
+    return responseBuilder.internalError(
+      res,
+      null,
+      'Failed to fetch bot observability insights'
+    );
+  }
+};
+
+// get self-improvement inbox for a bot
+exports.getBotSelfImprovementDashboard = async (req, res) => {
+  const { botId } = req.params;
+
+  try {
+    const result = await arizeInsightService.getBotSelfImprovementDashboard(
+      botId,
+      req.user?.id
+    );
+
+    return responseBuilder.ok(
+      res,
+      result,
+      'Bot self-improvement dashboard fetched successfully'
+    );
+  } catch (error) {
+    logger.error('Error fetching bot self-improvement dashboard', {
+      error: error.message,
+      botId,
+      userId: req.user?.id,
+    });
+
+    if (error.message === 'Bot not found') {
+      return responseBuilder.notFound(res, null, 'Bot not found');
+    }
+
+    return responseBuilder.internalError(
+      res,
+      null,
+      'Failed to fetch bot self-improvement dashboard'
+    );
+  }
+};
+
+// apply action to a self-improvement item
+exports.applyBotImprovementAction = async (req, res) => {
+  const { botId } = req.params;
+  const { itemKey, action, item } = req.body || {};
+
+  if (!itemKey || !action) {
+    return responseBuilder.badRequest(
+      res,
+      null,
+      'itemKey and action are required'
+    );
+  }
+
+  try {
+    const result = await arizeInsightService.applyImprovementAction({
+      botId,
+      userId: req.user?.id,
+      itemKey,
+      action,
+      item,
+    });
+
+    return responseBuilder.ok(
+      res,
+      result,
+      'Bot improvement action applied successfully'
+    );
+  } catch (error) {
+    logger.error('Error applying bot improvement action', {
+      error: error.message,
+      botId,
+      itemKey,
+      action,
+      userId: req.user?.id,
+    });
+
+    if (error.message === 'Bot not found') {
+      return responseBuilder.notFound(res, null, 'Bot not found');
+    }
+
+    return responseBuilder.badRequest(
+      res,
+      null,
+      error.message || 'Failed to apply bot improvement action'
+    );
+  }
+};
+
+exports.buildBotEvalDataset = async (req, res) => {
+  const { botId } = req.params;
+  const { sourceType } = req.body || {};
+
+  if (!sourceType) {
+    return responseBuilder.badRequest(res, null, 'sourceType is required');
+  }
+
+  try {
+    const result = await arizeInsightService.buildEvalDatasetFromProduction({
+      botId,
+      userId: req.user?.id,
+      sourceType,
+    });
+
+    return responseBuilder.ok(res, result, 'Eval dataset created successfully');
+  } catch (error) {
+    logger.error('Error building bot eval dataset', {
+      error: error.message,
+      botId,
+      sourceType,
+      userId: req.user?.id,
+    });
+
+    if (error.message === 'Bot not found') {
+      return responseBuilder.notFound(res, null, 'Bot not found');
+    }
+
+    return responseBuilder.badRequest(
+      res,
+      null,
+      error.message || 'Failed to build eval dataset'
+    );
+  }
+};
+
+exports.getBotEvalDatasets = async (req, res) => {
+  const { botId } = req.params;
+
+  try {
+    const result = await arizeInsightService.getEvalDatasets(
+      botId,
+      req.user?.id
+    );
+
+    return responseBuilder.ok(res, result, 'Eval datasets fetched successfully');
+  } catch (error) {
+    logger.error('Error fetching bot eval datasets', {
+      error: error.message,
+      botId,
+      userId: req.user?.id,
+    });
+
+    if (error.message === 'Bot not found') {
+      return responseBuilder.notFound(res, null, 'Bot not found');
+    }
+
+    return responseBuilder.internalError(
+      res,
+      null,
+      'Failed to fetch eval datasets'
+    );
+  }
+};
+
+exports.runBotLLMJudge = async (req, res) => {
+  const { botId } = req.params;
+  const { datasetName = 'all' } = req.body || {};
+
+  try {
+    const result = await arizeInsightService.runLLMJudgeForBot({
+      botId,
+      userId: req.user?.id,
+      datasetName,
+    });
+
+    return responseBuilder.ok(res, result, 'LLM-as-a-Judge eval completed');
+  } catch (error) {
+    logger.error('Error running bot LLM judge', {
+      error: error.message,
+      botId,
+      datasetName,
+      userId: req.user?.id,
+    });
+
+    if (error.message === 'Bot not found') {
+      return responseBuilder.notFound(res, null, 'Bot not found');
+    }
+
+    return responseBuilder.badRequest(
+      res,
+      null,
+      error.message || 'Failed to run LLM-as-a-Judge eval'
+    );
+  }
+};
+
+exports.getBotExperiments = async (req, res) => {
+  const { botId } = req.params;
+
+  try {
+    const result = await arizeInsightService.getBotExperiments(
+      botId,
+      req.user?.id
+    );
+
+    return responseBuilder.ok(res, result, 'Bot experiments fetched successfully');
+  } catch (error) {
+    logger.error('Error fetching bot experiments', {
+      error: error.message,
+      botId,
+      userId: req.user?.id,
+    });
+
+    if (error.message === 'Bot not found') {
+      return responseBuilder.notFound(res, null, 'Bot not found');
+    }
+
+    return responseBuilder.internalError(
+      res,
+      null,
+      'Failed to fetch bot experiments'
+    );
+  }
+};
+
+exports.createBotExperiment = async (req, res) => {
+  const { botId } = req.params;
+
+  try {
+    const result = await arizeInsightService.createBotExperiment({
+      botId,
+      userId: req.user?.id,
+      data: req.body,
+    });
+
+    return responseBuilder.created(res, result, 'Bot experiment created successfully');
+  } catch (error) {
+    logger.error('Error creating bot experiment', {
+      error: error.message,
+      botId,
+      userId: req.user?.id,
+    });
+
+    if (error.message === 'Bot not found') {
+      return responseBuilder.notFound(res, null, 'Bot not found');
+    }
+
+    return responseBuilder.badRequest(
+      res,
+      null,
+      error.message || 'Failed to create bot experiment'
+    );
+  }
+};
+
+exports.runBotExperiment = async (req, res) => {
+  const { botId, experimentId } = req.params;
+
+  try {
+    const result = await arizeInsightService.runBotExperiment({
+      botId,
+      userId: req.user?.id,
+      experimentId,
+    });
+
+    return responseBuilder.ok(res, result, 'Bot experiment completed successfully');
+  } catch (error) {
+    logger.error('Error running bot experiment', {
+      error: error.message,
+      botId,
+      experimentId,
+      userId: req.user?.id,
+    });
+
+    if (error.message === 'Bot not found' || error.message === 'Experiment not found') {
+      return responseBuilder.notFound(res, null, error.message);
+    }
+
+    return responseBuilder.badRequest(
+      res,
+      null,
+      error.message || 'Failed to run bot experiment'
     );
   }
 };

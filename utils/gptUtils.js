@@ -54,6 +54,10 @@
 
 require('dotenv').config();
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const {
+  runPhoenixSpan,
+  setPhoenixSpanAttributes,
+} = require('../config/phoenixTracing');
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
@@ -85,18 +89,35 @@ Return only a list of 10–15 questions and answers in JSON format like this:
 
     const userPrompt = `Here is a chunk of the document:\n\n${textChunk}\n\nGenerate Q&A pairs now.`;
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-3-pro-preview' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-3.1-pro-preview' });
 
     const prompt = `${systemPrompt}\n\n${userPrompt}`;
 
-    const result = await model.generateContent(prompt);
+    return runPhoenixSpan(
+      'llm.gemini.generate_qas',
+      'LLM',
+      {
+        'llm.provider': 'gemini',
+        'llm.model_name': 'gemini-3.1-pro-preview',
+        'llm.operation': 'generate_qas',
+        'input.value': prompt,
+        'input.mime_type': 'text/plain',
+      },
+      async (span) => {
+        const result = await model.generateContent(prompt);
+        const responseText = result.response.text();
 
-    const responseText = result.response.text();
+        const jsonMatch = responseText.match(/\[[\s\S]*\]/);
+        const qas = jsonMatch ? JSON.parse(jsonMatch[0]) : [];
+        const output = Array.isArray(qas) ? qas : [];
+        setPhoenixSpanAttributes(span, {
+          'output.value': JSON.stringify(output),
+          'output.mime_type': 'application/json',
+        });
 
-    const jsonMatch = responseText.match(/\[[\s\S]*\]/);
-    const qas = jsonMatch ? JSON.parse(jsonMatch[0]) : [];
-
-    return Array.isArray(qas) ? qas : [];
+        return output;
+      }
+    );
   } catch (error) {
     console.error('Error in generateQAsViaGPT (Gemini):', error);
     return [];
@@ -111,8 +132,24 @@ Return only a list of 10–15 questions and answers in JSON format like this:
 exports.getEmbedding = async (text) => {
   try {
     const model = genAI.getGenerativeModel({ model: 'gemini-embedding-001' });
-    const result = await model.embedContent(text);
-    return new Float32Array(result.embedding.values);
+    return runPhoenixSpan(
+      'embedding.gemini',
+      'EMBEDDING',
+      {
+        'embedding.model_name': 'gemini-embedding-001',
+        'llm.provider': 'gemini',
+        'input.value': text,
+        'input.mime_type': 'text/plain',
+      },
+      async (span) => {
+        const result = await model.embedContent(text);
+        const output = new Float32Array(result.embedding.values);
+        setPhoenixSpanAttributes(span, {
+          'embedding.vector_length': output.length,
+        });
+        return output;
+      }
+    );
   } catch (error) {
     console.error('Error generating embedding (Gemini):', error);
     return new Float32Array();

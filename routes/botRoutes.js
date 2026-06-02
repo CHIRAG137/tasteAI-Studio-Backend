@@ -154,4 +154,103 @@ router.get(
   botController.getSuggestedColumnConfiguration
 );
 
+/**
+ * @route   GET /api/bots/:botId/observability
+ * @desc    Get Arize/Phoenix MCP setup and bot self-improvement insights
+ * @access  Private
+ */
+router.get(
+  '/:botId/observability',
+  authMiddleware,
+  botController.getBotObservabilityInsights
+);
+
+/**
+ * @route   GET /api/bots/:botId/improvements
+ * @desc    Get bot health and self-improvement inbox items
+ * @access  Private
+ */
+router.get(
+  '/:botId/improvements',
+  authMiddleware,
+  botController.getBotSelfImprovementDashboard
+);
+
+/**
+ * @route   POST /api/bots/:botId/improvements/actions
+ * @desc    Apply an action to a bot self-improvement item
+ * @access  Private
+ */
+router.post(
+  '/:botId/improvements/actions',
+  authMiddleware,
+  botController.applyBotImprovementAction
+);
+
+/**
+ * @route   GET /api/bots/:botId/eval-datasets
+ * @desc    List eval datasets and judge runs for a bot
+ * @access  Private
+ */
+router.get(
+  '/:botId/eval-datasets',
+  authMiddleware,
+  botController.getBotEvalDatasets
+);
+
+/**
+ * @route   POST /api/bots/:botId/eval-datasets/build
+ * @desc    Build a Phoenix-ready eval dataset from production conversations
+ * @access  Private
+ */
+router.post(
+  '/:botId/eval-datasets/build',
+  authMiddleware,
+  botController.buildBotEvalDataset
+);
+
+/**
+ * @route   POST /api/bots/:botId/evals/judge
+ * @desc    Run LLM-as-a-Judge grading over a bot eval dataset
+ * @access  Private
+ */
+router.post(
+  '/:botId/evals/judge',
+  authMiddleware,
+  botController.runBotLLMJudge
+);
+
+/**
+ * @route   GET /api/bots/:botId/experiments
+ * @desc    List bot experiment lab runs
+ * @access  Private
+ */
+router.get(
+  '/:botId/experiments',
+  authMiddleware,
+  botController.getBotExperiments
+);
+
+/**
+ * @route   POST /api/bots/:botId/experiments
+ * @desc    Create a control/treatment bot experiment
+ * @access  Private
+ */
+router.post(
+  '/:botId/experiments',
+  authMiddleware,
+  botController.createBotExperiment
+);
+
+/**
+ * @route   POST /api/bots/:botId/experiments/:experimentId/run
+ * @desc    Run a bot experiment against eval datasets
+ * @access  Private
+ */
+router.post(
+  '/:botId/experiments/:experimentId/run',
+  authMiddleware,
+  botController.runBotExperiment
+);
+
 module.exports = router;

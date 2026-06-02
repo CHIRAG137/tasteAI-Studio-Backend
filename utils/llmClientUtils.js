@@ -4,6 +4,52 @@ const { decryptApiKey } = require('./encryptionUtils');
 const logger = require('./logger');
 const ChatBot = require('../models/ChatBot');
 const UserApiKey = require('../models/UserApiKey');
+const {
+  runPhoenixSpan,
+  setPhoenixSpanAttributes,
+} = require('../config/phoenixTracing');
+
+async function traceLLMCall({ provider, modelName, operation, input }, fn) {
+  return runPhoenixSpan(
+    `llm.${provider}.${operation}`,
+    'LLM',
+    {
+      'llm.provider': provider,
+      'llm.model_name': modelName,
+      'llm.operation': operation,
+      'input.value': input,
+      'input.mime_type': 'text/plain',
+    },
+    async (span) => {
+      const output = await fn();
+      setPhoenixSpanAttributes(span, {
+        'output.value': typeof output === 'string' ? output : JSON.stringify(output),
+        'output.mime_type': typeof output === 'string' ? 'text/plain' : 'application/json',
+      });
+      return output;
+    }
+  );
+}
+
+async function traceEmbeddingCall({ provider, modelName, input }, fn) {
+  return runPhoenixSpan(
+    `embedding.${provider}`,
+    'EMBEDDING',
+    {
+      'embedding.model_name': modelName,
+      'llm.provider': provider,
+      'input.value': input,
+      'input.mime_type': 'text/plain',
+    },
+    async (span) => {
+      const output = await fn();
+      setPhoenixSpanAttributes(span, {
+        'embedding.vector_length': output?.length || 0,
+      });
+      return output;
+    }
+  );
+}
 
 /**
  * Gemma via OpenRouter uses OpenAI-compatible API
@@ -22,8 +68,13 @@ function createOpenRouterInterface(apiKey, modelName = 'google/gemma-4-31b-it') 
       const embeddingModel = genAI.getGenerativeModel({
         model: 'embedding-001',
       });
-      const result = await embeddingModel.embedContent(text);
-      return new Float32Array(result.embedding.values);
+      return traceEmbeddingCall(
+        { provider: 'gemini', modelName: 'embedding-001', input: text },
+        async () => {
+          const result = await embeddingModel.embedContent(text);
+          return new Float32Array(result.embedding.values);
+        }
+      );
     },
     generateQAs: async (textChunk, botName, botDescription, personaContext = null) => {
       const systemPrompt = `
@@ -45,27 +96,37 @@ Return only a list of 10–15 questions and answers in JSON format like this:
 
       const userPrompt = `Here is a chunk of the document:\n\n${textChunk}\n\nGenerate Q&A pairs now.`;
 
-      const completion = await client.chat.completions.create({
-        model: modelName,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt },
-        ],
-        temperature: 0.7,
-      });
+      return traceLLMCall(
+        { provider: 'openrouter', modelName, operation: 'generate_qas', input: userPrompt },
+        async () => {
+          const completion = await client.chat.completions.create({
+            model: modelName,
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: userPrompt },
+            ],
+            temperature: 0.7,
+          });
 
-      const responseText = completion.choices[0].message.content;
-      const jsonMatch = responseText.match(/\[[\s\S]*\]/);
-      const qas = jsonMatch ? JSON.parse(jsonMatch[0]) : [];
-      return Array.isArray(qas) ? qas : [];
+          const responseText = completion.choices[0].message.content;
+          const jsonMatch = responseText.match(/\[[\s\S]*\]/);
+          const qas = jsonMatch ? JSON.parse(jsonMatch[0]) : [];
+          return Array.isArray(qas) ? qas : [];
+        }
+      );
     },
     generateSummary: async (prompt) => {
-      const completion = await client.chat.completions.create({
-        model: modelName,
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0.7,
-      });
-      return completion.choices[0].message.content;
+      return traceLLMCall(
+        { provider: 'openrouter', modelName, operation: 'generate_summary', input: prompt },
+        async () => {
+          const completion = await client.chat.completions.create({
+            model: modelName,
+            messages: [{ role: 'user', content: prompt }],
+            temperature: 0.7,
+          });
+          return completion.choices[0].message.content;
+        }
+      );
     },
   };
 }
@@ -119,7 +180,7 @@ exports.getLLMClient = async (botIdOrBot, userId = null) => {
         if (bot.custom_llm_provider === 'openai') {
           return createOpenAIInterface(decrypted, bot.custom_model || 'gpt-4');
         } else if (bot.custom_llm_provider === 'gemini') {
-          return createGeminiInterface(decrypted, bot.custom_model || 'gemini-3-pro-preview');
+          return createGeminiInterface(decrypted, bot.custom_model || 'gemini-3.1-pro-preview');
         } else if (bot.custom_llm_provider === 'gemma') {
           return createOpenRouterInterface(decrypted, bot.custom_model || 'google/gemma-4-31b-it');
         }
@@ -148,15 +209,20 @@ exports.getLLMClient = async (botIdOrBot, userId = null) => {
  */
 function createDefaultLLMInterface() {
   const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-  const model = genAI.getGenerativeModel({ model: 'gemini-3-pro-preview' });
+  const model = genAI.getGenerativeModel({ model: 'gemini-3.1-pro-preview' });
 
   return {
     getEmbedding: async (text) => {
       const embeddingModel = genAI.getGenerativeModel({
         model: 'embedding-001',
       });
-      const result = await embeddingModel.embedContent(text);
-      return new Float32Array(result.embedding.values);
+      return traceEmbeddingCall(
+        { provider: 'gemini', modelName: 'embedding-001', input: text },
+        async () => {
+          const result = await embeddingModel.embedContent(text);
+          return new Float32Array(result.embedding.values);
+        }
+      );
     },
     generateQAs: async (textChunk, botName, botDescription, personaContext = null) => {
       const systemPrompt = `
@@ -179,16 +245,26 @@ Return only a list of 10–15 questions and answers in JSON format like this:
       const userPrompt = `Here is a chunk of the document:\n\n${textChunk}\n\nGenerate Q&A pairs now.`;
       const prompt = `${systemPrompt}\n\n${userPrompt}`;
 
-      const result = await model.generateContent(prompt);
-      const responseText = result.response.text();
+      return traceLLMCall(
+        { provider: 'gemini', modelName: 'gemini-3.1-pro-preview', operation: 'generate_qas', input: prompt },
+        async () => {
+          const result = await model.generateContent(prompt);
+          const responseText = result.response.text();
 
-      const jsonMatch = responseText.match(/\[[\s\S]*\]/);
-      const qas = jsonMatch ? JSON.parse(jsonMatch[0]) : [];
-      return Array.isArray(qas) ? qas : [];
+          const jsonMatch = responseText.match(/\[[\s\S]*\]/);
+          const qas = jsonMatch ? JSON.parse(jsonMatch[0]) : [];
+          return Array.isArray(qas) ? qas : [];
+        }
+      );
     },
     generateSummary: async (prompt) => {
-      const result = await model.generateContent(prompt);
-      return result.response.text();
+      return traceLLMCall(
+        { provider: 'gemini', modelName: 'gemini-3.1-pro-preview', operation: 'generate_summary', input: prompt },
+        async () => {
+          const result = await model.generateContent(prompt);
+          return result.response.text();
+        }
+      );
     },
   };
 }
@@ -201,11 +277,16 @@ function createOpenAIInterface(apiKey, modelName = 'gpt-4') {
 
   return {
     getEmbedding: async (text) => {
-      const result = await client.embeddings.create({
-        model: 'text-embedding-ada-002',
-        input: text,
-      });
-      return new Float32Array(result.data[0].embedding);
+      return traceEmbeddingCall(
+        { provider: 'openai', modelName: 'text-embedding-ada-002', input: text },
+        async () => {
+          const result = await client.embeddings.create({
+            model: 'text-embedding-ada-002',
+            input: text,
+          });
+          return new Float32Array(result.data[0].embedding);
+        }
+      );
     },
     generateQAs: async (textChunk, botName, botDescription, personaContext = null) => {
       const systemPrompt = `
@@ -227,27 +308,37 @@ Return only a list of 10–15 questions and answers in JSON format like this:
 
       const userPrompt = `Here is a chunk of the document:\n\n${textChunk}\n\nGenerate Q&A pairs now.`;
 
-      const completion = await client.chat.completions.create({
-        model: modelName,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt },
-        ],
-        temperature: 0.7,
-      });
+      return traceLLMCall(
+        { provider: 'openai', modelName, operation: 'generate_qas', input: userPrompt },
+        async () => {
+          const completion = await client.chat.completions.create({
+            model: modelName,
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: userPrompt },
+            ],
+            temperature: 0.7,
+          });
 
-      const responseText = completion.choices[0].message.content;
-      const jsonMatch = responseText.match(/\[[\s\S]*\]/);
-      const qas = jsonMatch ? JSON.parse(jsonMatch[0]) : [];
-      return Array.isArray(qas) ? qas : [];
+          const responseText = completion.choices[0].message.content;
+          const jsonMatch = responseText.match(/\[[\s\S]*\]/);
+          const qas = jsonMatch ? JSON.parse(jsonMatch[0]) : [];
+          return Array.isArray(qas) ? qas : [];
+        }
+      );
     },
     generateSummary: async (prompt) => {
-      const completion = await client.chat.completions.create({
-        model: modelName,
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0.7,
-      });
-      return completion.choices[0].message.content;
+      return traceLLMCall(
+        { provider: 'openai', modelName, operation: 'generate_summary', input: prompt },
+        async () => {
+          const completion = await client.chat.completions.create({
+            model: modelName,
+            messages: [{ role: 'user', content: prompt }],
+            temperature: 0.7,
+          });
+          return completion.choices[0].message.content;
+        }
+      );
     },
   };
 }
@@ -255,7 +346,7 @@ Return only a list of 10–15 questions and answers in JSON format like this:
 /**
  * Create interface for custom Gemini LLM
  */
-function createGeminiInterface(apiKey, modelName = 'gemini-3-pro-preview') {
+function createGeminiInterface(apiKey, modelName = 'gemini-3.1-pro-preview') {
   const genAI = new GoogleGenerativeAI(apiKey);
   const model = genAI.getGenerativeModel({ model: modelName });
   const embeddingModel = genAI.getGenerativeModel({
@@ -264,8 +355,13 @@ function createGeminiInterface(apiKey, modelName = 'gemini-3-pro-preview') {
 
   return {
     getEmbedding: async (text) => {
-      const result = await embeddingModel.embedContent(text);
-      return new Float32Array(result.embedding.values);
+      return traceEmbeddingCall(
+        { provider: 'gemini', modelName: 'embedding-001', input: text },
+        async () => {
+          const result = await embeddingModel.embedContent(text);
+          return new Float32Array(result.embedding.values);
+        }
+      );
     },
     generateQAs: async (textChunk, botName, botDescription, personaContext = null) => {
       const systemPrompt = `
@@ -288,16 +384,26 @@ Return only a list of 10–15 questions and answers in JSON format like this:
       const userPrompt = `Here is a chunk of the document:\n\n${textChunk}\n\nGenerate Q&A pairs now.`;
       const prompt = `${systemPrompt}\n\n${userPrompt}`;
 
-      const result = await model.generateContent(prompt);
-      const responseText = result.response.text();
+      return traceLLMCall(
+        { provider: 'gemini', modelName, operation: 'generate_qas', input: prompt },
+        async () => {
+          const result = await model.generateContent(prompt);
+          const responseText = result.response.text();
 
-      const jsonMatch = responseText.match(/\[[\s\S]*\]/);
-      const qas = jsonMatch ? JSON.parse(jsonMatch[0]) : [];
-      return Array.isArray(qas) ? qas : [];
+          const jsonMatch = responseText.match(/\[[\s\S]*\]/);
+          const qas = jsonMatch ? JSON.parse(jsonMatch[0]) : [];
+          return Array.isArray(qas) ? qas : [];
+        }
+      );
     },
     generateSummary: async (prompt) => {
-      const result = await model.generateContent(prompt);
-      return result.response.text();
+      return traceLLMCall(
+        { provider: 'gemini', modelName, operation: 'generate_summary', input: prompt },
+        async () => {
+          const result = await model.generateContent(prompt);
+          return result.response.text();
+        }
+      );
     },
   };
 }
@@ -348,7 +454,7 @@ exports.testCustomLLMConnection = async (provider, apiKey, model = null) => {
     (normalizedProvider === 'openai' 
       ? 'gpt-4' 
       : (normalizedProvider === 'gemini' 
-        ? 'gemini-3-pro-preview' 
+        ? 'gemini-3.1-pro-preview' 
         : 'google/gemma-4-31b-it'));
   const prompt = 'Please respond with the single word OK to validate your API key.';
 

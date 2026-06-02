@@ -22,6 +22,11 @@ const {
 } = require('../utils/dataProcessingUtils');
 const { encryptApiKey } = require('../utils/encryptionUtils');
 const { sanitizeBotForResponse, sanitizeBotsForResponse } = require('../utils/botSanitizer');
+const {
+  runPhoenixSpan,
+  setPhoenixSpanAttributes,
+} = require('../config/phoenixTracing');
+const BotInteractionMetric = require('../models/BotInteractionMetric');
 
 const DEFAULT_EMBED_CUSTOMIZATION = {
   // Chat defaults
@@ -570,8 +575,7 @@ exports.createBot = async (req) => {
   };
 };
 
-// ask query to a chatbot
-exports.askBot = async (question, botId, flowSessionId = null, userId = null, chatHistory = [], matchedAnswer = null, userEmotion = null) => {
+async function askBotImpl(question, botId, flowSessionId = null, userId = null, chatHistory = [], matchedAnswer = null, userEmotion = null) {
   const bot = await ChatBot.findById(botId);
   if (!bot) {
     logger.error('Bot not found', { botId });
@@ -905,6 +909,7 @@ Based on the chat history, matched answer, and user's emotion, provide the best 
       question,
       answer: answer,
       embedding: Buffer.from(inputEmbedding.buffer),
+      source,
     });
     logger.info('Final answer saved to QAHistory', { botId, question });
   } catch (error) {
@@ -916,6 +921,89 @@ Based on the chat history, matched answer, and user's emotion, provide the best 
 
   // Return the final answer
   return { answer, score: bestScore, source };
+}
+
+// ask query to a chatbot
+exports.askBot = async (question, botId, flowSessionId = null, userId = null, chatHistory = [], matchedAnswer = null, userEmotion = null) => {
+  const startedAt = Date.now();
+  return runPhoenixSpan(
+    'bot.answer_question',
+    'AGENT',
+    {
+      'bot.id': String(botId),
+      'session.id': flowSessionId ? String(flowSessionId) : undefined,
+      'user.id': userId ? String(userId) : undefined,
+      'input.value': question,
+      'input.mime_type': 'text/plain',
+      'metadata.chat_history_count': Array.isArray(chatHistory) ? chatHistory.length : 0,
+      'metadata.user_emotion': userEmotion || 'neutral',
+    },
+    async (span) => {
+      let result;
+      try {
+        result = await askBotImpl(
+          question,
+          botId,
+          flowSessionId,
+          userId,
+          chatHistory,
+          matchedAnswer,
+          userEmotion
+        );
+      } finally {
+        const latencyMs = Date.now() - startedAt;
+        if (result) {
+          const confidence =
+            typeof result.score === 'number' && Number.isFinite(result.score)
+              ? Math.max(0, Math.min(1, result.score))
+              : null;
+          const usedFallback =
+            result.source === 'none' ||
+            !result.answer ||
+            result.answer.toLowerCase().includes('cannot provide an answer') ||
+            result.answer.toLowerCase().includes('no match found');
+          const hallucinationRisk =
+            confidence === null
+              ? usedFallback
+                ? 0.8
+                : 0.45
+              : Math.max(0, Math.min(1, 1 - confidence));
+
+          BotInteractionMetric.create({
+            bot: botId,
+            flowSession: flowSessionId || null,
+            question,
+            answer: result.answer || '',
+            source: result.source || 'unknown',
+            confidence,
+            latencyMs,
+            usedFallback,
+            groundednessScore: Math.max(0, Math.min(1, 1 - hallucinationRisk)),
+            hallucinationRisk,
+            userEmotion: userEmotion || 'neutral',
+            metadata: {
+              chatHistoryCount: Array.isArray(chatHistory) ? chatHistory.length : 0,
+            },
+          }).catch((error) => {
+            logger.warn('Failed to save bot interaction metric', {
+              botId,
+              error: error.message,
+            });
+          });
+        }
+      }
+
+      setPhoenixSpanAttributes(span, {
+        'output.value': result?.answer,
+        'output.mime_type': 'text/plain',
+        'metadata.answer_source': result?.source,
+        'metadata.match_score': result?.score,
+        'metadata.latency_ms': Date.now() - startedAt,
+      });
+
+      return result;
+    }
+  );
 };
 
 // get all the chatbots(paginated)
