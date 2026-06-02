@@ -253,4 +253,61 @@ router.post(
   botController.runBotExperiment
 );
 
+const regressionTestController = require('../controllers/regressionTestController');
+
+/**
+ * @route   POST /api/bots/:botId/regression-tests
+ * @desc    Create regression test suite from production conversations
+ * @access  Private
+ */
+router.post(
+  '/:botId/regression-tests',
+  authMiddleware,
+  regressionTestController.createRegressionTests
+);
+
+/**
+ * @route   GET /api/bots/:botId/regression-tests
+ * @desc    Get all regression test suites for a bot
+ * @access  Private
+ */
+router.get(
+  '/:botId/regression-tests',
+  authMiddleware,
+  regressionTestController.getRegressionTests
+);
+
+/**
+ * @route   POST /api/bots/:botId/regression-tests/:testSuiteId/run
+ * @desc    Run regression tests for a test suite
+ * @access  Private
+ */
+router.post(
+  '/:botId/regression-tests/:testSuiteId/run',
+  authMiddleware,
+  regressionTestController.runRegressionTests
+);
+
+/**
+ * @route   GET /api/bots/:botId/regression-tests/:testSuiteId
+ * @desc    Get details of a specific test suite
+ * @access  Private
+ */
+router.get(
+  '/:botId/regression-tests/:testSuiteId',
+  authMiddleware,
+  regressionTestController.getTestSuiteDetails
+);
+
+/**
+ * @route   POST /api/bots/:botId/regression-tests/:testSuiteId/test-cases
+ * @desc    Add a new test case to a test suite
+ * @access  Private
+ */
+router.post(
+  '/:botId/regression-tests/:testSuiteId/test-cases',
+  authMiddleware,
+  regressionTestController.addTestCase
+);
+
 module.exports = router;
