@@ -379,6 +379,44 @@ exports.getChatHistoryBySessionId = async (req, res) => {
   }
 };
 
+// get product-friendly Phoenix trace timeline for a session
+exports.getSessionTraceTimeline = async (req, res) => {
+  const { botId, sessionId } = req.params;
+
+  try {
+    logger.info('Fetching session trace timeline', {
+      botId,
+      sessionId,
+      userId: req.user?.id,
+    });
+
+    const result = await botService.getSessionTraceTimeline(botId, sessionId);
+
+    return responseBuilder.ok(
+      res,
+      result,
+      'Session trace timeline fetched successfully'
+    );
+  } catch (error) {
+    logger.error('Error fetching session trace timeline', {
+      error: error.message,
+      botId,
+      sessionId,
+      userId: req.user?.id,
+    });
+
+    if (error.message === 'Bot not found' || error.message === 'Chat history not found') {
+      return responseBuilder.notFound(res, null, error.message);
+    }
+
+    return responseBuilder.internalError(
+      res,
+      null,
+      'Failed to fetch session trace timeline'
+    );
+  }
+};
+
 // get spreadsheet configuration for a bot
 exports.getSpreadsheetConfig = async (req, res) => {
   const { botId } = req.params;

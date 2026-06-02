@@ -576,6 +576,18 @@ exports.createBot = async (req) => {
 };
 
 async function askBotImpl(question, botId, flowSessionId = null, userId = null, chatHistory = [], matchedAnswer = null, userEmotion = null) {
+  const overallStart = Date.now();
+  const traceTimings = {
+    embeddingGeneration: { start: null, duration: null },
+    retrieval: { start: null, duration: null },
+    promptGeneration: { start: null, duration: null },
+    answerGeneration: { start: null, duration: null },
+  };
+  const retrievalTrace = {
+    totalQAsSearched: 0,
+    threshold: 0.85,
+  };
+
   const bot = await ChatBot.findById(botId);
   if (!bot) {
     logger.error('Bot not found', { botId });
@@ -589,8 +601,12 @@ async function askBotImpl(question, botId, flowSessionId = null, userId = null, 
   
   logger.info('Bot asked a question', { botId, question, flowSessionId, llmProvider: llmType });
 
-  // Use custom LLM if configured, otherwise use default
+  // ==================== EMBEDDING GENERATION ====================
+  traceTimings.embeddingGeneration.start = Date.now();
   let inputEmbedding;
+  let embeddingProvider = 'default';
+  let embeddingModel = 'embedding-001';
+
   if (bot.custom_llm_provider && (bot.encrypted_api_key || bot.custom_api_key_source === 'user')) {
     try {
       logger.debug('Using custom LLM for embedding generation', {
@@ -598,6 +614,8 @@ async function askBotImpl(question, botId, flowSessionId = null, userId = null, 
         provider: bot.custom_llm_provider,
         keySource: bot.custom_api_key_source,
       });
+      embeddingProvider = bot.custom_llm_provider;
+      embeddingModel = bot.custom_model || 'default';
       inputEmbedding = await generateEmbedding(question, botId, userId);
     } catch (error) {
       logger.error('Error generating embedding with custom LLM, falling back to default', { 
@@ -605,14 +623,20 @@ async function askBotImpl(question, botId, flowSessionId = null, userId = null, 
         provider: bot.custom_llm_provider,
         error: error.message 
       });
+      embeddingProvider = 'default';
+      embeddingModel = 'embedding-001';
       inputEmbedding = await getEmbedding(question);
     }
   } else {
     logger.debug('Using default LLM for embedding generation', { botId });
     inputEmbedding = await getEmbedding(question);
   }
+  traceTimings.embeddingGeneration.duration = Date.now() - traceTimings.embeddingGeneration.start;
 
+  // ==================== RETRIEVAL ====================
+  traceTimings.retrieval.start = Date.now();
   const qas = await QAHistory.find({ bot: botId });
+  retrievalTrace.totalQAsSearched = qas.length;
 
   let bestMatch = null,
     bestScore = -1;
@@ -626,12 +650,17 @@ async function askBotImpl(question, botId, flowSessionId = null, userId = null, 
       bestMatch = qa;
     }
   }
+  traceTimings.retrieval.duration = Date.now() - traceTimings.retrieval.start;
 
   let answer = null;
   let source = 'qa';
+  let sourceDescription = null;
+  const retrievalThreshold = 0.85;
+  retrievalTrace.threshold = retrievalThreshold;
 
-  if (bestScore > 0.85 && bestMatch) {
+  if (bestScore > retrievalThreshold && bestMatch) {
     answer = bestMatch.answer;
+    sourceDescription = `Matched Q&A: "${bestMatch.question}"`;
     logger.info('Best QA match found', { botId, score: bestScore, question });
   } else {
     logger.warn('No strong QA match found', {
@@ -716,6 +745,7 @@ Based on the dataset information, field descriptions, chat history, and the comp
         ) {
           answer = llmResponse;
           source = 'dataset';
+          sourceDescription = `Dataset: ${spreadsheetConfig.datasetDescription?.substring(0, 100) || 'Spreadsheet'}`;
 
           logger.info('Answered using dataset context', {
             botId,
@@ -786,6 +816,7 @@ Based on this data, answer the user's question. If the question appears to be as
           ) {
             answer = llmResponse;
             source = 'spreadsheet';
+            sourceDescription = `Spreadsheet: ${spreadsheetConfig.outputColumn}`;
 
             logger.info('Answered using spreadsheet prediction data', {
               botId,
@@ -841,6 +872,9 @@ Based on this data, answer the user's question. If the question appears to be as
     }
   }
 
+  // ==================== PROMPT GENERATION & ANSWER GENERATION ====================
+  traceTimings.promptGeneration.start = Date.now();
+
   // Always generate a response using LLM with context
   const { getLLMClient } = require('../utils/llmClientUtils');
   const llmClient = await getLLMClient(botId, userId);
@@ -891,16 +925,26 @@ User's Emotion/Preference: ${context.userEmotion} (e.g., wants detailed answer, 
 
 Based on the chat history, matched answer, and user's emotion, provide the best possible response. If the matched answer is relevant, incorporate it naturally. Adjust the response length and detail based on the user's emotion/preference.`;
 
+  traceTimings.promptGeneration.duration = Date.now() - traceTimings.promptGeneration.start;
+
+  // ==================== ANSWER GENERATION ====================
+  traceTimings.answerGeneration.start = Date.now();
+
   try {
     const llmResponse = await llmClient.generateSummary(prompt);
     answer = llmResponse || answer || 'I apologize, but I cannot provide an answer at this time.';
-    source = 'llm';
+    if (source === 'none') {
+      source = 'llm';
+      sourceDescription = 'LLM generated response';
+    }
     logger.info('Generated LLM response with context', { botId, question, answer });
   } catch (error) {
     logger.error('Error generating LLM response', { botId, error: error.message });
     // Fallback to matched answer or default
     answer = answer || 'I apologize, but I cannot provide an answer at this time.';
   }
+
+  traceTimings.answerGeneration.duration = Date.now() - traceTimings.answerGeneration.start;
 
   // Save the final LLM answer to QAHistory (only the generated response)
   try {
@@ -919,8 +963,21 @@ Based on the chat history, matched answer, and user's emotion, provide the best 
     });
   }
 
-  // Return the final answer
-  return { answer, score: bestScore, source };
+  // Return the final answer with trace data
+  return { 
+    answer, 
+    score: bestScore, 
+    source,
+    sourceDescription,
+    matchedMatch: bestMatch,
+    traceTimings,
+    retrievalTrace,
+    finalPrompt: prompt,
+    embeddingProvider,
+    embeddingModel,
+    llmProvider: bot.custom_llm_provider || 'default',
+    llmModel: bot.custom_model || 'gemini-3.1-pro-preview',
+  };
 }
 
 // ask query to a chatbot
@@ -969,6 +1026,40 @@ exports.askBot = async (question, botId, flowSessionId = null, userId = null, ch
                 : 0.45
               : Math.max(0, Math.min(1, 1 - confidence));
 
+          // Build detailed trace object
+          const traceData = {
+            embeddingGeneration: {
+              durationMs: result.traceTimings?.embeddingGeneration?.duration || null,
+              provider: result.embeddingProvider || 'default',
+              model: result.embeddingModel || 'embedding-001',
+            },
+            retrieval: {
+              durationMs: result.traceTimings?.retrieval?.duration || null,
+              totalQAsSearched: result.retrievalTrace?.totalQAsSearched ?? null,
+              matchedQAId: result.matchedMatch?._id || null,
+              matchedQuestion: result.matchedMatch?.question || null,
+              matchedAnswer: result.matchedMatch?.answer || null,
+              retrievalScore: result.score || null,
+              retrievalThreshold: result.retrievalTrace?.threshold || 0.85,
+            },
+            fallback: {
+              used: usedFallback,
+              source: result.source || 'unknown',
+              sourceDescription: result.sourceDescription || null,
+            },
+            promptGeneration: {
+              durationMs: result.traceTimings?.promptGeneration?.duration || null,
+              finalPromptLength: result.finalPrompt?.length || null,
+              finalPrompt: result.finalPrompt || null,
+            },
+            answerGeneration: {
+              durationMs: result.traceTimings?.answerGeneration?.duration || null,
+              llmProvider: result.llmProvider || 'default',
+              llmModel: result.llmModel || 'gemini-3.1-pro-preview',
+            },
+            totalDurationMs: latencyMs,
+          };
+
           BotInteractionMetric.create({
             bot: botId,
             flowSession: flowSessionId || null,
@@ -984,6 +1075,7 @@ exports.askBot = async (question, botId, flowSessionId = null, userId = null, ch
             metadata: {
               chatHistoryCount: Array.isArray(chatHistory) ? chatHistory.length : 0,
             },
+            trace: traceData,
           }).catch((error) => {
             logger.warn('Failed to save bot interaction metric', {
               botId,
@@ -1630,6 +1722,57 @@ exports.saveBotCustomization = async (botId, data) => {
   return customization;
 };
 
+const serializeTraceMetric = (metric) => {
+  if (!metric) return null;
+
+  return {
+    id: String(metric._id),
+    question: metric.question || '',
+    answer: metric.answer || '',
+    source: metric.source || 'unknown',
+    confidence: metric.confidence,
+    latencyMs: metric.latencyMs,
+    usedFallback: metric.usedFallback,
+    groundednessScore: metric.groundednessScore,
+    hallucinationRisk: metric.hallucinationRisk,
+    userEmotion: metric.userEmotion,
+    trace: metric.trace || {},
+    createdAt: metric.createdAt,
+  };
+};
+
+const attachTraceMetricsToSession = (session, metrics) => {
+  const serializedMetrics = metrics.map(serializeTraceMetric).filter(Boolean);
+  const usedMetricIds = new Set();
+
+  const history = (session.history || []).map((entry) => {
+    if (entry?.mode !== 'qa' || !entry.question) {
+      return entry;
+    }
+
+    const matchingMetric = serializedMetrics.find((metric) => {
+      if (usedMetricIds.has(metric.id)) return false;
+      return metric.question === entry.question;
+    });
+
+    if (matchingMetric) {
+      usedMetricIds.add(matchingMetric.id);
+      return {
+        ...entry,
+        traceMetric: matchingMetric,
+      };
+    }
+
+    return entry;
+  });
+
+  return {
+    ...session,
+    history,
+    traceMetrics: serializedMetrics,
+  };
+};
+
 // get all chat histories by bot id(paginated)
 exports.getAllChatHistoriesByBotId = async (botId, page = 1, limit = 10) => {
   logger.info('Service: Retrieving all chat histories', {
@@ -1653,10 +1796,33 @@ exports.getAllChatHistoriesByBotId = async (botId, page = 1, limit = 10) => {
       )
       .sort({ createdAt: -1 })
       .skip(skip)
-      .limit(limit),
+      .limit(limit)
+      .lean(),
 
     FlowSession.countDocuments({ bot: botId }),
   ]);
+
+  const sessionIds = sessions.map((session) => session._id);
+  const metrics = await BotInteractionMetric.find({
+    bot: botId,
+    flowSession: { $in: sessionIds },
+  })
+    .sort({ createdAt: 1 })
+    .lean();
+
+  const metricsBySessionId = metrics.reduce((acc, metric) => {
+    const key = String(metric.flowSession);
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(metric);
+    return acc;
+  }, {});
+
+  const sessionsWithTrace = sessions.map((session) =>
+    attachTraceMetricsToSession(
+      session,
+      metricsBySessionId[String(session._id)] || []
+    )
+  );
 
   const totalPages = Math.ceil(totalSessions / limit);
 
@@ -1678,7 +1844,7 @@ exports.getAllChatHistoriesByBotId = async (botId, page = 1, limit = 10) => {
       hasNextPage: page < totalPages,
       hasPrevPage: page > 1,
     },
-    sessions,
+    sessions: sessionsWithTrace,
   };
 };
 
@@ -1698,13 +1864,20 @@ exports.getChatHistoryBySessionId = async (botId, sessionId) => {
     throw new Error('Bot not found');
   }
 
-  const session = await FlowSession.findOne({ _id: sessionId, bot: botId });
+  const session = await FlowSession.findOne({ _id: sessionId, bot: botId }).lean();
   if (!session) {
     logger.warn('Chat session not found', { botId, sessionId });
     throw new Error('Chat history not found');
   }
 
-  const history = session.history || [];
+  const metrics = await BotInteractionMetric.find({
+    bot: botId,
+    flowSession: sessionId,
+  })
+    .sort({ createdAt: 1 })
+    .lean();
+  const sessionWithTrace = attachTraceMetricsToSession(session, metrics);
+  const history = sessionWithTrace.history || [];
 
   // ✅ Filter out unwanted "extra" entries:
   // - type = question/confirmation
@@ -1741,6 +1914,36 @@ exports.getChatHistoryBySessionId = async (botId, sessionId) => {
     summaryGeneratedAt: session.summaryGeneratedAt || null,
     createdAt: session.createdAt,
     lastUpdatedAt: session.lastUpdatedAt,
+    traceMetrics: sessionWithTrace.traceMetrics,
+  };
+};
+
+exports.getSessionTraceTimeline = async (botId, sessionId) => {
+  const bot = await ChatBot.findById(botId);
+  if (!bot) {
+    throw new Error('Bot not found');
+  }
+
+  const session = await FlowSession.findOne({ _id: sessionId, bot: botId })
+    .select('_id bot createdAt lastUpdatedAt')
+    .lean();
+  if (!session) {
+    throw new Error('Chat history not found');
+  }
+
+  const metrics = await BotInteractionMetric.find({
+    bot: botId,
+    flowSession: sessionId,
+  })
+    .sort({ createdAt: 1 })
+    .lean();
+
+  return {
+    botId,
+    sessionId,
+    createdAt: session.createdAt,
+    lastUpdatedAt: session.lastUpdatedAt,
+    traces: metrics.map(serializeTraceMetric).filter(Boolean),
   };
 };
 
