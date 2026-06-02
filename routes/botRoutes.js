@@ -122,6 +122,17 @@ router.get(
 );
 
 /**
+ * @route   GET /api/bots/:botId/history/:sessionId/trace
+ * @desc    Get product-friendly Phoenix trace timeline for a specific session
+ * @access  Private
+ */
+router.get(
+  '/:botId/history/:sessionId/trace',
+  authMiddleware,
+  botController.getSessionTraceTimeline
+);
+
+/**
  * @route   GET /api/bots/:botId/spreadsheet-config
  * @desc    Get spreadsheet configuration for a bot
  * @access  Private
