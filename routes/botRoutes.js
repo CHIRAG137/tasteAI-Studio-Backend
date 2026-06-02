@@ -220,4 +220,37 @@ router.post(
   botController.runBotLLMJudge
 );
 
+/**
+ * @route   GET /api/bots/:botId/experiments
+ * @desc    List bot experiment lab runs
+ * @access  Private
+ */
+router.get(
+  '/:botId/experiments',
+  authMiddleware,
+  botController.getBotExperiments
+);
+
+/**
+ * @route   POST /api/bots/:botId/experiments
+ * @desc    Create a control/treatment bot experiment
+ * @access  Private
+ */
+router.post(
+  '/:botId/experiments',
+  authMiddleware,
+  botController.createBotExperiment
+);
+
+/**
+ * @route   POST /api/bots/:botId/experiments/:experimentId/run
+ * @desc    Run a bot experiment against eval datasets
+ * @access  Private
+ */
+router.post(
+  '/:botId/experiments/:experimentId/run',
+  authMiddleware,
+  botController.runBotExperiment
+);
+
 module.exports = router;

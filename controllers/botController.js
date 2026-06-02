@@ -684,3 +684,93 @@ exports.runBotLLMJudge = async (req, res) => {
     );
   }
 };
+
+exports.getBotExperiments = async (req, res) => {
+  const { botId } = req.params;
+
+  try {
+    const result = await arizeInsightService.getBotExperiments(
+      botId,
+      req.user?.id
+    );
+
+    return responseBuilder.ok(res, result, 'Bot experiments fetched successfully');
+  } catch (error) {
+    logger.error('Error fetching bot experiments', {
+      error: error.message,
+      botId,
+      userId: req.user?.id,
+    });
+
+    if (error.message === 'Bot not found') {
+      return responseBuilder.notFound(res, null, 'Bot not found');
+    }
+
+    return responseBuilder.internalError(
+      res,
+      null,
+      'Failed to fetch bot experiments'
+    );
+  }
+};
+
+exports.createBotExperiment = async (req, res) => {
+  const { botId } = req.params;
+
+  try {
+    const result = await arizeInsightService.createBotExperiment({
+      botId,
+      userId: req.user?.id,
+      data: req.body,
+    });
+
+    return responseBuilder.created(res, result, 'Bot experiment created successfully');
+  } catch (error) {
+    logger.error('Error creating bot experiment', {
+      error: error.message,
+      botId,
+      userId: req.user?.id,
+    });
+
+    if (error.message === 'Bot not found') {
+      return responseBuilder.notFound(res, null, 'Bot not found');
+    }
+
+    return responseBuilder.badRequest(
+      res,
+      null,
+      error.message || 'Failed to create bot experiment'
+    );
+  }
+};
+
+exports.runBotExperiment = async (req, res) => {
+  const { botId, experimentId } = req.params;
+
+  try {
+    const result = await arizeInsightService.runBotExperiment({
+      botId,
+      userId: req.user?.id,
+      experimentId,
+    });
+
+    return responseBuilder.ok(res, result, 'Bot experiment completed successfully');
+  } catch (error) {
+    logger.error('Error running bot experiment', {
+      error: error.message,
+      botId,
+      experimentId,
+      userId: req.user?.id,
+    });
+
+    if (error.message === 'Bot not found' || error.message === 'Experiment not found') {
+      return responseBuilder.notFound(res, null, error.message);
+    }
+
+    return responseBuilder.badRequest(
+      res,
+      null,
+      error.message || 'Failed to run bot experiment'
+    );
+  }
+};

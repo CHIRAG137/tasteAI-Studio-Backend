@@ -4,11 +4,13 @@ const QAHistory = require('../models/QAHistory');
 const HandoffSession = require('../models/HandoffSession');
 const BotEvalDatasetItem = require('../models/BotEvalDatasetItem');
 const BotEvalRun = require('../models/BotEvalRun');
+const BotExperiment = require('../models/BotExperiment');
 const BotInteractionMetric = require('../models/BotInteractionMetric');
 const BotImprovementAction = require('../models/BotImprovementAction');
 const humanHandoffService = require('./humanHandoffService');
 const { generateEmbedding, getLLMClient } = require('../utils/llmClientUtils');
 const { buildPhoenixMcpConfig } = require('../config/phoenixTracing');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 function getQuestionText(entry) {
   return (
@@ -233,6 +235,20 @@ function normalizeJudgeScore(value) {
   return Math.max(0, Math.min(1, number));
 }
 
+function averageNumbers(values) {
+  const clean = values.filter(
+    (value) => typeof value === 'number' && Number.isFinite(value)
+  );
+  if (!clean.length) return null;
+  return clean.reduce((sum, value) => sum + value, 0) / clean.length;
+}
+
+function estimateCostFromText(...parts) {
+  const characters = parts.join('').length;
+  const estimatedTokens = Math.ceil(characters / 4);
+  return Number((estimatedTokens * 0.0000005).toFixed(6));
+}
+
 async function upsertDatasetItems(records) {
   const results = [];
   for (const record of records) {
@@ -244,6 +260,107 @@ async function upsertDatasetItems(records) {
     results.push(saved);
   }
   return results;
+}
+
+async function generateVariantAnswer({ bot, variant, item, userId }) {
+  const config = variant.config || {};
+  const prompt = `
+You are running an experiment for chatbot "${bot.name || 'Bot'}".
+
+Bot description:
+${bot.description || 'Not provided'}
+
+Base bot instructions:
+${bot.custom_instructions || 'None'}
+
+Variant label:
+${variant.label}
+
+Variant description:
+${variant.description || 'No description provided'}
+
+Variant JSON config:
+${JSON.stringify(config, null, 2)}
+
+Interpret the variant JSON config as product-controlled bot configuration.
+Common keys may include model, promptInstructions, responseStyle, retrievalThreshold,
+handoffPolicy, refusalPolicy, tone, maxAnswerLength, knowledgeStrategy, or any custom
+runtime keys. Apply only what is present in the config and keep behavior aligned with
+the bot persona.
+
+User question:
+${item.question}
+
+Available expected/reviewer context:
+${item.expectedAnswer || item.actualAnswer || 'No extra context available'}
+
+Answer as the bot.`;
+
+  const startedAt = Date.now();
+  let output;
+
+  if (config.model && String(config.model).toLowerCase().startsWith('gemini')) {
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    const model = genAI.getGenerativeModel({ model: config.model });
+    const result = await model.generateContent(prompt);
+    output = result.response.text();
+  } else {
+    const llmClient = await getLLMClient(bot, userId);
+    output = await llmClient.generateSummary(prompt);
+  }
+
+  return {
+    output,
+    latencyMs: Date.now() - startedAt,
+    estimatedCost: estimateCostFromText(prompt, output || ''),
+  };
+}
+
+async function judgeExperimentSample({ bot, item, controlOutput, treatmentOutput, userId }) {
+  const judgePrompt = `
+You are judging an A/B experiment for a production chatbot.
+
+Bot:
+- Name: ${bot.name || 'Bot'}
+- Description: ${bot.description || 'Not provided'}
+- Tone: ${bot.conversation_tone || 'Professional'}
+- Response style: ${bot.response_style || 'Helpful'}
+
+User question:
+${item.question}
+
+Expected/reviewer context:
+${item.expectedAnswer || item.actualAnswer || 'None'}
+
+Control answer:
+${controlOutput}
+
+Treatment answer:
+${treatmentOutput}
+
+Score both answers from 0 to 1 for relevance, helpfulness, groundedness, tone match, instruction following, refusal correctness, handoff correctness, and response length fit.
+Pick a winner: "control", "treatment", or "tie".
+
+Return only JSON:
+{
+  "winner": "control|treatment|tie",
+  "controlScore": 0-1,
+  "treatmentScore": 0-1,
+  "explanation": "short explanation"
+}`;
+
+  const llmClient = await getLLMClient(bot, userId);
+  const raw = await llmClient.generateSummary(judgePrompt);
+  const parsed = parseJudgeJson(raw) || {};
+
+  return {
+    winner: ['control', 'treatment', 'tie'].includes(parsed.winner)
+      ? parsed.winner
+      : 'tie',
+    controlScore: normalizeJudgeScore(parsed.controlScore),
+    treatmentScore: normalizeJudgeScore(parsed.treatmentScore),
+    explanation: parsed.explanation || 'Judge completed without explanation.',
+  };
 }
 
 function buildImprovementItem(type, metric, overrides = {}) {
@@ -993,6 +1110,206 @@ Return only JSON:
       error: error.message,
       completedAt: new Date(),
     });
+    throw error;
+  }
+};
+
+exports.getBotExperiments = async (botId, userId) => {
+  const bot = await ChatBot.findOne({ _id: botId, user: userId }).lean();
+  if (!bot) {
+    throw new Error('Bot not found');
+  }
+
+  const [experiments, datasets] = await Promise.all([
+    BotExperiment.find({ bot: botId }).sort({ createdAt: -1 }).lean(),
+    BotEvalDatasetItem.aggregate([
+      { $match: { bot: bot._id } },
+      {
+        $group: {
+          _id: '$datasetName',
+          itemCount: { $sum: 1 },
+          latestItemAt: { $max: '$createdAt' },
+        },
+      },
+      { $sort: { latestItemAt: -1 } },
+    ]),
+  ]);
+
+  return {
+    experiments,
+    datasets: datasets.map((dataset) => ({
+      datasetName: dataset._id,
+      itemCount: dataset.itemCount,
+      latestItemAt: dataset.latestItemAt,
+    })),
+    defaults: {
+      control: {
+        label: 'Current bot',
+        description: '',
+        trafficAllocation: 50,
+        config: {},
+      },
+      treatment: {
+        label: 'Treatment',
+        description: '',
+        trafficAllocation: 50,
+        config: {},
+      },
+    },
+  };
+};
+
+exports.createBotExperiment = async ({ botId, userId, data }) => {
+  const bot = await ChatBot.findOne({ _id: botId, user: userId }).lean();
+  if (!bot) {
+    throw new Error('Bot not found');
+  }
+
+  if (!data?.name) {
+    throw new Error('Experiment name is required');
+  }
+
+  const experiment = await BotExperiment.create({
+    bot: botId,
+    name: data.name,
+    hypothesis: data.hypothesis || '',
+    datasetName: data.datasetName || 'all',
+    primaryMetric: data.primaryMetric || 'judge_score',
+    guardrailMetric: data.guardrailMetric || 'latency',
+    targetingRules: data.targetingRules || {},
+    control: {
+      label: data.control?.label || 'Current bot',
+      description: data.control?.description || '',
+      trafficAllocation: Number(data.control?.trafficAllocation ?? 50),
+      config: data.control?.config || {},
+    },
+    treatment: {
+      label: data.treatment?.label || 'Treatment',
+      description: data.treatment?.description || '',
+      trafficAllocation: Number(data.treatment?.trafficAllocation ?? 50),
+      config: data.treatment?.config || {},
+    },
+    createdBy: userId,
+  });
+
+  return experiment;
+};
+
+exports.runBotExperiment = async ({ botId, userId, experimentId }) => {
+  const bot = await ChatBot.findOne({ _id: botId, user: userId }).lean();
+  if (!bot) {
+    throw new Error('Bot not found');
+  }
+
+  const experiment = await BotExperiment.findOne({ _id: experimentId, bot: botId });
+  if (!experiment) {
+    throw new Error('Experiment not found');
+  }
+
+  const datasetQuery = { bot: botId };
+  if (experiment.datasetName && experiment.datasetName !== 'all') {
+    datasetQuery.datasetName = experiment.datasetName;
+  }
+
+  const items = await BotEvalDatasetItem.find(datasetQuery)
+    .sort({ createdAt: -1 })
+    .limit(20)
+    .lean();
+
+  if (!items.length) {
+    throw new Error('Create an eval dataset before running an experiment');
+  }
+
+  experiment.status = 'running';
+  experiment.error = null;
+  await experiment.save();
+
+  try {
+    const samples = [];
+
+    for (const item of items) {
+      const [control, treatment] = await Promise.all([
+        generateVariantAnswer({
+          bot,
+          variant: experiment.control,
+          item,
+          userId,
+        }),
+        generateVariantAnswer({
+          bot,
+          variant: experiment.treatment,
+          item,
+          userId,
+        }),
+      ]);
+
+      const judge = await judgeExperimentSample({
+        bot,
+        item,
+        controlOutput: control.output,
+        treatmentOutput: treatment.output,
+        userId,
+      });
+
+      samples.push({
+        question: item.question,
+        controlOutput: control.output,
+        treatmentOutput: treatment.output,
+        winner: judge.winner,
+        controlScore: judge.controlScore,
+        treatmentScore: judge.treatmentScore,
+        explanation: judge.explanation,
+        controlLatencyMs: control.latencyMs,
+        treatmentLatencyMs: treatment.latencyMs,
+        controlEstimatedCost: control.estimatedCost,
+        treatmentEstimatedCost: treatment.estimatedCost,
+      });
+    }
+
+    const treatmentWins = samples.filter(
+      (sample) => sample.winner === 'treatment'
+    ).length;
+    const controlWins = samples.filter((sample) => sample.winner === 'control')
+      .length;
+    const ties = samples.filter((sample) => sample.winner === 'tie').length;
+
+    experiment.status = 'completed';
+    experiment.samples = samples;
+    experiment.metrics = {
+      controlWins,
+      treatmentWins,
+      ties,
+      treatmentWinRate: samples.length ? treatmentWins / samples.length : 0,
+      controlAverageJudgeScore: averageNumbers(
+        samples.map((sample) => sample.controlScore)
+      ),
+      treatmentAverageJudgeScore: averageNumbers(
+        samples.map((sample) => sample.treatmentScore)
+      ),
+      controlAverageLatencyMs: averageNumbers(
+        samples.map((sample) => sample.controlLatencyMs)
+      ),
+      treatmentAverageLatencyMs: averageNumbers(
+        samples.map((sample) => sample.treatmentLatencyMs)
+      ),
+      controlEstimatedCost: samples.reduce(
+        (sum, sample) => sum + (sample.controlEstimatedCost || 0),
+        0
+      ),
+      treatmentEstimatedCost: samples.reduce(
+        (sum, sample) => sum + (sample.treatmentEstimatedCost || 0),
+        0
+      ),
+    };
+    experiment.completedAt = new Date();
+    await experiment.save();
+
+    return experiment.toObject();
+  } catch (error) {
+    experiment.status = 'failed';
+    experiment.error = error.message;
+    experiment.completedAt = new Date();
+    await experiment.save();
     throw error;
   }
 };
