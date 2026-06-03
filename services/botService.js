@@ -23,6 +23,8 @@ const {
 const { encryptApiKey } = require('../utils/encryptionUtils');
 const { sanitizeBotForResponse, sanitizeBotsForResponse } = require('../utils/botSanitizer');
 const {
+  buildPhoenixTraceUrl,
+  getPhoenixRuntimeInfo,
   runPhoenixSpan,
   setPhoenixSpanAttributes,
 } = require('../config/phoenixTracing');
@@ -997,6 +999,12 @@ exports.askBot = async (question, botId, flowSessionId = null, userId = null, ch
     },
     async (span) => {
       let result;
+      const spanContext =
+        span && typeof span.spanContext === 'function'
+          ? span.spanContext()
+          : null;
+      const phoenixTraceId = spanContext?.traceId || null;
+      const phoenixSpanId = spanContext?.spanId || null;
       try {
         result = await askBotImpl(
           question,
@@ -1059,6 +1067,7 @@ exports.askBot = async (question, botId, flowSessionId = null, userId = null, ch
             },
             totalDurationMs: latencyMs,
           };
+          const phoenixInfo = getPhoenixRuntimeInfo(phoenixTraceId);
 
           BotInteractionMetric.create({
             bot: botId,
@@ -1074,6 +1083,19 @@ exports.askBot = async (question, botId, flowSessionId = null, userId = null, ch
             userEmotion: userEmotion || 'neutral',
             metadata: {
               chatHistoryCount: Array.isArray(chatHistory) ? chatHistory.length : 0,
+            },
+            phoenix: {
+              enabled: Boolean(phoenixInfo.enabled && phoenixTraceId),
+              projectName: phoenixInfo.projectName,
+              baseUrl: phoenixInfo.baseUrl,
+              traceId: phoenixTraceId,
+              spanId: phoenixSpanId,
+              spanName: 'bot.answer_question',
+              traceUrl: phoenixTraceId
+                ? phoenixInfo.traceUrl || buildPhoenixTraceUrl(phoenixTraceId)
+                : null,
+              traceUrlSource: phoenixInfo.traceUrlSource,
+              mcpServer: phoenixInfo.mcpServer || 'phoenix',
             },
             trace: traceData,
           }).catch((error) => {
@@ -1091,6 +1113,8 @@ exports.askBot = async (question, botId, flowSessionId = null, userId = null, ch
         'metadata.answer_source': result?.source,
         'metadata.match_score': result?.score,
         'metadata.latency_ms': Date.now() - startedAt,
+        'metadata.phoenix_trace_id': phoenixTraceId,
+        'metadata.phoenix_span_id': phoenixSpanId,
       });
 
       return result;
@@ -1736,6 +1760,7 @@ const serializeTraceMetric = (metric) => {
     groundednessScore: metric.groundednessScore,
     hallucinationRisk: metric.hallucinationRisk,
     userEmotion: metric.userEmotion,
+    phoenix: metric.phoenix || {},
     trace: metric.trace || {},
     createdAt: metric.createdAt,
   };

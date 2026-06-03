@@ -7,6 +7,46 @@ let enabled = false;
 
 const DEFAULT_PROJECT_NAME = 'tasteAI-Studio';
 
+function getPhoenixProjectName() {
+  return process.env.PHOENIX_PROJECT_NAME || DEFAULT_PROJECT_NAME;
+}
+
+function getPhoenixBaseUrl() {
+  return (
+    process.env.PHOENIX_BASE_URL ||
+    process.env.PHOENIX_APP_URL ||
+    'https://app.phoenix.arize.com'
+  ).replace(/\/+$/, '');
+}
+
+function buildPhoenixTraceUrl(traceId) {
+  if (!traceId) return null;
+
+  const template = process.env.PHOENIX_TRACE_URL_TEMPLATE;
+  if (template) {
+    return template
+      .replace(/\{traceId\}/g, traceId)
+      .replace(/\{projectName\}/g, encodeURIComponent(getPhoenixProjectName()));
+  }
+
+  return `${getPhoenixBaseUrl()}/traces/${traceId}`;
+}
+
+function getPhoenixRuntimeInfo(traceId = null) {
+  return {
+    enabled,
+    projectName: getPhoenixProjectName(),
+    baseUrl: getPhoenixBaseUrl(),
+    collectorEndpoint:
+      process.env.PHOENIX_COLLECTOR_ENDPOINT || process.env.PHOENIX_BASE_URL || null,
+    mcpServer: 'phoenix',
+    traceUrl: buildPhoenixTraceUrl(traceId),
+    traceUrlSource: process.env.PHOENIX_TRACE_URL_TEMPLATE
+      ? 'template'
+      : 'default',
+  };
+}
+
 function shouldEnableTracing() {
   if (process.env.PHOENIX_ENABLED === 'false') {
     return false;
@@ -74,7 +114,7 @@ function initPhoenixTracing() {
 
   try {
     provider = phoenix.register({
-      projectName: process.env.PHOENIX_PROJECT_NAME || DEFAULT_PROJECT_NAME,
+      projectName: getPhoenixProjectName(),
       url:
         process.env.PHOENIX_COLLECTOR_ENDPOINT || process.env.PHOENIX_BASE_URL,
       apiKey: process.env.PHOENIX_API_KEY,
@@ -84,7 +124,7 @@ function initPhoenixTracing() {
 
     enabled = true;
     logger.info('Phoenix tracing initialized', {
-      projectName: process.env.PHOENIX_PROJECT_NAME || DEFAULT_PROJECT_NAME,
+      projectName: getPhoenixProjectName(),
       instrumentations: instrumentations.length,
     });
   } catch (error) {
@@ -196,6 +236,8 @@ function buildPhoenixMcpConfig() {
 
 module.exports = {
   buildPhoenixMcpConfig,
+  buildPhoenixTraceUrl,
+  getPhoenixRuntimeInfo,
   initPhoenixTracing,
   runPhoenixSpan,
   setPhoenixSpanAttributes: setAttributes,
