@@ -24,6 +24,17 @@ const BotInteractionMetricSchema = new mongoose.Schema(
     hallucinationRisk: { type: Number, default: null },
     userEmotion: { type: String, default: 'neutral' },
     metadata: { type: mongoose.Schema.Types.Mixed, default: {} },
+    phoenix: {
+      enabled: { type: Boolean, default: false },
+      projectName: { type: String, default: null },
+      baseUrl: { type: String, default: null },
+      traceId: { type: String, default: null, index: true },
+      spanId: { type: String, default: null },
+      spanName: { type: String, default: null },
+      traceUrl: { type: String, default: null },
+      traceUrlSource: { type: String, default: null },
+      mcpServer: { type: String, default: 'phoenix' },
+    },
     
     // Detailed trace information for timeline visualization
     trace: {
