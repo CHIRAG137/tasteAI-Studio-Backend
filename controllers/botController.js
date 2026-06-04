@@ -626,6 +626,50 @@ exports.applyBotImprovementAction = async (req, res) => {
   }
 };
 
+// ask the private Phoenix self-introspection tool a question
+exports.askBotSelfIntrospection = async (req, res) => {
+  const { botId } = req.params;
+  const { question } = req.body || {};
+
+  if (!question || !String(question).trim()) {
+    return responseBuilder.badRequest(
+      res,
+      null,
+      'question is required'
+    );
+  }
+
+  try {
+    const result = await arizeInsightService.askBotSelfIntrospection({
+      botId,
+      userId: req.user?.id,
+      question,
+    });
+
+    return responseBuilder.ok(
+      res,
+      result,
+      'Bot self-introspection completed successfully'
+    );
+  } catch (error) {
+    logger.error('Error running bot self-introspection', {
+      error: error.message,
+      botId,
+      userId: req.user?.id,
+    });
+
+    if (error.message === 'Bot not found') {
+      return responseBuilder.notFound(res, null, 'Bot not found');
+    }
+
+    return responseBuilder.badRequest(
+      res,
+      null,
+      error.message || 'Failed to run bot self-introspection'
+    );
+  }
+};
+
 exports.buildBotEvalDataset = async (req, res) => {
   const { botId } = req.params;
   const { sourceType } = req.body || {};
