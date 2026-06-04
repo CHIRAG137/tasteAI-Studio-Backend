@@ -199,6 +199,17 @@ router.post(
 );
 
 /**
+ * @route   POST /api/bots/:botId/improvements/introspect
+ * @desc    Ask the private Phoenix MCP self-introspection tool about bot failures
+ * @access  Private
+ */
+router.post(
+  '/:botId/improvements/introspect',
+  authMiddleware,
+  botController.askBotSelfIntrospection
+);
+
+/**
  * @route   GET /api/bots/:botId/eval-datasets
  * @desc    List eval datasets and judge runs for a bot
  * @access  Private

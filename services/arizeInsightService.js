@@ -7,10 +7,22 @@ const BotEvalRun = require('../models/BotEvalRun');
 const BotExperiment = require('../models/BotExperiment');
 const BotInteractionMetric = require('../models/BotInteractionMetric');
 const BotImprovementAction = require('../models/BotImprovementAction');
+const BotAutopilotConfig = require('../models/BotAutopilotConfig');
+const BotAutopilotRun = require('../models/BotAutopilotRun');
+const SlackIntegration = require('../models/SlackIntegration');
 const humanHandoffService = require('./humanHandoffService');
 const { generateEmbedding, getLLMClient } = require('../utils/llmClientUtils');
-const { buildPhoenixMcpConfig } = require('../config/phoenixTracing');
+const { buildPhoenixMcpConfig, getPhoenixRuntimeInfo, runPhoenixSpan, setPhoenixSpanAttributes } = require('../config/phoenixTracing');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const sendEmail = require('../utils/sendEmailUtil');
+const slackClient = require('../config/slackClient');
+
+const DEFAULT_INTROSPECTION_QUESTIONS = [
+  'Why did my bot fail yesterday?',
+  'What questions are users asking that I cannot answer?',
+  'Which prompt version performed best?',
+  'What should I add to training data?',
+];
 
 function getQuestionText(entry) {
   return (
@@ -432,6 +444,726 @@ async function loadHealthInputs(botId) {
       .lean(),
   ]);
 }
+
+function countBy(items, getKey) {
+  return items.reduce((acc, item) => {
+    const key = getKey(item) || 'unknown';
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
+}
+
+function buildFailureClusters(metrics) {
+  const buckets = {};
+
+  for (const metric of metrics) {
+    const key = normalizeKey(metric.question).split('-').slice(0, 5).join('-');
+    if (!key) continue;
+    if (!buckets[key]) {
+      buckets[key] = {
+        intentKey: key,
+        count: 0,
+        examples: [],
+        avgConfidence: null,
+        avgLatencyMs: null,
+        fallbackCount: 0,
+      };
+    }
+    buckets[key].count += 1;
+    buckets[key].examples.push({
+      question: metric.question,
+      answer: metric.answer,
+      source: metric.source,
+      confidence: metric.confidence,
+      traceUrl: metric.phoenix?.traceUrl || null,
+      createdAt: metric.createdAt,
+    });
+    if (metric.usedFallback || metric.source === 'none') {
+      buckets[key].fallbackCount += 1;
+    }
+  }
+
+  return Object.values(buckets)
+    .map((bucket) => ({
+      ...bucket,
+      examples: bucket.examples.slice(0, 3),
+      avgConfidence: average(bucket.examples.map((item) => item.confidence)),
+      avgLatencyMs: average(
+        metrics
+          .filter((metric) => normalizeKey(metric.question).startsWith(bucket.intentKey))
+          .map((metric) => metric.latencyMs)
+      ),
+    }))
+    .sort((a, b) => {
+      const aScore = a.fallbackCount * 2 + a.count + (a.avgConfidence === null ? 1 : 1 - a.avgConfidence);
+      const bScore = b.fallbackCount * 2 + b.count + (b.avgConfidence === null ? 1 : 1 - b.avgConfidence);
+      return bScore - aScore;
+    })
+    .slice(0, 8);
+}
+
+function buildIntrospectionEvidence({ bot, metrics, handoffs, evalRuns, experiments }) {
+  const lowConfidence = metrics.filter(
+    (metric) => typeof metric.confidence !== 'number' || metric.confidence < 0.85
+  );
+  const unanswered = metrics.filter(
+    (metric) => metric.usedFallback || metric.source === 'none'
+  );
+  const linkedPhoenixTraces = metrics.filter((metric) => metric.phoenix?.traceId);
+  const sourceBreakdown = countBy(metrics, (metric) => metric.source);
+  const fallbackBreakdown = countBy(unanswered, (metric) => metric.trace?.fallback?.source || metric.source);
+  const latestJudgeRun = evalRuns.find((run) => run.status === 'completed') || evalRuns[0] || null;
+  const completedExperiments = experiments.filter((experiment) => experiment.status === 'completed');
+  const bestExperiment = completedExperiments
+    .slice()
+    .sort((a, b) => {
+      const aScore = a.metrics?.treatmentAverageJudgeScore ?? a.metrics?.treatmentWinRate ?? 0;
+      const bScore = b.metrics?.treatmentAverageJudgeScore ?? b.metrics?.treatmentWinRate ?? 0;
+      return bScore - aScore;
+    })[0] || null;
+
+  return {
+    bot: {
+      id: String(bot._id),
+      name: bot.name,
+      model: bot.custom_model || 'gemini-3.1-pro-preview',
+      provider: bot.custom_llm_provider || 'default',
+      promptStyle: {
+        purpose: bot.primary_purpose,
+        tone: bot.conversation_tone,
+        responseStyle: bot.response_style,
+        customInstructions: bot.custom_instructions,
+      },
+    },
+    phoenix: {
+      ...getPhoenixRuntimeInfo(),
+      mcpConfig: buildPhoenixMcpConfig(),
+      linkedTraceCount: linkedPhoenixTraces.length,
+      recentTraceUrls: linkedPhoenixTraces
+        .slice(0, 8)
+        .map((metric) => ({
+          traceId: metric.phoenix.traceId,
+          spanId: metric.phoenix.spanId,
+          traceUrl: metric.phoenix.traceUrl,
+          question: metric.question,
+          confidence: metric.confidence,
+        })),
+    },
+    metrics: {
+      sampledInteractions: metrics.length,
+      lowConfidenceCount: lowConfidence.length,
+      unansweredCount: unanswered.length,
+      fallbackRate: metrics.length ? unanswered.length / metrics.length : 0,
+      averageConfidence: average(metrics.map((metric) => metric.confidence)),
+      averageLatencyMs: average(metrics.map((metric) => metric.latencyMs)),
+      sourceBreakdown,
+      fallbackBreakdown,
+    },
+    failureClusters: buildFailureClusters(lowConfidence.concat(unanswered)),
+    topLowConfidenceQuestions: lowConfidence.slice(0, 12).map((metric) => ({
+      question: metric.question,
+      answer: metric.answer,
+      confidence: metric.confidence,
+      source: metric.source,
+      traceUrl: metric.phoenix?.traceUrl || null,
+      createdAt: metric.createdAt,
+    })),
+    topUnansweredQuestions: unanswered.slice(0, 12).map((metric) => ({
+      question: metric.question,
+      answer: metric.answer,
+      source: metric.source,
+      fallbackSource: metric.trace?.fallback?.source || null,
+      traceUrl: metric.phoenix?.traceUrl || null,
+      createdAt: metric.createdAt,
+    })),
+    handoffs: {
+      sampled: handoffs.length,
+      unresolved: handoffs.filter((handoff) => handoff.status !== 'resolved').length,
+      escalated: handoffs.filter((handoff) => handoff.escalated || handoff.escalationHistory?.length).length,
+      recentQuestions: handoffs.slice(0, 8).map((handoff) => ({
+        question:
+          handoff.userQuestion ||
+          handoff.messages?.find((message) => message.sender === 'user')?.message ||
+          'Handoff session',
+        status: handoff.status,
+        escalated: Boolean(handoff.escalated || handoff.escalationHistory?.length),
+        requestedAt: handoff.requestedAt || handoff.createdAt,
+      })),
+    },
+    evals: {
+      latestJudgeRun: latestJudgeRun
+        ? {
+            datasetName: latestJudgeRun.datasetName,
+            status: latestJudgeRun.status,
+            overallScore: latestJudgeRun.overallScore,
+            criteria: latestJudgeRun.criteria,
+            explanations: (latestJudgeRun.explanations || []).slice(0, 5),
+            completedAt: latestJudgeRun.completedAt,
+          }
+        : null,
+    },
+    experiments: {
+      completedCount: completedExperiments.length,
+      best: bestExperiment
+        ? {
+            name: bestExperiment.name,
+            hypothesis: bestExperiment.hypothesis,
+            control: bestExperiment.control,
+            treatment: bestExperiment.treatment,
+            metrics: bestExperiment.metrics,
+            completedAt: bestExperiment.completedAt,
+          }
+        : null,
+      recent: experiments.slice(0, 5).map((experiment) => ({
+        name: experiment.name,
+        status: experiment.status,
+        hypothesis: experiment.hypothesis,
+        metrics: experiment.metrics,
+      })),
+    },
+  };
+}
+
+function buildIntrospectionFallbackAnswer(question, evidence) {
+  const topCluster = evidence.failureClusters[0];
+  const unanswered = evidence.topUnansweredQuestions.slice(0, 3);
+  const lowConfidence = evidence.topLowConfidenceQuestions.slice(0, 3);
+  const bestExperiment = evidence.experiments.best;
+
+  return [
+    `I inspected ${evidence.metrics.sampledInteractions} recent production traces for ${evidence.bot.name}.`,
+    `The biggest issue is ${evidence.metrics.unansweredCount} unanswered/fallback responses and ${evidence.metrics.lowConfidenceCount} low-confidence answers.`,
+    topCluster
+      ? `The strongest failing intent cluster is "${topCluster.examples[0]?.question || topCluster.intentKey}", seen ${topCluster.count} time(s).`
+      : 'I did not find a repeated failing intent cluster yet.',
+    unanswered.length
+      ? `Add training coverage for: ${unanswered.map((item) => item.question).join('; ')}.`
+      : 'No unanswered examples were found in the sampled traces.',
+    lowConfidence.length
+      ? `Review low-confidence answers for: ${lowConfidence.map((item) => item.question).join('; ')}.`
+      : 'No low-confidence examples were found in the sampled traces.',
+    bestExperiment
+      ? `Best completed prompt/config experiment appears to be "${bestExperiment.name}" based on its saved treatment metrics.`
+      : 'No completed prompt/config experiment is available yet, so I cannot name a best prompt version.',
+    `Admin question answered: ${question}`,
+  ].join('\n\n');
+}
+
+exports.askBotSelfIntrospection = async ({ botId, userId, question }) => {
+  const bot = await ChatBot.findOne({ _id: botId, user: userId }).lean();
+  if (!bot) {
+    throw new Error('Bot not found');
+  }
+
+  const adminQuestion = String(question || '').trim();
+  if (!adminQuestion) {
+    throw new Error('Question is required');
+  }
+
+  return runPhoenixSpan(
+    'bot.self_introspection',
+    'CHAIN',
+    {
+      'bot.id': String(botId),
+      'user.id': userId ? String(userId) : undefined,
+      'input.value': adminQuestion,
+      'metadata.tool': 'phoenix_mcp_self_introspection',
+    },
+    async (span) => {
+      const [metrics, handoffs, evalRuns, experiments] = await Promise.all([
+        BotInteractionMetric.find({ bot: botId })
+          .sort({ createdAt: -1 })
+          .limit(200)
+          .lean(),
+        HandoffSession.find({ bot: botId })
+          .sort({ requestedAt: -1 })
+          .limit(80)
+          .lean(),
+        BotEvalRun.find({ bot: botId })
+          .sort({ createdAt: -1 })
+          .limit(10)
+          .lean(),
+        BotExperiment.find({ bot: botId })
+          .sort({ createdAt: -1 })
+          .limit(10)
+          .lean(),
+      ]);
+
+      const evidence = buildIntrospectionEvidence({
+        bot,
+        metrics,
+        handoffs,
+        evalRuns,
+        experiments,
+      });
+
+      const prompt = `
+You are a private MCP self-introspection tool for the bot "${bot.name}".
+Your internal instruction is: "Inspect your recent Phoenix traces and identify what you are failing at."
+
+Use only the evidence JSON below. It contains recent production traces, Phoenix trace links,
+eval judge results, experiment outcomes, handoffs, and failure clusters.
+When Phoenix trace IDs are present, mention that the evidence is Phoenix-linked.
+If the admin asks about a time range such as yesterday, infer from timestamps in the evidence.
+If the evidence cannot answer something, say exactly what is missing and what to run next.
+
+Admin question:
+${adminQuestion}
+
+Evidence JSON:
+${JSON.stringify(evidence, null, 2)}
+
+Return a concise, actionable answer with:
+1. direct answer
+2. evidence from traces/evals/experiments
+3. what to add/change next
+4. suggested follow-up action, such as creating training Q&A, eval dataset, regression test, or experiment
+`;
+
+      let answer;
+      try {
+        const llmClient = await getLLMClient(bot, userId);
+        answer = await llmClient.generateSummary(prompt);
+      } catch (error) {
+        answer = buildIntrospectionFallbackAnswer(adminQuestion, evidence);
+      }
+
+      setPhoenixSpanAttributes(span, {
+        'output.value': answer,
+        'metadata.sampled_interactions': evidence.metrics.sampledInteractions,
+        'metadata.low_confidence_count': evidence.metrics.lowConfidenceCount,
+        'metadata.unanswered_count': evidence.metrics.unansweredCount,
+        'metadata.phoenix_linked_trace_count': evidence.phoenix.linkedTraceCount,
+      });
+
+      return {
+        question: adminQuestion,
+        answer,
+        defaultQuestions: DEFAULT_INTROSPECTION_QUESTIONS,
+        evidence: {
+          phoenix: evidence.phoenix,
+          metrics: evidence.metrics,
+          failureClusters: evidence.failureClusters,
+          topLowConfidenceQuestions: evidence.topLowConfidenceQuestions,
+          topUnansweredQuestions: evidence.topUnansweredQuestions,
+          latestJudgeRun: evidence.evals.latestJudgeRun,
+          bestExperiment: evidence.experiments.best,
+        },
+      };
+    }
+  );
+};
+
+function normalizeEmailList(value) {
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item || '').trim()).filter(Boolean);
+  }
+  return String(value || '')
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function getPeriodForCadence(cadence) {
+  const to = new Date();
+  const days = cadence === 'daily' ? 1 : cadence === 'monthly' ? 30 : 7;
+  return {
+    from: new Date(to.getTime() - days * 24 * 60 * 60 * 1000),
+    to,
+    cadence: ['daily', 'weekly', 'monthly'].includes(cadence) ? cadence : 'weekly',
+  };
+}
+
+function computeNextAutopilotRun(cadence = 'weekly', timeOfDay = '09:00') {
+  const [hourRaw, minuteRaw] = String(timeOfDay || '09:00').split(':');
+  const hour = Math.max(0, Math.min(23, Number(hourRaw) || 9));
+  const minute = Math.max(0, Math.min(59, Number(minuteRaw) || 0));
+  const next = new Date();
+  next.setUTCHours(hour, minute, 0, 0);
+
+  if (next <= new Date()) {
+    if (cadence === 'daily') next.setUTCDate(next.getUTCDate() + 1);
+    else if (cadence === 'monthly') next.setUTCMonth(next.getUTCMonth() + 1);
+    else next.setUTCDate(next.getUTCDate() + 7);
+  }
+
+  return next;
+}
+
+function buildDefaultAutopilotRecommendations(evidence) {
+  const recommendations = [];
+  const sourceBreakdown = evidence.metrics.sourceBreakdown || {};
+  const llmCount = sourceBreakdown.llm || 0;
+  const qaCount = sourceBreakdown.qa || 0;
+
+  if (llmCount > qaCount) {
+    recommendations.push({
+      priority: 'high',
+      title: 'Your bot often answers from LLM instead of knowledge base',
+      detail: `${llmCount} sampled answers came from LLM versus ${qaCount} from curated Q&A. Promote reliable generated answers into training data.`,
+      evidence: [`LLM answers: ${llmCount}`, `Knowledge-base answers: ${qaCount}`],
+      suggestedAction: 'Create training Q&A from high-frequency LLM answers.',
+      channel: 'training_data',
+    });
+  }
+
+  for (const item of evidence.topUnansweredQuestions.slice(0, 4)) {
+    recommendations.push({
+      priority: 'high',
+      title: `Add docs for: ${item.question}`,
+      detail: 'Users are asking this and the bot used a fallback or could not answer confidently.',
+      evidence: [item.traceUrl ? `Phoenix trace: ${item.traceUrl}` : 'Local trace metric', `Source: ${item.source}`],
+      suggestedAction: 'Add an approved Q&A answer, source document, or workflow branch.',
+      channel: 'knowledge_gap',
+    });
+  }
+
+  const handoff = evidence.handoffs;
+  if (handoff.escalated > 0 || handoff.unresolved > 0) {
+    recommendations.push({
+      priority: 'medium',
+      title: 'Handoff should trigger earlier for difficult sessions',
+      detail: `${handoff.escalated} escalated and ${handoff.unresolved} unresolved handoff sessions were found in the sample.`,
+      evidence: handoff.recentQuestions.slice(0, 3).map((item) => item.question),
+      suggestedAction: 'Add handoff rules for billing, refunds, account disputes, and repeated fallback turns.',
+      channel: 'handoff_policy',
+    });
+  }
+
+  if (recommendations.length === 0) {
+    recommendations.push({
+      priority: 'low',
+      title: 'Keep monitoring Phoenix traces',
+      detail: 'No severe recurring issue was detected in the sampled traces. Create a weekly eval dataset to catch regressions early.',
+      evidence: [`Sampled interactions: ${evidence.metrics.sampledInteractions}`],
+      suggestedAction: 'Run LLM-as-a-Judge on recent low-confidence traces.',
+      channel: 'monitoring',
+    });
+  }
+
+  return recommendations.slice(0, 8);
+}
+
+function normalizeAutopilotRecommendations(parsed, evidence) {
+  const recommendations = Array.isArray(parsed?.recommendations)
+    ? parsed.recommendations
+    : [];
+
+  const clean = recommendations
+    .map((item, index) => ({
+      priority: ['high', 'medium', 'low'].includes(item.priority)
+        ? item.priority
+        : index < 2
+          ? 'high'
+          : 'medium',
+      title: String(item.title || '').trim() || 'Improve bot performance',
+      detail: String(item.detail || item.description || '').trim(),
+      evidence: Array.isArray(item.evidence)
+        ? item.evidence.map((entry) => String(entry)).slice(0, 5)
+        : [],
+      suggestedAction: String(item.suggestedAction || item.action || '').trim(),
+      channel: String(item.channel || 'general').trim(),
+    }))
+    .filter((item) => item.title && item.detail)
+    .slice(0, 10);
+
+  return clean.length ? clean : buildDefaultAutopilotRecommendations(evidence);
+}
+
+function renderAutopilotEmail({ bot, run }) {
+  const items = run.recommendations
+    .map(
+      (item) => `
+        <li style="margin-bottom:16px">
+          <strong>[${String(item.priority || 'medium').toUpperCase()}] ${item.title}</strong>
+          <p style="margin:6px 0;color:#374151;line-height:1.5">${item.detail}</p>
+          ${item.suggestedAction ? `<p style="margin:6px 0;color:#065f46"><strong>Next:</strong> ${item.suggestedAction}</p>` : ''}
+        </li>
+      `
+    )
+    .join('');
+
+  return `
+    <div style="font-family:Arial,sans-serif;max-width:720px;margin:0 auto;color:#111827">
+      <h2 style="margin-bottom:4px">Bot Autopilot Recommendations</h2>
+      <p style="margin-top:0;color:#6b7280">${bot.name} · ${run.period.cadence} report</p>
+      <div style="background:#f8fafc;border:1px solid #e5e7eb;border-radius:8px;padding:14px;margin:16px 0">
+        <p style="margin:0;white-space:pre-wrap">${run.summary}</p>
+      </div>
+      <ol style="padding-left:20px">${items}</ol>
+      <p style="font-size:12px;color:#6b7280;margin-top:24px">
+        Generated from Phoenix-linked traces, Q&A history, handoffs, evals, and experiments in TasteAI Studio.
+      </p>
+    </div>
+  `;
+}
+
+function renderAutopilotSlackText({ bot, run }) {
+  const lines = [
+    `*Bot Autopilot Recommendations* for *${bot.name}* (${run.period.cadence})`,
+    run.summary,
+    '',
+    ...run.recommendations.slice(0, 8).map(
+      (item, index) =>
+        `${index + 1}. *[${String(item.priority || 'medium').toUpperCase()}] ${item.title}*\n${item.detail}${item.suggestedAction ? `\nNext: ${item.suggestedAction}` : ''}`
+    ),
+  ];
+  return lines.join('\n');
+}
+
+async function deliverAutopilotRun({ bot, config, run }) {
+  const deliveries = [];
+
+  if (config.delivery?.email?.enabled) {
+    for (const recipient of config.delivery.email.recipients || []) {
+      try {
+        await sendEmail({
+          to: recipient,
+          subject: `Bot Autopilot Recommendations: ${bot.name}`,
+          text: `${run.summary}\n\n${run.recommendations.map((item) => `- [${item.priority}] ${item.title}: ${item.detail}`).join('\n')}`,
+          html: renderAutopilotEmail({ bot, run }),
+        });
+        deliveries.push({ channel: 'email', target: recipient, status: 'sent', sentAt: new Date() });
+      } catch (error) {
+        deliveries.push({ channel: 'email', target: recipient, status: 'failed', error: error.message, sentAt: new Date() });
+      }
+    }
+  }
+
+  if (config.delivery?.slack?.enabled && config.delivery.slack.channelId) {
+    try {
+      const integration = await SlackIntegration.findOne({ userId: config.user }).lean();
+      if (!integration?.slackAccessToken) {
+        throw new Error('Slack is not connected for this user');
+      }
+      await slackClient.post(
+        '/chat.postMessage',
+        {
+          channel: config.delivery.slack.channelId,
+          text: renderAutopilotSlackText({ bot, run }),
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${integration.slackAccessToken}`,
+          },
+        }
+      );
+      deliveries.push({ channel: 'slack', target: config.delivery.slack.channelId, status: 'sent', sentAt: new Date() });
+    } catch (error) {
+      deliveries.push({ channel: 'slack', target: config.delivery.slack.channelId, status: 'failed', error: error.message, sentAt: new Date() });
+    }
+  }
+
+  return deliveries;
+}
+
+exports.getBotAutopilot = async (botId, userId) => {
+  const bot = await ChatBot.findOne({ _id: botId, user: userId }).lean();
+  if (!bot) throw new Error('Bot not found');
+
+  let config = await BotAutopilotConfig.findOne({ bot: botId }).lean();
+  if (!config) {
+    const user = await User.findById(userId).lean();
+    config = await BotAutopilotConfig.create({
+      bot: botId,
+      user: userId,
+      delivery: {
+        email: { enabled: true, recipients: user?.email ? [user.email] : [] },
+        slack: { enabled: false, channelId: bot.slack_channel_id || '' },
+      },
+      nextRunAt: computeNextAutopilotRun('weekly', '09:00'),
+    });
+    config = config.toObject();
+  }
+
+  const runs = await BotAutopilotRun.find({ bot: botId })
+    .sort({ createdAt: -1 })
+    .limit(10)
+    .lean();
+
+  return { config, runs };
+};
+
+exports.saveBotAutopilot = async ({ botId, userId, data }) => {
+  const bot = await ChatBot.findOne({ _id: botId, user: userId }).lean();
+  if (!bot) throw new Error('Bot not found');
+
+  const cadence = ['daily', 'weekly', 'monthly'].includes(data?.cadence)
+    ? data.cadence
+    : 'weekly';
+  const timeOfDay = /^\d{2}:\d{2}$/.test(String(data?.timeOfDay || ''))
+    ? data.timeOfDay
+    : '09:00';
+
+  const payload = {
+    bot: botId,
+    user: userId,
+    enabled: Boolean(data?.enabled),
+    prompt: String(data?.prompt || '').trim() || undefined,
+    cadence,
+    timeOfDay,
+    timezone: String(data?.timezone || 'UTC'),
+    delivery: {
+      email: {
+        enabled: Boolean(data?.delivery?.email?.enabled),
+        recipients: normalizeEmailList(data?.delivery?.email?.recipients),
+      },
+      slack: {
+        enabled: Boolean(data?.delivery?.slack?.enabled),
+        channelId: String(data?.delivery?.slack?.channelId || '').trim(),
+      },
+    },
+    nextRunAt: Boolean(data?.enabled) ? computeNextAutopilotRun(cadence, timeOfDay) : null,
+  };
+
+  const config = await BotAutopilotConfig.findOneAndUpdate(
+    { bot: botId },
+    payload,
+    { upsert: true, new: true, setDefaultsOnInsert: true }
+  ).lean();
+
+  return config;
+};
+
+exports.generateBotAutopilotRecommendations = async ({
+  botId,
+  userId,
+  trigger = 'preview',
+  send = false,
+  promptOverride = null,
+}) => {
+  const bot = await ChatBot.findOne({ _id: botId, user: userId }).lean();
+  if (!bot) throw new Error('Bot not found');
+
+  let config = await BotAutopilotConfig.findOne({ bot: botId }).lean();
+  if (!config) {
+    config = (await exports.saveBotAutopilot({ botId, userId, data: {} }));
+  }
+
+  const period = getPeriodForCadence(config.cadence);
+  const [metrics, handoffs, evalRuns, experiments] = await Promise.all([
+    BotInteractionMetric.find({
+      bot: botId,
+      createdAt: { $gte: period.from, $lte: period.to },
+    }).sort({ createdAt: -1 }).limit(300).lean(),
+    HandoffSession.find({
+      bot: botId,
+      $or: [
+        { requestedAt: { $gte: period.from, $lte: period.to } },
+        { createdAt: { $gte: period.from, $lte: period.to } },
+      ],
+    }).sort({ requestedAt: -1 }).limit(100).lean(),
+    BotEvalRun.find({ bot: botId }).sort({ createdAt: -1 }).limit(10).lean(),
+    BotExperiment.find({ bot: botId }).sort({ createdAt: -1 }).limit(10).lean(),
+  ]);
+
+  const evidence = buildIntrospectionEvidence({ bot, metrics, handoffs, evalRuns, experiments });
+  const prompt = String(promptOverride || config.prompt || '').trim();
+  const autopilotPrompt = `
+You are Bot Autopilot Recommendations for "${bot.name}".
+Use Phoenix/Arize trace evidence, Q&A history, handoffs, evals, and experiments to generate recurring ${period.cadence} recommendations.
+
+User setup prompt:
+${prompt}
+
+Look for examples like:
+- Add docs for refund policy
+- Bot often answers from LLM instead of knowledge base
+- Users ask about pricing but training data has no pricing content
+- Handoff should trigger earlier for billing disputes
+- Tone mismatch detected in sessions
+
+Evidence JSON:
+${JSON.stringify(evidence, null, 2)}
+
+Return only JSON:
+{
+  "summary": "short executive summary",
+  "recommendations": [
+    {
+      "priority": "high|medium|low",
+      "title": "short recommendation title",
+      "detail": "why this matters",
+      "evidence": ["specific trace/eval/history evidence"],
+      "suggestedAction": "what the admin should do next",
+      "channel": "training_data|prompt|handoff_policy|tone|knowledge_gap|eval|other"
+    }
+  ]
+}`;
+
+  return runPhoenixSpan(
+    'bot.autopilot_recommendations',
+    'CHAIN',
+    {
+      'bot.id': String(botId),
+      'user.id': userId ? String(userId) : undefined,
+      'metadata.trigger': trigger,
+      'metadata.cadence': period.cadence,
+      'input.value': prompt,
+    },
+    async (span) => {
+      let summary = '';
+      let recommendations;
+      try {
+        const llmClient = await getLLMClient(bot, userId);
+        const raw = await llmClient.generateSummary(autopilotPrompt);
+        const parsed = parseJudgeJson(raw) || {};
+        summary = String(parsed.summary || '').trim();
+        recommendations = normalizeAutopilotRecommendations(parsed, evidence);
+      } catch (error) {
+        recommendations = buildDefaultAutopilotRecommendations(evidence);
+      }
+
+      if (!summary) {
+        summary = `${recommendations.length} recommendations generated from ${evidence.metrics.sampledInteractions} recent interactions and ${evidence.phoenix.linkedTraceCount} Phoenix-linked traces.`;
+      }
+
+      let run = await BotAutopilotRun.create({
+        bot: botId,
+        config: config._id,
+        trigger,
+        prompt,
+        period,
+        status: 'completed',
+        summary,
+        recommendations,
+        evidence: {
+          phoenix: evidence.phoenix,
+          metrics: evidence.metrics,
+          failureClusters: evidence.failureClusters,
+          handoffs: evidence.handoffs,
+          latestJudgeRun: evidence.evals.latestJudgeRun,
+          bestExperiment: evidence.experiments.best,
+        },
+      });
+
+      let deliveries = [];
+      if (send) {
+        deliveries = await deliverAutopilotRun({ bot, config, run: run.toObject() });
+        run.deliveries = deliveries;
+        await run.save();
+      }
+
+      if (trigger !== 'preview') {
+        await BotAutopilotConfig.findByIdAndUpdate(config._id, {
+          lastRunAt: new Date(),
+          nextRunAt: config.enabled ? computeNextAutopilotRun(config.cadence, config.timeOfDay) : null,
+          lastStatus: 'completed',
+          lastError: null,
+        });
+      }
+
+      setPhoenixSpanAttributes(span, {
+        'output.value': summary,
+        'metadata.recommendation_count': recommendations.length,
+        'metadata.delivery_count': deliveries.length,
+        'metadata.sampled_interactions': evidence.metrics.sampledInteractions,
+      });
+
+      return run.toObject();
+    }
+  );
+};
 
 exports.getBotObservabilityInsights = async (botId, userId) => {
   const bot = await ChatBot.findOne({ _id: botId, user: userId }).lean();
