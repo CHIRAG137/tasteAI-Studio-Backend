@@ -672,17 +672,22 @@ exports.askBotSelfIntrospection = async (req, res) => {
 
 exports.buildBotEvalDataset = async (req, res) => {
   const { botId } = req.params;
-  const { sourceType } = req.body || {};
+  const { sourceType, customTypeId } = req.body || {};
 
-  if (!sourceType) {
-    return responseBuilder.badRequest(res, null, 'sourceType is required');
+  if (!sourceType && !customTypeId) {
+    return responseBuilder.badRequest(
+      res,
+      null,
+      'sourceType or customTypeId is required'
+    );
   }
 
   try {
     const result = await arizeInsightService.buildEvalDatasetFromProduction({
       botId,
       userId: req.user?.id,
-      sourceType,
+      sourceType: sourceType || 'custom',
+      customTypeId,
     });
 
     return responseBuilder.ok(res, result, 'Eval dataset created successfully');
@@ -691,6 +696,7 @@ exports.buildBotEvalDataset = async (req, res) => {
       error: error.message,
       botId,
       sourceType,
+      customTypeId,
       userId: req.user?.id,
     });
 
@@ -702,6 +708,112 @@ exports.buildBotEvalDataset = async (req, res) => {
       res,
       null,
       error.message || 'Failed to build eval dataset'
+    );
+  }
+};
+
+exports.createBotEvalDatasetType = async (req, res) => {
+  const { botId } = req.params;
+
+  try {
+    const result = await arizeInsightService.createEvalDatasetType({
+      botId,
+      userId: req.user?.id,
+      payload: req.body || {},
+    });
+
+    return responseBuilder.created(
+      res,
+      result,
+      'Custom eval dataset type created successfully'
+    );
+  } catch (error) {
+    logger.error('Error creating bot eval dataset type', {
+      error: error.message,
+      botId,
+      userId: req.user?.id,
+    });
+
+    if (error.message === 'Bot not found') {
+      return responseBuilder.notFound(res, null, 'Bot not found');
+    }
+
+    return responseBuilder.badRequest(
+      res,
+      null,
+      error.message || 'Failed to create eval dataset type'
+    );
+  }
+};
+
+exports.getBotEvalDatasetTypes = async (req, res) => {
+  const { botId } = req.params;
+
+  try {
+    const result = await arizeInsightService.listEvalDatasetTypes(
+      botId,
+      req.user?.id
+    );
+
+    return responseBuilder.ok(
+      res,
+      result,
+      'Eval dataset types fetched successfully'
+    );
+  } catch (error) {
+    logger.error('Error fetching bot eval dataset types', {
+      error: error.message,
+      botId,
+      userId: req.user?.id,
+    });
+
+    if (error.message === 'Bot not found') {
+      return responseBuilder.notFound(res, null, 'Bot not found');
+    }
+
+    return responseBuilder.badRequest(
+      res,
+      null,
+      error.message || 'Failed to fetch eval dataset types'
+    );
+  }
+};
+
+exports.deleteBotEvalDatasetType = async (req, res) => {
+  const { botId, typeId } = req.params;
+
+  try {
+    const result = await arizeInsightService.deleteEvalDatasetType({
+      botId,
+      userId: req.user?.id,
+      typeId,
+    });
+
+    return responseBuilder.ok(
+      res,
+      result,
+      'Custom eval dataset type deleted successfully'
+    );
+  } catch (error) {
+    logger.error('Error deleting bot eval dataset type', {
+      error: error.message,
+      botId,
+      typeId,
+      userId: req.user?.id,
+    });
+
+    if (error.message === 'Bot not found') {
+      return responseBuilder.notFound(res, null, 'Bot not found');
+    }
+
+    if (error.message === 'Custom eval dataset type not found') {
+      return responseBuilder.notFound(res, null, error.message);
+    }
+
+    return responseBuilder.badRequest(
+      res,
+      null,
+      error.message || 'Failed to delete eval dataset type'
     );
   }
 };
@@ -737,13 +849,21 @@ exports.getBotEvalDatasets = async (req, res) => {
 
 exports.runBotLLMJudge = async (req, res) => {
   const { botId } = req.params;
-  const { datasetName = 'all' } = req.body || {};
+  const {
+    datasetName = 'all',
+    evalMode = 'standard',
+    selectedCriteria = [],
+    passThreshold = 0.7,
+  } = req.body || {};
 
   try {
     const result = await arizeInsightService.runLLMJudgeForBot({
       botId,
       userId: req.user?.id,
       datasetName,
+      evalMode,
+      selectedCriteria,
+      passThreshold,
     });
 
     return responseBuilder.ok(res, result, 'LLM-as-a-Judge eval completed');

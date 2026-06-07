@@ -3,6 +3,7 @@ const FlowSession = require('../models/FlowSession');
 const QAHistory = require('../models/QAHistory');
 const HandoffSession = require('../models/HandoffSession');
 const BotEvalDatasetItem = require('../models/BotEvalDatasetItem');
+const BotEvalDatasetType = require('../models/BotEvalDatasetType');
 const BotEvalRun = require('../models/BotEvalRun');
 const BotExperiment = require('../models/BotExperiment');
 const BotInteractionMetric = require('../models/BotInteractionMetric');
@@ -206,22 +207,134 @@ function normalizeKey(value) {
     .slice(0, 80);
 }
 
-function datasetNameForSource(sourceType) {
+const SOURCE_TYPE_POLARITY = {
+  low_confidence_traces: 'negative',
+  high_confidence_traces: 'positive',
+  handoff_sessions: 'negative',
+  resolved_handoffs: 'positive',
+  negative_feedback: 'negative',
+  positive_feedback: 'positive',
+  unanswered_questions: 'negative',
+  grounded_answers: 'positive',
+  hallucination_risk: 'negative',
+  qa_retrieval_hits: 'positive',
+  slow_responses: 'negative',
+  self_improvement: 'neutral',
+  custom: 'neutral',
+};
+
+const JUDGE_CRITERIA = {
+  relevance: {
+    key: 'relevance',
+    label: 'Relevance',
+    description: 'Does the answer directly address the user question?',
+  },
+  helpfulness: {
+    key: 'helpfulness',
+    label: 'Helpfulness',
+    description: 'Is the answer useful and actionable for the user?',
+  },
+  groundedness: {
+    key: 'groundedness',
+    label: 'Groundedness',
+    description: 'Is the answer supported by training data or known facts?',
+  },
+  toneMatch: {
+    key: 'toneMatch',
+    label: 'Tone match',
+    description: 'Does the tone match the bot persona and conversation style?',
+  },
+  instructionFollowing: {
+    key: 'instructionFollowing',
+    label: 'Instruction following',
+    description: 'Does the answer follow custom bot instructions and policies?',
+  },
+  handoffCorrectness: {
+    key: 'handoffCorrectness',
+    label: 'Handoff correctness',
+    description: 'Was escalation or human handoff handled appropriately?',
+  },
+  refusalCorrectness: {
+    key: 'refusalCorrectness',
+    label: 'Refusal correctness',
+    description: 'When the bot cannot answer, does it refuse or clarify correctly?',
+  },
+  responseLengthFit: {
+    key: 'responseLengthFit',
+    label: 'Response length',
+    description: 'Is the answer concise without being too short or verbose?',
+  },
+};
+
+const EVAL_MODE_CRITERIA = {
+  standard: Object.keys(JUDGE_CRITERIA),
+  regression: [
+    'relevance',
+    'groundedness',
+    'refusalCorrectness',
+    'handoffCorrectness',
+    'helpfulness',
+  ],
+  gold_standard: [
+    'relevance',
+    'helpfulness',
+    'groundedness',
+    'toneMatch',
+    'instructionFollowing',
+    'responseLengthFit',
+  ],
+};
+
+const BUILTIN_EVAL_SOURCE_TYPES = [
+  'low_confidence_traces',
+  'high_confidence_traces',
+  'handoff_sessions',
+  'resolved_handoffs',
+  'negative_feedback',
+  'positive_feedback',
+  'unanswered_questions',
+  'grounded_answers',
+  'hallucination_risk',
+  'qa_retrieval_hits',
+  'slow_responses',
+];
+
+function datasetNameForSource(sourceType, customName) {
+  if (customName) return customName;
   const names = {
     low_confidence_traces: 'Low Confidence Traces',
+    high_confidence_traces: 'High Confidence Traces',
     handoff_sessions: 'Handoff Sessions',
+    resolved_handoffs: 'Resolved Handoffs',
     negative_feedback: 'Negative Feedback',
+    positive_feedback: 'Positive Feedback',
     unanswered_questions: 'Unanswered Questions',
+    grounded_answers: 'Grounded Answers',
+    hallucination_risk: 'Hallucination Risk',
+    qa_retrieval_hits: 'QA Retrieval Hits',
+    slow_responses: 'Slow Responses',
+    custom: 'Custom Eval Dataset',
   };
   return names[sourceType] || 'Production Conversations';
 }
 
-function buildDatasetRecord({ botId, sourceType, itemKey, question, answer, metadata, userId }) {
+function buildDatasetRecord({
+  botId,
+  sourceType,
+  itemKey,
+  question,
+  answer,
+  metadata,
+  userId,
+  datasetName,
+  customTypeId,
+}) {
   return {
     bot: botId,
     itemKey,
-    datasetName: datasetNameForSource(sourceType),
+    datasetName: datasetName || datasetNameForSource(sourceType),
     sourceType,
+    customTypeId: customTypeId || null,
     question,
     expectedAnswer: '',
     actualAnswer: answer || '',
@@ -229,6 +342,372 @@ function buildDatasetRecord({ botId, sourceType, itemKey, question, answer, meta
     metadata: metadata || {},
     createdBy: userId,
   };
+}
+
+function metricToDatasetRecord({
+  botId,
+  sourceType,
+  metric,
+  userId,
+  datasetName,
+  customTypeId,
+}) {
+  const itemKey = customTypeId
+    ? `custom:${customTypeId}:${metric._id}`
+    : `${sourceType}:${metric._id}`;
+
+  return buildDatasetRecord({
+    botId,
+    sourceType,
+    itemKey,
+    question: metric.question || 'Untitled question',
+    answer: metric.answer || '',
+    userId,
+    datasetName,
+    customTypeId,
+    metadata: {
+      confidence: metric.confidence,
+      latencyMs: metric.latencyMs,
+      flowSession: metric.flowSession,
+      source: metric.source,
+      groundednessScore: metric.groundednessScore,
+      hallucinationRisk: metric.hallucinationRisk,
+      usedFallback: metric.usedFallback,
+      retrievalScore: metric.trace?.retrieval?.retrievalScore,
+      traceUrl: metric.phoenix?.traceUrl,
+    },
+  });
+}
+
+function handoffToDatasetRecord({
+  botId,
+  sourceType,
+  handoff,
+  userId,
+  datasetName,
+  customTypeId,
+}) {
+  const itemKey = customTypeId
+    ? `custom:${customTypeId}:${handoff._id}`
+    : `${sourceType}:${handoff._id}`;
+
+  return buildDatasetRecord({
+    botId,
+    sourceType,
+    itemKey,
+    question:
+      handoff.userQuestion ||
+      handoff.messages?.find((message) => message.sender === 'user')?.message ||
+      'Handoff session',
+    answer: handoff.agentNotes || handoff.userFeedback || '',
+    userId,
+    datasetName,
+    customTypeId,
+    metadata: {
+      handoffSession: handoff._id,
+      status: handoff.status,
+      escalated: handoff.escalated,
+      userRating: handoff.userRating,
+      userFeedback: handoff.userFeedback,
+    },
+  });
+}
+
+function buildMetricQueryFromFilters(botId, filters = {}) {
+  const query = { bot: botId };
+
+  if (typeof filters.confidenceMin === 'number') {
+    query.confidence = { ...(query.confidence || {}), $gte: filters.confidenceMin };
+  }
+  if (typeof filters.confidenceMax === 'number') {
+    query.confidence = { ...(query.confidence || {}), $lte: filters.confidenceMax };
+  }
+  if (typeof filters.hallucinationRiskMin === 'number') {
+    query.hallucinationRisk = {
+      ...(query.hallucinationRisk || {}),
+      $gte: filters.hallucinationRiskMin,
+    };
+  }
+  if (typeof filters.hallucinationRiskMax === 'number') {
+    query.hallucinationRisk = {
+      ...(query.hallucinationRisk || {}),
+      $lte: filters.hallucinationRiskMax,
+    };
+  }
+  if (typeof filters.groundednessScoreMin === 'number') {
+    query.groundednessScore = {
+      ...(query.groundednessScore || {}),
+      $gte: filters.groundednessScoreMin,
+    };
+  }
+  if (typeof filters.groundednessScoreMax === 'number') {
+    query.groundednessScore = {
+      ...(query.groundednessScore || {}),
+      $lte: filters.groundednessScoreMax,
+    };
+  }
+  if (typeof filters.usedFallback === 'boolean') {
+    query.usedFallback = filters.usedFallback;
+  }
+  if (Array.isArray(filters.sources) && filters.sources.length) {
+    query.source = { $in: filters.sources };
+  }
+  if (Array.isArray(filters.userEmotions) && filters.userEmotions.length) {
+    query.userEmotion = { $in: filters.userEmotions };
+  }
+  if (typeof filters.latencyMsMin === 'number') {
+    query.latencyMs = { ...(query.latencyMs || {}), $gte: filters.latencyMsMin };
+  }
+  if (typeof filters.latencyMsMax === 'number') {
+    query.latencyMs = { ...(query.latencyMs || {}), $lte: filters.latencyMsMax };
+  }
+  if (typeof filters.retrievalScoreMin === 'number') {
+    query['trace.retrieval.retrievalScore'] = { $gte: filters.retrievalScoreMin };
+  }
+
+  return query;
+}
+
+function buildHandoffQueryFromFilters(botId, filters = {}) {
+  const query = { bot: botId };
+
+  if (Array.isArray(filters.statuses) && filters.statuses.length) {
+    query.status = { $in: filters.statuses };
+  }
+  if (typeof filters.escalated === 'boolean') {
+    query.escalated = filters.escalated;
+  }
+  if (typeof filters.userRatingMin === 'number') {
+    query.userRating = { ...(query.userRating || {}), $gte: filters.userRatingMin };
+  }
+  if (typeof filters.userRatingMax === 'number') {
+    query.userRating = { ...(query.userRating || {}), $lte: filters.userRatingMax };
+  }
+  if (filters.hasFeedback === true) {
+    query.userFeedback = { $exists: true, $ne: '' };
+  }
+  if (filters.hasFeedback === false) {
+    query.$or = [
+      { userFeedback: { $exists: false } },
+      { userFeedback: '' },
+      { userFeedback: null },
+    ];
+  }
+
+  return query;
+}
+
+async function fetchMetricsForBuiltinSource(botId, sourceType) {
+  const baseQuery = { bot: botId };
+  let query = baseQuery;
+
+  switch (sourceType) {
+    case 'low_confidence_traces':
+      query = {
+        ...baseQuery,
+        $or: [{ confidence: { $lt: 0.85 } }, { confidence: null }],
+      };
+      break;
+    case 'high_confidence_traces':
+      query = {
+        ...baseQuery,
+        confidence: { $gte: 0.9 },
+        usedFallback: { $ne: true },
+        source: { $ne: 'none' },
+      };
+      break;
+    case 'unanswered_questions':
+      query = {
+        ...baseQuery,
+        $or: [{ usedFallback: true }, { source: 'none' }],
+      };
+      break;
+    case 'grounded_answers':
+      query = {
+        ...baseQuery,
+        confidence: { $gte: 0.85 },
+        $or: [
+          { groundednessScore: { $gte: 0.8 } },
+          { hallucinationRisk: { $lte: 0.2 } },
+        ],
+      };
+      break;
+    case 'hallucination_risk':
+      query = {
+        ...baseQuery,
+        hallucinationRisk: { $gte: 0.45 },
+      };
+      break;
+    case 'qa_retrieval_hits':
+      query = {
+        ...baseQuery,
+        source: { $in: ['qa', 'dataset'] },
+        'trace.retrieval.retrievalScore': { $gte: 0.85 },
+      };
+      break;
+    case 'slow_responses':
+      query = {
+        ...baseQuery,
+        latencyMs: { $gte: 5000 },
+      };
+      break;
+    default:
+      return [];
+  }
+
+  return BotInteractionMetric.find(query).sort({ createdAt: -1 }).limit(100).lean();
+}
+
+async function fetchHandoffsForBuiltinSource(botId, sourceType) {
+  let query = { bot: botId };
+
+  switch (sourceType) {
+    case 'handoff_sessions':
+      break;
+    case 'resolved_handoffs':
+      query = { ...query, status: 'resolved', escalated: { $ne: true } };
+      break;
+    case 'negative_feedback':
+      query = {
+        ...query,
+        $or: [
+          { userRating: { $lte: 2 } },
+          { userFeedback: { $exists: true, $ne: '' } },
+        ],
+      };
+      break;
+    case 'positive_feedback':
+      query = { ...query, userRating: { $gte: 4 } };
+      break;
+    default:
+      return [];
+  }
+
+  return HandoffSession.find(query).sort({ requestedAt: -1 }).limit(100).lean();
+}
+
+function inferDatasetPolarity(sourceTypes = [], customTypes = [], datasetName = '') {
+  const customMatch = customTypes.find(
+    (type) => type.datasetName === datasetName || type.name === datasetName
+  );
+  if (customMatch?.polarity) {
+    return customMatch.polarity;
+  }
+
+  const polarities = (sourceTypes || [])
+    .map((type) => SOURCE_TYPE_POLARITY[type])
+    .filter(Boolean);
+
+  if (!polarities.length) return 'neutral';
+  const unique = [...new Set(polarities)];
+  if (unique.length > 1) return 'mixed';
+  return unique[0];
+}
+
+function datasetDescriptionFor(sourceTypes = [], customTypes = [], datasetName = '') {
+  const customMatch = customTypes.find(
+    (type) => type.datasetName === datasetName || type.name === datasetName
+  );
+  if (customMatch?.description) {
+    return customMatch.description;
+  }
+
+  const primarySource = sourceTypes?.[0];
+  if (!primarySource) return 'Production conversation samples for evaluation.';
+  return `Built from ${primarySource.replace(/_/g, ' ')} traces.`;
+}
+
+function resolveJudgeCriteria({ evalMode = 'standard', selectedCriteria = [] }) {
+  if (evalMode === 'custom' && Array.isArray(selectedCriteria) && selectedCriteria.length) {
+    return selectedCriteria.filter((key) => JUDGE_CRITERIA[key]);
+  }
+  return EVAL_MODE_CRITERIA[evalMode] || EVAL_MODE_CRITERIA.standard;
+}
+
+function buildJudgePrompt({ bot, item, evalMode, polarity, activeCriteria }) {
+  const criteriaLines = activeCriteria
+    .map((key) => `- ${JUDGE_CRITERIA[key].label}: ${JUDGE_CRITERIA[key].description}`)
+    .join('\n');
+
+  const modeGuidance = {
+    regression:
+      'This is a REGRESSION dataset built from production failure signals. Grade whether the actual answer shows the failure pattern (low confidence, fallback, grounding risk, etc.). Low scores confirm the item belongs in this dataset.',
+    gold_standard:
+      'This is a GOLD STANDARD dataset built from high-quality production answers. Grade whether the answer is exemplary and should be preserved as expected behavior.',
+    standard:
+      'Grade the answer holistically against the bot persona and user intent.',
+    custom:
+      'Grade the answer using only the selected criteria below.',
+  };
+
+  const polarityGuidance = {
+    negative:
+      'Dataset polarity: negative/regression. Prioritize detecting weak, ungrounded, or incorrect answers.',
+    positive:
+      'Dataset polarity: positive/gold standard. Prioritize confirming answer quality, tone, and completeness.',
+    neutral: 'Dataset polarity: neutral. Apply balanced grading.',
+    mixed: 'Dataset polarity: mixed. Apply balanced grading across heterogeneous traces.',
+  };
+
+  const scoreTemplate = activeCriteria.reduce((acc, key) => {
+    acc[key] = '0-1';
+    return acc;
+  }, {});
+
+  return `
+You are an LLM-as-a-Judge evaluator for a production chatbot.
+
+Bot persona:
+- Name: ${bot.name || 'Bot'}
+- Description: ${bot.description || 'Not provided'}
+- Tone: ${bot.conversation_tone || 'Professional'}
+- Response style: ${bot.response_style || 'Helpful'}
+- Custom instructions: ${bot.custom_instructions || 'None'}
+- Human handoff enabled: ${bot.human_handoff_enabled ? 'yes' : 'no'}
+
+Evaluation mode: ${evalMode}
+${modeGuidance[evalMode] || modeGuidance.standard}
+${polarityGuidance[polarity] || polarityGuidance.neutral}
+
+Score only these criteria:
+${criteriaLines}
+
+Dataset source type: ${item.sourceType || item.source || 'unknown'}
+Trace metadata: ${JSON.stringify(item.metadata || {})}
+
+User question:
+${item.question}
+
+Actual bot answer:
+${item.actualAnswer || '(empty)'}
+
+Expected answer or reviewer note:
+${item.expectedAnswer || '(not provided)'}
+
+Return only JSON:
+{
+  "scores": ${JSON.stringify(scoreTemplate)},
+  "explanation": "short practical explanation referencing the criteria"
+}`;
+}
+
+function averageItemScore(scores, activeCriteria) {
+  const values = activeCriteria
+    .map((key) => scores[key])
+    .filter((value) => typeof value === 'number' && Number.isFinite(value));
+  if (!values.length) return null;
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+function itemVerdict({ overallItemScore, passThreshold, polarity }) {
+  if (typeof overallItemScore !== 'number') return 'review';
+  if (polarity === 'negative') {
+    return overallItemScore < passThreshold ? 'pass' : 'fail';
+  }
+  if (polarity === 'positive') {
+    return overallItemScore >= passThreshold ? 'pass' : 'fail';
+  }
+  return overallItemScore >= passThreshold ? 'pass' : 'fail';
 }
 
 function parseJudgeJson(text) {
@@ -1540,136 +2019,169 @@ exports.applyImprovementAction = async ({
   };
 };
 
-exports.buildEvalDatasetFromProduction = async ({ botId, userId, sourceType }) => {
+exports.createEvalDatasetType = async ({ botId, userId, payload }) => {
   const bot = await ChatBot.findOne({ _id: botId, user: userId }).lean();
   if (!bot) {
     throw new Error('Bot not found');
   }
 
-  const validSources = [
-    'low_confidence_traces',
-    'handoff_sessions',
-    'negative_feedback',
-    'unanswered_questions',
-  ];
+  const name = String(payload?.name || '').trim();
+  if (!name) {
+    throw new Error('Eval dataset type name is required');
+  }
 
-  if (!validSources.includes(sourceType)) {
-    throw new Error('Invalid dataset source type');
+  const record = await BotEvalDatasetType.create({
+    bot: botId,
+    name,
+    description: String(payload?.description || '').trim(),
+    polarity: ['positive', 'negative', 'neutral'].includes(payload?.polarity)
+      ? payload.polarity
+      : 'neutral',
+    traceSource:
+      payload?.traceSource === 'handoff_sessions'
+        ? 'handoff_sessions'
+        : 'interaction_metrics',
+    traceFilters: payload?.traceFilters || {},
+    handoffFilters: payload?.handoffFilters || {},
+    datasetName: String(payload?.datasetName || name).trim(),
+    createdBy: userId,
+  });
+
+  return record;
+};
+
+exports.listEvalDatasetTypes = async (botId, userId) => {
+  const bot = await ChatBot.findOne({ _id: botId, user: userId }).lean();
+  if (!bot) {
+    throw new Error('Bot not found');
+  }
+
+  return BotEvalDatasetType.find({ bot: botId })
+    .sort({ createdAt: -1 })
+    .lean();
+};
+
+exports.deleteEvalDatasetType = async ({ botId, userId, typeId }) => {
+  const bot = await ChatBot.findOne({ _id: botId, user: userId }).lean();
+  if (!bot) {
+    throw new Error('Bot not found');
+  }
+
+  const deleted = await BotEvalDatasetType.findOneAndDelete({
+    _id: typeId,
+    bot: botId,
+  });
+
+  if (!deleted) {
+    throw new Error('Custom eval dataset type not found');
+  }
+
+  return { deleted: true, id: String(deleted._id) };
+};
+
+exports.buildEvalDatasetFromProduction = async ({
+  botId,
+  userId,
+  sourceType,
+  customTypeId,
+}) => {
+  const bot = await ChatBot.findOne({ _id: botId, user: userId }).lean();
+  if (!bot) {
+    throw new Error('Bot not found');
   }
 
   let records = [];
+  let resolvedSourceType = sourceType;
+  let datasetName = datasetNameForSource(sourceType);
+  let resolvedCustomTypeId = null;
 
-  if (sourceType === 'low_confidence_traces') {
-    const metrics = await BotInteractionMetric.find({
+  if (customTypeId || sourceType === 'custom' || String(sourceType).startsWith('custom:')) {
+    const typeId =
+      customTypeId || String(sourceType).replace(/^custom:/, '') || customTypeId;
+    const customType = await BotEvalDatasetType.findOne({
+      _id: typeId,
       bot: botId,
-      $or: [{ confidence: { $lt: 0.85 } }, { confidence: null }],
-    })
-      .sort({ createdAt: -1 })
-      .limit(100)
-      .lean();
+    }).lean();
 
-    records = metrics.map((metric) =>
-      buildDatasetRecord({
-        botId,
-        sourceType,
-        itemKey: `${sourceType}:${metric._id}`,
-        question: metric.question || 'Untitled question',
-        answer: metric.answer || '',
-        userId,
-        metadata: {
-          confidence: metric.confidence,
-          latencyMs: metric.latencyMs,
-          flowSession: metric.flowSession,
-          source: metric.source,
-        },
-      })
-    );
-  }
+    if (!customType) {
+      throw new Error('Custom eval dataset type not found');
+    }
 
-  if (sourceType === 'unanswered_questions') {
-    const metrics = await BotInteractionMetric.find({
-      bot: botId,
-      $or: [{ usedFallback: true }, { source: 'none' }],
-    })
-      .sort({ createdAt: -1 })
-      .limit(100)
-      .lean();
+    resolvedSourceType = 'custom';
+    resolvedCustomTypeId = customType._id;
+    datasetName = customType.datasetName || customType.name;
 
-    records = metrics.map((metric) =>
-      buildDatasetRecord({
-        botId,
-        sourceType,
-        itemKey: `${sourceType}:${metric._id}`,
-        question: metric.question || 'Untitled question',
-        answer: metric.answer || '',
-        userId,
-        metadata: {
-          confidence: metric.confidence,
-          usedFallback: metric.usedFallback,
-          flowSession: metric.flowSession,
-        },
-      })
-    );
-  }
+    if (customType.traceSource === 'handoff_sessions') {
+      const handoffs = await HandoffSession.find(
+        buildHandoffQueryFromFilters(botId, customType.handoffFilters || {})
+      )
+        .sort({ requestedAt: -1 })
+        .limit(100)
+        .lean();
 
-  if (sourceType === 'handoff_sessions') {
-    const handoffs = await HandoffSession.find({ bot: botId })
-      .sort({ requestedAt: -1 })
-      .limit(100)
-      .lean();
+      records = handoffs.map((handoff) =>
+        handoffToDatasetRecord({
+          botId,
+          sourceType: 'custom',
+          handoff,
+          userId,
+          datasetName,
+          customTypeId: resolvedCustomTypeId,
+        })
+      );
+    } else {
+      const metrics = await BotInteractionMetric.find(
+        buildMetricQueryFromFilters(botId, customType.traceFilters || {})
+      )
+        .sort({ createdAt: -1 })
+        .limit(100)
+        .lean();
 
-    records = handoffs.map((handoff) =>
-      buildDatasetRecord({
-        botId,
-        sourceType,
-        itemKey: `${sourceType}:${handoff._id}`,
-        question:
-          handoff.userQuestion ||
-          handoff.messages?.find((message) => message.sender === 'user')?.message ||
-          'Human handoff session',
-        answer: handoff.agentNotes || '',
-        userId,
-        metadata: {
-          handoffSession: handoff._id,
-          status: handoff.status,
-          escalated: handoff.escalated,
-          userRating: handoff.userRating,
-        },
-      })
-    );
-  }
+      records = metrics.map((metric) =>
+        metricToDatasetRecord({
+          botId,
+          sourceType: 'custom',
+          metric,
+          userId,
+          datasetName,
+          customTypeId: resolvedCustomTypeId,
+        })
+      );
+    }
+  } else if (!BUILTIN_EVAL_SOURCE_TYPES.includes(sourceType)) {
+    throw new Error('Invalid dataset source type');
+  } else {
+    const metricSources = [
+      'low_confidence_traces',
+      'high_confidence_traces',
+      'unanswered_questions',
+      'grounded_answers',
+      'hallucination_risk',
+      'qa_retrieval_hits',
+      'slow_responses',
+    ];
+    const handoffSources = [
+      'handoff_sessions',
+      'resolved_handoffs',
+      'negative_feedback',
+      'positive_feedback',
+    ];
 
-  if (sourceType === 'negative_feedback') {
-    const handoffs = await HandoffSession.find({
-      bot: botId,
-      $or: [
-        { userRating: { $lte: 2 } },
-        { userFeedback: { $exists: true, $ne: '' } },
-      ],
-    })
-      .sort({ requestedAt: -1 })
-      .limit(100)
-      .lean();
+    if (metricSources.includes(sourceType)) {
+      const metrics = await fetchMetricsForBuiltinSource(botId, sourceType);
+      records = metrics.map((metric) =>
+        metricToDatasetRecord({ botId, sourceType, metric, userId })
+      );
+    }
 
-    records = handoffs.map((handoff) =>
-      buildDatasetRecord({
-        botId,
-        sourceType,
-        itemKey: `${sourceType}:${handoff._id}`,
-        question:
-          handoff.userQuestion ||
-          handoff.messages?.find((message) => message.sender === 'user')?.message ||
-          'Negative feedback session',
-        answer: handoff.agentNotes || handoff.userFeedback || '',
-        userId,
-        metadata: {
-          handoffSession: handoff._id,
-          userRating: handoff.userRating,
-          userFeedback: handoff.userFeedback,
-          status: handoff.status,
-        },
-      })
-    );
+    if (handoffSources.includes(sourceType)) {
+      const handoffs = await fetchHandoffsForBuiltinSource(botId, sourceType);
+      records = handoffs.map((handoff) =>
+        handoffToDatasetRecord({ botId, sourceType, handoff, userId })
+      );
+    }
+
+    datasetName = datasetNameForSource(sourceType);
   }
 
   const saved = await upsertDatasetItems(
@@ -1677,8 +2189,9 @@ exports.buildEvalDatasetFromProduction = async ({ botId, userId, sourceType }) =
   );
 
   return {
-    sourceType,
-    datasetName: datasetNameForSource(sourceType),
+    sourceType: resolvedSourceType,
+    customTypeId: resolvedCustomTypeId ? String(resolvedCustomTypeId) : null,
+    datasetName,
     createdCount: saved.length,
     items: saved,
   };
@@ -1690,10 +2203,19 @@ exports.getEvalDatasets = async (botId, userId) => {
     throw new Error('Bot not found');
   }
 
-  const [items, runs] = await Promise.all([
+  const [items, runs, customTypes] = await Promise.all([
     BotEvalDatasetItem.find({ bot: botId }).sort({ createdAt: -1 }).limit(300).lean(),
-    BotEvalRun.find({ bot: botId }).sort({ createdAt: -1 }).limit(10).lean(),
+    BotEvalRun.find({ bot: botId }).sort({ createdAt: -1 }).limit(25).lean(),
+    BotEvalDatasetType.find({ bot: botId }).sort({ createdAt: -1 }).lean(),
   ]);
+
+  const latestRunByDataset = runs.reduce((acc, run) => {
+    const key = run.datasetName || 'all';
+    if (!acc[key]) {
+      acc[key] = run;
+    }
+    return acc;
+  }, {});
 
   const datasets = Object.values(
     items.reduce((acc, item) => {
@@ -1713,19 +2235,88 @@ exports.getEvalDatasets = async (botId, userId) => {
       }
       return acc;
     }, {})
-  ).map((dataset) => ({
-    ...dataset,
-    sourceTypes: Array.from(dataset.sourceTypes),
-  }));
+  ).map((dataset) => {
+    const sourceTypes = Array.from(dataset.sourceTypes);
+    const polarity = inferDatasetPolarity(
+      sourceTypes,
+      customTypes,
+      dataset.datasetName
+    );
+    return {
+      ...dataset,
+      sourceTypes,
+      polarity,
+      description: datasetDescriptionFor(
+        sourceTypes,
+        customTypes,
+        dataset.datasetName
+      ),
+      latestRun: latestRunByDataset[dataset.datasetName] || null,
+    };
+  });
+
+  const totalItems = items.length;
+  const completedRuns = runs.filter((run) => run.status === 'completed');
+  const averageOverallScore = averageNumbers(
+    completedRuns.map((run) => run.overallScore)
+  );
 
   return {
     datasets,
     items,
     runs,
+    customTypes,
+    builtinTypes: BUILTIN_EVAL_SOURCE_TYPES.map((type) => ({
+      sourceType: type,
+      datasetName: datasetNameForSource(type),
+      polarity: SOURCE_TYPE_POLARITY[type] || 'neutral',
+    })),
+    judgeSummary: {
+      totalDatasets: datasets.length,
+      totalItems,
+      totalRuns: runs.length,
+      completedRuns: completedRuns.length,
+      averageOverallScore,
+      latestRun: runs[0] || null,
+    },
+    judgeConfig: {
+      criteria: Object.values(JUDGE_CRITERIA),
+      evalModes: [
+        {
+          key: 'standard',
+          label: 'Standard',
+          description: 'Balanced grading across all quality dimensions.',
+        },
+        {
+          key: 'regression',
+          label: 'Regression',
+          description: 'Focus on failure detection for negative datasets.',
+        },
+        {
+          key: 'gold_standard',
+          label: 'Gold standard',
+          description: 'Focus on quality preservation for positive datasets.',
+        },
+        {
+          key: 'custom',
+          label: 'Custom criteria',
+          description: 'Grade only the criteria you select.',
+        },
+      ],
+      defaultPassThreshold: 0.7,
+      sourceTypePolarity: SOURCE_TYPE_POLARITY,
+    },
   };
 };
 
-exports.runLLMJudgeForBot = async ({ botId, userId, datasetName }) => {
+exports.runLLMJudgeForBot = async ({
+  botId,
+  userId,
+  datasetName,
+  evalMode = 'standard',
+  selectedCriteria = [],
+  passThreshold = 0.7,
+}) => {
   const bot = await ChatBot.findOne({ _id: botId, user: userId }).lean();
   if (!bot) {
     throw new Error('Bot not found');
@@ -1736,20 +2327,48 @@ exports.runLLMJudgeForBot = async ({ botId, userId, datasetName }) => {
     query.datasetName = datasetName;
   }
 
-  const items = await BotEvalDatasetItem.find(query)
-    .sort({ createdAt: -1 })
-    .limit(30)
-    .lean();
+  const [items, customTypes] = await Promise.all([
+    BotEvalDatasetItem.find(query).sort({ createdAt: -1 }).limit(30).lean(),
+    BotEvalDatasetType.find({ bot: botId }).lean(),
+  ]);
 
   if (!items.length) {
     throw new Error('No eval dataset items found for this bot');
   }
+
+  const sourceTypes = [...new Set(items.map((item) => item.sourceType || item.source))];
+  const polarity =
+    datasetName && datasetName !== 'all'
+      ? inferDatasetPolarity(sourceTypes, customTypes, datasetName)
+      : inferDatasetPolarity(sourceTypes, customTypes);
+
+  const resolvedEvalMode =
+    evalMode === 'standard' && polarity === 'negative'
+      ? 'regression'
+      : evalMode === 'standard' && polarity === 'positive'
+        ? 'gold_standard'
+        : evalMode;
+
+  const activeCriteria = resolveJudgeCriteria({
+    evalMode: resolvedEvalMode,
+    selectedCriteria,
+  });
+
+  const threshold = Number(passThreshold);
+  const normalizedThreshold =
+    Number.isFinite(threshold) && threshold > 0 && threshold <= 1 ? threshold : 0.7;
 
   const run = await BotEvalRun.create({
     bot: botId,
     datasetName: datasetName || 'all',
     status: 'running',
     judgeModel: bot.custom_model || 'gemini-3.1-pro-preview',
+    evalMode: resolvedEvalMode,
+    polarity,
+    sourceTypes,
+    itemCount: items.length,
+    passThreshold: normalizedThreshold,
+    selectedCriteria: activeCriteria,
   });
 
   try {
@@ -1757,81 +2376,63 @@ exports.runLLMJudgeForBot = async ({ botId, userId, datasetName }) => {
     const explanations = [];
 
     for (const item of items) {
-      const prompt = `
-You are an LLM-as-a-Judge evaluator for a production chatbot.
-
-Bot persona:
-- Name: ${bot.name || 'Bot'}
-- Description: ${bot.description || 'Not provided'}
-- Tone: ${bot.conversation_tone || 'Professional'}
-- Response style: ${bot.response_style || 'Helpful'}
-- Custom instructions: ${bot.custom_instructions || 'None'}
-- Human handoff enabled: ${bot.human_handoff_enabled ? 'yes' : 'no'}
-
-Evaluate the actual bot answer against the user question and any expected answer.
-
-User question:
-${item.question}
-
-Actual bot answer:
-${item.actualAnswer || '(empty)'}
-
-Expected answer or reviewer note:
-${item.expectedAnswer || '(not provided)'}
-
-Return only JSON:
-{
-  "scores": {
-    "relevance": 0-1,
-    "helpfulness": 0-1,
-    "groundedness": 0-1,
-    "toneMatch": 0-1,
-    "instructionFollowing": 0-1,
-    "handoffCorrectness": 0-1,
-    "refusalCorrectness": 0-1,
-    "responseLengthFit": 0-1
-  },
-  "explanation": "short practical explanation"
-}`;
+      const prompt = buildJudgePrompt({
+        bot,
+        item,
+        evalMode: resolvedEvalMode,
+        polarity,
+        activeCriteria,
+      });
 
       const raw = await llmClient.generateSummary(prompt);
       const parsed = parseJudgeJson(raw) || {};
       const scores = parsed.scores || {};
-      const normalizedScores = {
-        relevance: normalizeJudgeScore(scores.relevance),
-        helpfulness: normalizeJudgeScore(scores.helpfulness),
-        groundedness: normalizeJudgeScore(scores.groundedness),
-        toneMatch: normalizeJudgeScore(scores.toneMatch),
-        instructionFollowing: normalizeJudgeScore(scores.instructionFollowing),
-        handoffCorrectness: normalizeJudgeScore(scores.handoffCorrectness),
-        refusalCorrectness: normalizeJudgeScore(scores.refusalCorrectness),
-        responseLengthFit: normalizeJudgeScore(scores.responseLengthFit),
-      };
+      const normalizedScores = activeCriteria.reduce((acc, key) => {
+        acc[key] = normalizeJudgeScore(scores[key]);
+        return acc;
+      }, {});
+
+      const overallItemScore = averageItemScore(normalizedScores, activeCriteria);
+      const verdict = itemVerdict({
+        overallItemScore,
+        passThreshold: normalizedThreshold,
+        polarity,
+      });
 
       explanations.push({
         itemId: item._id,
         question: item.question,
         scores: normalizedScores,
+        overallItemScore,
+        verdict,
+        sourceType: item.sourceType || item.source || null,
         explanation: parsed.explanation || 'Judge completed without explanation.',
       });
     }
 
-    const criteria = Object.keys(explanations[0].scores).reduce((acc, key) => {
+    const criteria = activeCriteria.reduce((acc, key) => {
       acc[key] =
-        explanations.reduce((sum, item) => sum + item.scores[key], 0) /
+        explanations.reduce((sum, entry) => sum + (entry.scores[key] || 0), 0) /
         explanations.length;
       return acc;
     }, {});
 
-    const overallScore =
-      Object.values(criteria).reduce((sum, value) => sum + value, 0) /
-      Object.values(criteria).length;
+    const overallScore = averageNumbers(
+      explanations.map((entry) => entry.overallItemScore)
+    );
+
+    const passedCount = explanations.filter((entry) => entry.verdict === 'pass').length;
+    const failedCount = explanations.filter((entry) => entry.verdict === 'fail').length;
+    const passRate = explanations.length ? passedCount / explanations.length : null;
 
     await BotEvalRun.findByIdAndUpdate(run._id, {
       status: 'completed',
       criteria,
       overallScore,
       explanations,
+      passedCount,
+      failedCount,
+      passRate,
       completedAt: new Date(),
     });
 

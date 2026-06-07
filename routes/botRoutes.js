@@ -232,6 +232,39 @@ router.post(
 );
 
 /**
+ * @route   GET /api/bots/:botId/eval-dataset-types
+ * @desc    List custom eval dataset types for a bot
+ * @access  Private
+ */
+router.get(
+  '/:botId/eval-dataset-types',
+  authMiddleware,
+  botController.getBotEvalDatasetTypes
+);
+
+/**
+ * @route   POST /api/bots/:botId/eval-dataset-types
+ * @desc    Create a custom eval dataset type with trace filters
+ * @access  Private
+ */
+router.post(
+  '/:botId/eval-dataset-types',
+  authMiddleware,
+  botController.createBotEvalDatasetType
+);
+
+/**
+ * @route   DELETE /api/bots/:botId/eval-dataset-types/:typeId
+ * @desc    Delete a custom eval dataset type
+ * @access  Private
+ */
+router.delete(
+  '/:botId/eval-dataset-types/:typeId',
+  authMiddleware,
+  botController.deleteBotEvalDatasetType
+);
+
+/**
  * @route   POST /api/bots/:botId/evals/judge
  * @desc    Run LLM-as-a-Judge grading over a bot eval dataset
  * @access  Private
