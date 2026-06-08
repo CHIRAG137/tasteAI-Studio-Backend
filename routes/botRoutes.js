@@ -210,6 +210,94 @@ router.post(
 );
 
 /**
+ * @route   GET /api/bots/:botId/autopilot
+ * @desc    Get bot autopilot recommendation config and recent runs
+ * @access  Private
+ */
+router.get(
+  '/:botId/autopilot',
+  authMiddleware,
+  botController.getBotAutopilot
+);
+
+/**
+ * @route   PUT /api/bots/:botId/autopilot
+ * @desc    Save bot autopilot schedule, prompt, and notification settings
+ * @access  Private
+ */
+router.put(
+  '/:botId/autopilot',
+  authMiddleware,
+  botController.saveBotAutopilot
+);
+
+/**
+ * @route   POST /api/bots/:botId/autopilot/generate
+ * @desc    Generate autopilot recommendations (preview or send via email/Slack)
+ * @access  Private
+ */
+router.post(
+  '/:botId/autopilot/generate',
+  authMiddleware,
+  botController.generateBotAutopilotRecommendations
+);
+
+/**
+ * @route   GET /api/bots/:botId/monitoring
+ * @desc    Get production monitoring alert config, snapshot, and active alerts
+ * @access  Private
+ */
+router.get(
+  '/:botId/monitoring',
+  authMiddleware,
+  botController.getBotMonitoring
+);
+
+/**
+ * @route   PUT /api/bots/:botId/monitoring
+ * @desc    Save monitoring alert rules and notification settings
+ * @access  Private
+ */
+router.put(
+  '/:botId/monitoring',
+  authMiddleware,
+  botController.saveBotMonitoring
+);
+
+/**
+ * @route   POST /api/bots/:botId/monitoring/evaluate
+ * @desc    Run monitoring threshold checks (optionally notify)
+ * @access  Private
+ */
+router.post(
+  '/:botId/monitoring/evaluate',
+  authMiddleware,
+  botController.evaluateBotMonitoring
+);
+
+/**
+ * @route   POST /api/bots/:botId/monitoring/alerts/:alertId/acknowledge
+ * @desc    Acknowledge a monitoring alert
+ * @access  Private
+ */
+router.post(
+  '/:botId/monitoring/alerts/:alertId/acknowledge',
+  authMiddleware,
+  botController.acknowledgeMonitoringAlert
+);
+
+/**
+ * @route   POST /api/bots/:botId/monitoring/alerts/:alertId/resolve
+ * @desc    Resolve a monitoring alert
+ * @access  Private
+ */
+router.post(
+  '/:botId/monitoring/alerts/:alertId/resolve',
+  authMiddleware,
+  botController.resolveMonitoringAlert
+);
+
+/**
  * @route   GET /api/bots/:botId/eval-datasets
  * @desc    List eval datasets and judge runs for a bot
  * @access  Private

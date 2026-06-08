@@ -1,4 +1,5 @@
 const ChatBot = require('../models/ChatBot');
+const User = require('../models/User');
 const FlowSession = require('../models/FlowSession');
 const QAHistory = require('../models/QAHistory');
 const HandoffSession = require('../models/HandoffSession');
@@ -1457,10 +1458,21 @@ exports.getBotAutopilot = async (botId, userId) => {
 
   const runs = await BotAutopilotRun.find({ bot: botId })
     .sort({ createdAt: -1 })
-    .limit(10)
+    .limit(20)
     .lean();
 
-  return { config, runs };
+  return {
+    config,
+    runs,
+    phoenix: getPhoenixRuntimeInfo(),
+    defaults: {
+      prompt:
+        'Generate practical bot improvement recommendations from Phoenix traces, Q&A history, evals, handoffs, and experiment results. Focus on training data gaps, fallback behavior, tone mismatch, prompt quality, handoff timing, and knowledge-base coverage.',
+      cadence: 'weekly',
+      timeOfDay: '09:00',
+      timezone: 'UTC',
+    },
+  };
 };
 
 exports.saveBotAutopilot = async ({ botId, userId, data }) => {
@@ -2205,7 +2217,7 @@ exports.getEvalDatasets = async (botId, userId) => {
 
   const [items, runs, customTypes] = await Promise.all([
     BotEvalDatasetItem.find({ bot: botId }).sort({ createdAt: -1 }).limit(300).lean(),
-    BotEvalRun.find({ bot: botId }).sort({ createdAt: -1 }).limit(25).lean(),
+    BotEvalRun.find({ bot: botId }).sort({ createdAt: -1 }).limit(100).lean(),
     BotEvalDatasetType.find({ bot: botId }).sort({ createdAt: -1 }).lean(),
   ]);
 

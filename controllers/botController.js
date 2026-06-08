@@ -5,6 +5,7 @@ const { testCustomLLMConnection } = require('../utils/llmClientUtils');
 const ChatBot = require('../models/ChatBot');
 const { enforceVisitorEmailVerificationForBot } = require('../utils/visitorEmailOtpEnforce');
 const arizeInsightService = require('../services/arizeInsightService');
+const botMonitoringService = require('../services/botMonitoringService');
 
 // create chatbot
 exports.createBot = async (req, res) => {
@@ -883,6 +884,252 @@ exports.runBotLLMJudge = async (req, res) => {
       res,
       null,
       error.message || 'Failed to run LLM-as-a-Judge eval'
+    );
+  }
+};
+
+exports.getBotAutopilot = async (req, res) => {
+  const { botId } = req.params;
+
+  try {
+    const result = await arizeInsightService.getBotAutopilot(
+      botId,
+      req.user?.id
+    );
+
+    return responseBuilder.ok(res, result, 'Bot autopilot fetched successfully');
+  } catch (error) {
+    logger.error('Error fetching bot autopilot', {
+      error: error.message,
+      botId,
+      userId: req.user?.id,
+    });
+
+    if (error.message === 'Bot not found') {
+      return responseBuilder.notFound(res, null, 'Bot not found');
+    }
+
+    return responseBuilder.badRequest(
+      res,
+      null,
+      error.message || 'Failed to fetch bot autopilot'
+    );
+  }
+};
+
+exports.saveBotAutopilot = async (req, res) => {
+  const { botId } = req.params;
+
+  try {
+    const result = await arizeInsightService.saveBotAutopilot({
+      botId,
+      userId: req.user?.id,
+      data: req.body || {},
+    });
+
+    return responseBuilder.ok(res, result, 'Bot autopilot saved successfully');
+  } catch (error) {
+    logger.error('Error saving bot autopilot', {
+      error: error.message,
+      botId,
+      userId: req.user?.id,
+    });
+
+    if (error.message === 'Bot not found') {
+      return responseBuilder.notFound(res, null, 'Bot not found');
+    }
+
+    return responseBuilder.badRequest(
+      res,
+      null,
+      error.message || 'Failed to save bot autopilot'
+    );
+  }
+};
+
+exports.generateBotAutopilotRecommendations = async (req, res) => {
+  const { botId } = req.params;
+  const {
+    trigger = 'preview',
+    send = false,
+    promptOverride = null,
+  } = req.body || {};
+
+  try {
+    const result = await arizeInsightService.generateBotAutopilotRecommendations({
+      botId,
+      userId: req.user?.id,
+      trigger,
+      send: Boolean(send),
+      promptOverride,
+    });
+
+    return responseBuilder.ok(
+      res,
+      result,
+      send
+        ? 'Autopilot recommendations generated and sent'
+        : 'Autopilot recommendations generated'
+    );
+  } catch (error) {
+    logger.error('Error generating bot autopilot recommendations', {
+      error: error.message,
+      botId,
+      userId: req.user?.id,
+    });
+
+    if (error.message === 'Bot not found') {
+      return responseBuilder.notFound(res, null, 'Bot not found');
+    }
+
+    return responseBuilder.badRequest(
+      res,
+      null,
+      error.message || 'Failed to generate autopilot recommendations'
+    );
+  }
+};
+
+exports.getBotMonitoring = async (req, res) => {
+  const { botId } = req.params;
+
+  try {
+    const result = await botMonitoringService.getBotMonitoring(
+      botId,
+      req.user?.id
+    );
+    return responseBuilder.ok(res, result, 'Bot monitoring fetched successfully');
+  } catch (error) {
+    logger.error('Error fetching bot monitoring', {
+      error: error.message,
+      botId,
+      userId: req.user?.id,
+    });
+    if (error.message === 'Bot not found') {
+      return responseBuilder.notFound(res, null, 'Bot not found');
+    }
+    return responseBuilder.badRequest(
+      res,
+      null,
+      error.message || 'Failed to fetch bot monitoring'
+    );
+  }
+};
+
+exports.saveBotMonitoring = async (req, res) => {
+  const { botId } = req.params;
+
+  try {
+    const result = await botMonitoringService.saveBotMonitoring({
+      botId,
+      userId: req.user?.id,
+      data: req.body || {},
+    });
+    return responseBuilder.ok(res, result, 'Bot monitoring saved successfully');
+  } catch (error) {
+    logger.error('Error saving bot monitoring', {
+      error: error.message,
+      botId,
+      userId: req.user?.id,
+    });
+    if (error.message === 'Bot not found') {
+      return responseBuilder.notFound(res, null, 'Bot not found');
+    }
+    return responseBuilder.badRequest(
+      res,
+      null,
+      error.message || 'Failed to save bot monitoring'
+    );
+  }
+};
+
+exports.evaluateBotMonitoring = async (req, res) => {
+  const { botId } = req.params;
+  const { notify = false } = req.body || {};
+
+  try {
+    const result = await botMonitoringService.evaluateBotMonitoring({
+      botId,
+      userId: req.user?.id,
+      notify: Boolean(notify),
+      trigger: 'manual',
+    });
+    return responseBuilder.ok(res, result, 'Monitoring evaluation completed');
+  } catch (error) {
+    logger.error('Error evaluating bot monitoring', {
+      error: error.message,
+      botId,
+      userId: req.user?.id,
+    });
+    if (error.message === 'Bot not found') {
+      return responseBuilder.notFound(res, null, 'Bot not found');
+    }
+    return responseBuilder.badRequest(
+      res,
+      null,
+      error.message || 'Failed to evaluate monitoring'
+    );
+  }
+};
+
+exports.acknowledgeMonitoringAlert = async (req, res) => {
+  const { botId, alertId } = req.params;
+
+  try {
+    const result = await botMonitoringService.acknowledgeMonitoringAlert({
+      botId,
+      userId: req.user?.id,
+      alertId,
+    });
+    return responseBuilder.ok(res, result, 'Alert acknowledged');
+  } catch (error) {
+    logger.error('Error acknowledging monitoring alert', {
+      error: error.message,
+      botId,
+      alertId,
+      userId: req.user?.id,
+    });
+    if (error.message === 'Bot not found') {
+      return responseBuilder.notFound(res, null, 'Bot not found');
+    }
+    if (error.message === 'Alert not found') {
+      return responseBuilder.notFound(res, null, error.message);
+    }
+    return responseBuilder.badRequest(
+      res,
+      null,
+      error.message || 'Failed to acknowledge alert'
+    );
+  }
+};
+
+exports.resolveMonitoringAlert = async (req, res) => {
+  const { botId, alertId } = req.params;
+
+  try {
+    const result = await botMonitoringService.resolveMonitoringAlert({
+      botId,
+      userId: req.user?.id,
+      alertId,
+    });
+    return responseBuilder.ok(res, result, 'Alert resolved');
+  } catch (error) {
+    logger.error('Error resolving monitoring alert', {
+      error: error.message,
+      botId,
+      alertId,
+      userId: req.user?.id,
+    });
+    if (error.message === 'Bot not found') {
+      return responseBuilder.notFound(res, null, 'Bot not found');
+    }
+    if (error.message === 'Alert not found') {
+      return responseBuilder.notFound(res, null, error.message);
+    }
+    return responseBuilder.badRequest(
+      res,
+      null,
+      error.message || 'Failed to resolve alert'
     );
   }
 };
