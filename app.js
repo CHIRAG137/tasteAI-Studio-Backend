@@ -27,6 +27,8 @@ const issueReportRoutes = require('./routes/issueReportRoutes');
 const visitorAuthRoutes = require('./routes/visitorAuthRoutes');
 const userRoutes = require('./routes/userRoutes');
 const { startInviteReminderScheduler } = require('./services/inviteReminderScheduler');
+const { startBotAutopilotScheduler } = require('./services/botAutopilotScheduler');
+const { startBotMonitoringScheduler } = require('./services/botMonitoringScheduler');
 
 const app = express();
 
@@ -147,6 +149,10 @@ app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   // Start the invite reminder scheduler (runs every hour)
   startInviteReminderScheduler('0 * * * *');
+  // Check for due bot autopilot recommendation deliveries every 15 minutes
+  startBotAutopilotScheduler('*/15 * * * *');
+  // Evaluate production monitoring alert thresholds every 15 minutes
+  startBotMonitoringScheduler('*/15 * * * *');
 });
 
 process.on('SIGTERM', async () => {
