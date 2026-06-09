@@ -11,6 +11,7 @@ const BotInteractionMetric = require('../models/BotInteractionMetric');
 const BotImprovementAction = require('../models/BotImprovementAction');
 const BotAutopilotConfig = require('../models/BotAutopilotConfig');
 const BotAutopilotRun = require('../models/BotAutopilotRun');
+const BotSelfIntrospectionRun = require('../models/BotSelfIntrospectionRun');
 const SlackIntegration = require('../models/SlackIntegration');
 const humanHandoffService = require('./humanHandoffService');
 const { generateEmbedding, getLLMClient } = require('../utils/llmClientUtils');
@@ -1216,22 +1217,83 @@ Return a concise, actionable answer with:
         'metadata.phoenix_linked_trace_count': evidence.phoenix.linkedTraceCount,
       });
 
+      const responseEvidence = {
+        phoenix: evidence.phoenix,
+        metrics: evidence.metrics,
+        failureClusters: evidence.failureClusters,
+        topLowConfidenceQuestions: evidence.topLowConfidenceQuestions,
+        topUnansweredQuestions: evidence.topUnansweredQuestions,
+        handoffs: evidence.handoffs,
+        latestJudgeRun: evidence.evals.latestJudgeRun,
+        bestExperiment: evidence.experiments.best,
+        recentExperiments: evidence.experiments.recent,
+      };
+
+      const savedRun = await BotSelfIntrospectionRun.create({
+        bot: botId,
+        user: userId,
+        question: adminQuestion,
+        answer,
+        evidence: responseEvidence,
+        summary: {
+          linkedTraceCount: evidence.phoenix.linkedTraceCount || 0,
+          sampledInteractions: evidence.metrics.sampledInteractions || 0,
+          lowConfidenceCount: evidence.metrics.lowConfidenceCount || 0,
+          unansweredCount: evidence.metrics.unansweredCount || 0,
+          fallbackRate: evidence.metrics.fallbackRate ?? null,
+          failureClusterCount: evidence.failureClusters?.length || 0,
+          phoenixProjectName: evidence.phoenix.projectName || null,
+        },
+      });
+
       return {
+        _id: savedRun._id,
+        createdAt: savedRun.createdAt,
         question: adminQuestion,
         answer,
         defaultQuestions: DEFAULT_INTROSPECTION_QUESTIONS,
-        evidence: {
-          phoenix: evidence.phoenix,
-          metrics: evidence.metrics,
-          failureClusters: evidence.failureClusters,
-          topLowConfidenceQuestions: evidence.topLowConfidenceQuestions,
-          topUnansweredQuestions: evidence.topUnansweredQuestions,
-          latestJudgeRun: evidence.evals.latestJudgeRun,
-          bestExperiment: evidence.experiments.best,
-        },
+        evidence: responseEvidence,
       };
     }
   );
+};
+
+exports.getBotSelfIntrospectionHistory = async (botId, userId, options = {}) => {
+  const bot = await ChatBot.findOne({ _id: botId, user: userId }).lean();
+  if (!bot) {
+    throw new Error('Bot not found');
+  }
+
+  const page = Math.max(1, Number(options.page) || 1);
+  const pageSize = Math.min(20, Math.max(1, Number(options.pageSize) || 5));
+  const search = String(options.search || '').trim();
+
+  const query = { bot: botId, user: userId };
+  if (search) {
+    query.$or = [
+      { question: { $regex: search, $options: 'i' } },
+      { answer: { $regex: search, $options: 'i' } },
+    ];
+  }
+
+  const [runs, total] = await Promise.all([
+    BotSelfIntrospectionRun.find(query)
+      .sort({ createdAt: -1 })
+      .skip((page - 1) * pageSize)
+      .limit(pageSize)
+      .lean(),
+    BotSelfIntrospectionRun.countDocuments(query),
+  ]);
+
+  return {
+    runs,
+    pagination: {
+      page,
+      pageSize,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / pageSize)),
+    },
+  };
 };
 
 function normalizeEmailList(value) {

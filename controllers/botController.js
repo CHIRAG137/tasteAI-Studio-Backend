@@ -627,6 +627,41 @@ exports.applyBotImprovementAction = async (req, res) => {
   }
 };
 
+exports.getBotSelfIntrospectionHistory = async (req, res) => {
+  const { botId } = req.params;
+  const { page, pageSize, search } = req.query || {};
+
+  try {
+    const result = await arizeInsightService.getBotSelfIntrospectionHistory(
+      botId,
+      req.user?.id,
+      { page, pageSize, search }
+    );
+
+    return responseBuilder.ok(
+      res,
+      result,
+      'Self-introspection history retrieved successfully'
+    );
+  } catch (error) {
+    logger.error('Error fetching self-introspection history', {
+      error: error.message,
+      botId,
+      userId: req.user?.id,
+    });
+
+    if (error.message === 'Bot not found') {
+      return responseBuilder.notFound(res, null, 'Bot not found');
+    }
+
+    return responseBuilder.internalError(
+      res,
+      null,
+      error.message || 'Failed to fetch self-introspection history'
+    );
+  }
+};
+
 // ask the private Phoenix self-introspection tool a question
 exports.askBotSelfIntrospection = async (req, res) => {
   const { botId } = req.params;
