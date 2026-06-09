@@ -199,6 +199,17 @@ router.post(
 );
 
 /**
+ * @route   GET /api/bots/:botId/improvements/introspect/history
+ * @desc    Get paginated self-introspection history for a bot
+ * @access  Private
+ */
+router.get(
+  '/:botId/improvements/introspect/history',
+  authMiddleware,
+  botController.getBotSelfIntrospectionHistory
+);
+
+/**
  * @route   POST /api/bots/:botId/improvements/introspect
  * @desc    Ask the private Phoenix MCP self-introspection tool about bot failures
  * @access  Private

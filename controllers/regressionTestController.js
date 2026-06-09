@@ -10,7 +10,11 @@ exports.createRegressionTests = async (req, res) => {
 
     const testSuite = await regressionTestService.createRegressionTestSuite(
       botId,
-      req.user?.id
+      req.user?.id,
+      {
+        name: req.body?.name,
+        description: req.body?.description,
+      }
     );
 
     return responseBuilder.ok(
@@ -25,10 +29,14 @@ exports.createRegressionTests = async (req, res) => {
       userId: req.user?.id,
     });
 
+    if (error.message?.includes('No production conversations')) {
+      return responseBuilder.badRequest(res, null, error.message);
+    }
+
     return responseBuilder.internalError(
       res,
       null,
-      'Failed to create regression test suite'
+      error.message || 'Failed to create regression test suite'
     );
   }
 };
@@ -73,7 +81,8 @@ exports.runRegressionTests = async (req, res) => {
     const results = await regressionTestService.runRegressionTests(
       botId,
       testSuiteId,
-      botVersionId || 'current'
+      botVersionId || 'current',
+      req.user?.id
     );
 
     return responseBuilder.ok(res, results, 'Regression tests executed successfully');
@@ -84,10 +93,17 @@ exports.runRegressionTests = async (req, res) => {
       testSuiteId,
     });
 
+    if (
+      error.message === 'Test suite not found' ||
+      error.message?.includes('no test cases')
+    ) {
+      return responseBuilder.badRequest(res, null, error.message);
+    }
+
     return responseBuilder.internalError(
       res,
       null,
-      'Failed to run regression tests'
+      error.message || 'Failed to run regression tests'
     );
   }
 };
