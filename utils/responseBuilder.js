@@ -1,43 +1,21 @@
-function buildResponse(res, statusCode, status, message, result = null) {
-  return res.status(statusCode).json({
-    status,
-    message,
-    result,
-  });
+'use strict';
+
+function build(res, statusCode, status, message, result = null) {
+  return res.status(statusCode).json({ status, message, result });
 }
 
-exports.ok = (res, result, message = 'OK') =>
-  buildResponse(res, 200, 'success', message, result);
-
-exports.created = (res, result, message = 'Created') =>
-  buildResponse(res, 201, 'success', message, result);
-
-exports.accepted = (res, result, message = 'Accepted') =>
-  buildResponse(res, 202, 'success', message, result);
-
-exports.noContent = (res, message = 'No Content') =>
-  buildResponse(res, 204, 'success', message, null);
-
-exports.badRequest = (res, error, message = 'Bad Request') =>
-  buildResponse(res, 400, 'error', message, error);
-
-exports.unauthorized = (res, error, message = 'Unauthorized') =>
-  buildResponse(res, 401, 'error', message, error);
-
-exports.forbidden = (res, error, message = 'Forbidden') =>
-  buildResponse(res, 403, 'error', message, error);
-
-exports.notFound = (res, error, message = 'Not Found') =>
-  buildResponse(res, 404, 'error', message, error);
-
-exports.conflict = (res, error, message = 'Conflict') =>
-  buildResponse(res, 409, 'error', message, error);
-
-exports.unprocessableEntity = (res, error, message = 'Unprocessable Entity') =>
-  buildResponse(res, 422, 'error', message, error);
-
-exports.internalError = (res, error, message = 'Internal Server Error') =>
-  buildResponse(res, 500, 'error', message, error);
-
-exports.serviceUnavailable = (res, error, message = 'Service Unavailable') =>
-  buildResponse(res, 503, 'error', message, error);
+module.exports = {
+  ok:                  (res, result, msg = 'OK')                    => build(res, 200, 'success', msg, result),
+  created:             (res, result, msg = 'Created')               => build(res, 201, 'success', msg, result),
+  accepted:            (res, result, msg = 'Accepted')              => build(res, 202, 'success', msg, result),
+  noContent:           (res, msg = 'No Content')                    => build(res, 204, 'success', msg, null),
+  badRequest:          (res, err, msg = 'Bad Request')              => build(res, 400, 'error',   msg, err),
+  unauthorized:        (res, err, msg = 'Unauthorized')             => build(res, 401, 'error',   msg, err),
+  forbidden:           (res, err, msg = 'Forbidden')                => build(res, 403, 'error',   msg, err),
+  notFound:            (res, err, msg = 'Not Found')                => build(res, 404, 'error',   msg, err),
+  conflict:            (res, err, msg = 'Conflict')                 => build(res, 409, 'error',   msg, err),
+  unprocessableEntity: (res, err, msg = 'Unprocessable Entity')     => build(res, 422, 'error',   msg, err),
+  tooManyRequests:     (res, err, msg = 'Too Many Requests')        => build(res, 429, 'error',   msg, err),
+  internalError:       (res, err, msg = 'Internal Server Error')    => build(res, 500, 'error',   msg, err),
+  serviceUnavailable:  (res, err, msg = 'Service Unavailable')      => build(res, 503, 'error',   msg, err),
+};

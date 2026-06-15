@@ -1,28 +1,34 @@
-function getTimeStamp() {
+'use strict';
+
+/**
+ * Minimal structured JSON logger.
+ */
+
+function getTimestamp() {
   return new Date().toISOString();
 }
 
 function formatLog(level, message, meta) {
   return JSON.stringify({
-    time: getTimeStamp(),
+    time: getTimestamp(),
     level: level.toUpperCase(),
     message,
-    ...(meta ? { meta } : {}),
+    ...(meta && Object.keys(meta).length ? { meta } : {}),
   });
 }
 
-function log(level, message, meta) {
+function log(level, message, meta = {}) {
   const line = formatLog(level, message, meta);
   if (level === 'error') {
-    console.error(line);
-  } else if (level === 'warn') {
-    console.warn(line);
+    process.stderr.write(line + '\n');
   } else {
-    console.log(line);
+    process.stdout.write(line + '\n');
   }
 }
 
-exports.info = (message, meta) => log('info', message, meta);
-exports.warn = (message, meta) => log('warn', message, meta);
-exports.error = (message, meta) => log('error', message, meta);
-exports.debug = (message, meta) => log('debug', message, meta);
+module.exports = {
+  info: (msg, meta) => log('info', msg, meta),
+  warn: (msg, meta) => log('warn', msg, meta),
+  error: (msg, meta) => log('error', msg, meta),
+  debug: (msg, meta) => log('debug', msg, meta),
+};
