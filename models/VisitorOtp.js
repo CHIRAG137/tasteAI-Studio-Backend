@@ -10,7 +10,7 @@ const visitorOtpSchema = new mongoose.Schema(
     expiresAt: { type: Date, required: true, index: true },
     attempts: { type: Number, default: 0 },
   },
-  { timestamps: true, versionKey: false }
+  { timestamps: true, versionKey: false },
 );
 
 // TTL index

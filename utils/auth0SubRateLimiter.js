@@ -38,4 +38,3 @@ exports.consumeAuth0SubRateLimit = ({
   buckets.set(key, current);
   return { allowed: true, remaining: Math.max(0, maxRequests - current.count) };
 };
-

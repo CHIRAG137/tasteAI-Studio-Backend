@@ -15,7 +15,12 @@ const BotSelfIntrospectionRun = require('../models/BotSelfIntrospectionRun');
 const SlackIntegration = require('../models/SlackIntegration');
 const humanHandoffService = require('./humanHandoffService');
 const { generateEmbedding, getLLMClient } = require('../utils/llmClientUtils');
-const { buildPhoenixMcpConfig, getPhoenixRuntimeInfo, runPhoenixSpan, setPhoenixSpanAttributes } = require('../config/phoenixTracing');
+const {
+  buildPhoenixMcpConfig,
+  getPhoenixRuntimeInfo,
+  runPhoenixSpan,
+  setPhoenixSpanAttributes,
+} = require('../config/phoenixTracing');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const sendEmail = require('../utils/sendEmailUtil');
 const slackClient = require('../config/slackClient');
@@ -28,15 +33,11 @@ const DEFAULT_INTROSPECTION_QUESTIONS = [
 ];
 
 function getQuestionText(entry) {
-  return (
-    entry?.question || entry?.message || entry?.content || entry?.text || ''
-  );
+  return entry?.question || entry?.message || entry?.content || entry?.text || '';
 }
 
 function getAnswerText(entry) {
-  return (
-    entry?.answer || entry?.response || entry?.content || entry?.text || ''
-  );
+  return entry?.answer || entry?.response || entry?.content || entry?.text || '';
 }
 
 function flattenSessionQa(session) {
@@ -54,10 +55,10 @@ function flattenSessionQa(session) {
 }
 
 function average(values) {
-  const clean = values.filter(
-    (value) => typeof value === 'number' && Number.isFinite(value)
-  );
-  if (!clean.length) return null;
+  const clean = values.filter((value) => typeof value === 'number' && Number.isFinite(value));
+  if (!clean.length) {
+    return null;
+  }
   return clean.reduce((sum, value) => sum + value, 0) / clean.length;
 }
 
@@ -69,36 +70,26 @@ function buildBotHealthScore(metrics, handoffs) {
   const totalInteractions = metrics.length;
   const totalHandoffs = handoffs.length;
   const escalatedHandoffs = handoffs.filter(
-    (handoff) => handoff.escalated || handoff.escalationHistory?.length
+    (handoff) => handoff.escalated || handoff.escalationHistory?.length,
   ).length;
   const fallbackCount = metrics.filter((metric) => metric.usedFallback).length;
   const lowConfidenceCount = metrics.filter(
-    (metric) =>
-      typeof metric.confidence !== 'number' || metric.confidence < 0.85
+    (metric) => typeof metric.confidence !== 'number' || metric.confidence < 0.85,
   ).length;
 
   const answerConfidence = average(metrics.map((metric) => metric.confidence));
-  const groundednessScore = average(
-    metrics.map((metric) => metric.groundednessScore)
-  );
+  const groundednessScore = average(metrics.map((metric) => metric.groundednessScore));
   const avgLatencyMs = average(metrics.map((metric) => metric.latencyMs));
-  const lowConfidenceRate = totalInteractions
-    ? lowConfidenceCount / totalInteractions
-    : 0;
+  const lowConfidenceRate = totalInteractions ? lowConfidenceCount / totalInteractions : 0;
   const fallbackRate = totalInteractions ? fallbackCount / totalInteractions : 0;
-  const handoffEscalationRate = totalHandoffs
-    ? escalatedHandoffs / totalHandoffs
-    : 0;
+  const handoffEscalationRate = totalHandoffs ? escalatedHandoffs / totalHandoffs : 0;
 
-  const confidenceScore =
-    answerConfidence === null ? 72 : Math.max(0, answerConfidence * 100);
+  const confidenceScore = answerConfidence === null ? 72 : Math.max(0, answerConfidence * 100);
   const lowConfidenceScore = Math.max(0, 100 - lowConfidenceRate * 100);
   const groundednessComponent =
     groundednessScore === null ? 70 : Math.max(0, groundednessScore * 100);
   const latencyScore =
-    avgLatencyMs === null
-      ? 75
-      : Math.max(0, 100 - Math.max(0, avgLatencyMs - 1500) / 80);
+    avgLatencyMs === null ? 75 : Math.max(0, 100 - Math.max(0, avgLatencyMs - 1500) / 80);
   const fallbackScore = Math.max(0, 100 - fallbackRate * 100);
   const handoffScore = Math.max(0, 100 - handoffEscalationRate * 100);
 
@@ -108,7 +99,7 @@ function buildBotHealthScore(metrics, handoffs) {
       groundednessComponent * 0.22 +
       latencyScore * 0.12 +
       fallbackScore * 0.13 +
-      handoffScore * 0.1
+      handoffScore * 0.1,
   );
 
   return {
@@ -145,12 +136,7 @@ function buildBotHealthScore(metrics, handoffs) {
   };
 }
 
-function buildRecommendations({
-  lowConfidenceQuestions,
-  sourceBreakdown,
-  totalQa,
-  healthScore,
-}) {
+function buildRecommendations({ lowConfidenceQuestions, sourceBreakdown, totalQa, healthScore }) {
   const recommendations = [];
 
   if (healthScore?.score < 70) {
@@ -302,7 +288,9 @@ const BUILTIN_EVAL_SOURCE_TYPES = [
 ];
 
 function datasetNameForSource(sourceType, customName) {
-  if (customName) return customName;
+  if (customName) {
+    return customName;
+  }
   const names = {
     low_confidence_traces: 'Low Confidence Traces',
     high_confidence_traces: 'High Confidence Traces',
@@ -346,14 +334,7 @@ function buildDatasetRecord({
   };
 }
 
-function metricToDatasetRecord({
-  botId,
-  sourceType,
-  metric,
-  userId,
-  datasetName,
-  customTypeId,
-}) {
+function metricToDatasetRecord({ botId, sourceType, metric, userId, datasetName, customTypeId }) {
   const itemKey = customTypeId
     ? `custom:${customTypeId}:${metric._id}`
     : `${sourceType}:${metric._id}`;
@@ -381,14 +362,7 @@ function metricToDatasetRecord({
   });
 }
 
-function handoffToDatasetRecord({
-  botId,
-  sourceType,
-  handoff,
-  userId,
-  datasetName,
-  customTypeId,
-}) {
+function handoffToDatasetRecord({ botId, sourceType, handoff, userId, datasetName, customTypeId }) {
   const itemKey = customTypeId
     ? `custom:${customTypeId}:${handoff._id}`
     : `${sourceType}:${handoff._id}`;
@@ -528,10 +502,7 @@ async function fetchMetricsForBuiltinSource(botId, sourceType) {
       query = {
         ...baseQuery,
         confidence: { $gte: 0.85 },
-        $or: [
-          { groundednessScore: { $gte: 0.8 } },
-          { hallucinationRisk: { $lte: 0.2 } },
-        ],
+        $or: [{ groundednessScore: { $gte: 0.8 } }, { hallucinationRisk: { $lte: 0.2 } }],
       };
       break;
     case 'hallucination_risk':
@@ -572,10 +543,7 @@ async function fetchHandoffsForBuiltinSource(botId, sourceType) {
     case 'negative_feedback':
       query = {
         ...query,
-        $or: [
-          { userRating: { $lte: 2 } },
-          { userFeedback: { $exists: true, $ne: '' } },
-        ],
+        $or: [{ userRating: { $lte: 2 } }, { userFeedback: { $exists: true, $ne: '' } }],
       };
       break;
     case 'positive_feedback':
@@ -590,32 +558,36 @@ async function fetchHandoffsForBuiltinSource(botId, sourceType) {
 
 function inferDatasetPolarity(sourceTypes = [], customTypes = [], datasetName = '') {
   const customMatch = customTypes.find(
-    (type) => type.datasetName === datasetName || type.name === datasetName
+    (type) => type.datasetName === datasetName || type.name === datasetName,
   );
   if (customMatch?.polarity) {
     return customMatch.polarity;
   }
 
-  const polarities = (sourceTypes || [])
-    .map((type) => SOURCE_TYPE_POLARITY[type])
-    .filter(Boolean);
+  const polarities = (sourceTypes || []).map((type) => SOURCE_TYPE_POLARITY[type]).filter(Boolean);
 
-  if (!polarities.length) return 'neutral';
+  if (!polarities.length) {
+    return 'neutral';
+  }
   const unique = [...new Set(polarities)];
-  if (unique.length > 1) return 'mixed';
+  if (unique.length > 1) {
+    return 'mixed';
+  }
   return unique[0];
 }
 
 function datasetDescriptionFor(sourceTypes = [], customTypes = [], datasetName = '') {
   const customMatch = customTypes.find(
-    (type) => type.datasetName === datasetName || type.name === datasetName
+    (type) => type.datasetName === datasetName || type.name === datasetName,
   );
   if (customMatch?.description) {
     return customMatch.description;
   }
 
   const primarySource = sourceTypes?.[0];
-  if (!primarySource) return 'Production conversation samples for evaluation.';
+  if (!primarySource) {
+    return 'Production conversation samples for evaluation.';
+  }
   return `Built from ${primarySource.replace(/_/g, ' ')} traces.`;
 }
 
@@ -636,10 +608,8 @@ function buildJudgePrompt({ bot, item, evalMode, polarity, activeCriteria }) {
       'This is a REGRESSION dataset built from production failure signals. Grade whether the actual answer shows the failure pattern (low confidence, fallback, grounding risk, etc.). Low scores confirm the item belongs in this dataset.',
     gold_standard:
       'This is a GOLD STANDARD dataset built from high-quality production answers. Grade whether the answer is exemplary and should be preserved as expected behavior.',
-    standard:
-      'Grade the answer holistically against the bot persona and user intent.',
-    custom:
-      'Grade the answer using only the selected criteria below.',
+    standard: 'Grade the answer holistically against the bot persona and user intent.',
+    custom: 'Grade the answer using only the selected criteria below.',
   };
 
   const polarityGuidance = {
@@ -697,12 +667,16 @@ function averageItemScore(scores, activeCriteria) {
   const values = activeCriteria
     .map((key) => scores[key])
     .filter((value) => typeof value === 'number' && Number.isFinite(value));
-  if (!values.length) return null;
+  if (!values.length) {
+    return null;
+  }
   return values.reduce((sum, value) => sum + value, 0) / values.length;
 }
 
 function itemVerdict({ overallItemScore, passThreshold, polarity }) {
-  if (typeof overallItemScore !== 'number') return 'review';
+  if (typeof overallItemScore !== 'number') {
+    return 'review';
+  }
   if (polarity === 'negative') {
     return overallItemScore < passThreshold ? 'pass' : 'fail';
   }
@@ -723,16 +697,20 @@ function parseJudgeJson(text) {
 
 function normalizeJudgeScore(value) {
   const number = Number(value);
-  if (!Number.isFinite(number)) return 0.5;
-  if (number > 1) return Math.max(0, Math.min(1, number / 100));
+  if (!Number.isFinite(number)) {
+    return 0.5;
+  }
+  if (number > 1) {
+    return Math.max(0, Math.min(1, number / 100));
+  }
   return Math.max(0, Math.min(1, number));
 }
 
 function averageNumbers(values) {
-  const clean = values.filter(
-    (value) => typeof value === 'number' && Number.isFinite(value)
-  );
-  if (!clean.length) return null;
+  const clean = values.filter((value) => typeof value === 'number' && Number.isFinite(value));
+  if (!clean.length) {
+    return null;
+  }
   return clean.reduce((sum, value) => sum + value, 0) / clean.length;
 }
 
@@ -748,7 +726,7 @@ async function upsertDatasetItems(records) {
     const saved = await BotEvalDatasetItem.findOneAndUpdate(
       { bot: record.bot, itemKey: record.itemKey },
       record,
-      { upsert: true, new: true, setDefaultsOnInsert: true }
+      { upsert: true, new: true, setDefaultsOnInsert: true },
     );
     results.push(saved);
   }
@@ -847,9 +825,7 @@ Return only JSON:
   const parsed = parseJudgeJson(raw) || {};
 
   return {
-    winner: ['control', 'treatment', 'tie'].includes(parsed.winner)
-      ? parsed.winner
-      : 'tie',
+    winner: ['control', 'treatment', 'tie'].includes(parsed.winner) ? parsed.winner : 'tie',
     controlScore: normalizeJudgeScore(parsed.controlScore),
     treatmentScore: normalizeJudgeScore(parsed.treatmentScore),
     explanation: parsed.explanation || 'Judge completed without explanation.',
@@ -872,8 +848,7 @@ function buildImprovementItem(type, metric, overrides = {}) {
         ? metric.confidence
         : null,
     hallucinationRisk:
-      typeof metric.hallucinationRisk === 'number' &&
-      Number.isFinite(metric.hallucinationRisk)
+      typeof metric.hallucinationRisk === 'number' && Number.isFinite(metric.hallucinationRisk)
         ? metric.hallucinationRisk
         : null,
     sessionId: metric.flowSession ? String(metric.flowSession) : null,
@@ -890,7 +865,9 @@ function buildImprovementItem(type, metric, overrides = {}) {
 
 function mergeActionState(items, actions) {
   const actionMap = actions.reduce((acc, action) => {
-    if (!acc[action.itemKey]) acc[action.itemKey] = [];
+    if (!acc[action.itemKey]) {
+      acc[action.itemKey] = [];
+    }
     acc[action.itemKey].push({
       action: action.action,
       status: action.status,
@@ -903,8 +880,7 @@ function mergeActionState(items, actions) {
     .filter((item) => {
       const itemActions = actionMap[item.key] || [];
       return !itemActions.some(
-        (action) =>
-          action.action === 'mark_expected' && action.status === 'completed'
+        (action) => action.action === 'mark_expected' && action.status === 'completed',
       );
     })
     .map((item) => ({
@@ -915,14 +891,8 @@ function mergeActionState(items, actions) {
 
 async function loadHealthInputs(botId) {
   return Promise.all([
-    BotInteractionMetric.find({ bot: botId })
-      .sort({ createdAt: -1 })
-      .limit(200)
-      .lean(),
-    HandoffSession.find({ bot: botId })
-      .sort({ requestedAt: -1 })
-      .limit(100)
-      .lean(),
+    BotInteractionMetric.find({ bot: botId }).sort({ createdAt: -1 }).limit(200).lean(),
+    HandoffSession.find({ bot: botId }).sort({ requestedAt: -1 }).limit(100).lean(),
   ]);
 }
 
@@ -939,7 +909,9 @@ function buildFailureClusters(metrics) {
 
   for (const metric of metrics) {
     const key = normalizeKey(metric.question).split('-').slice(0, 5).join('-');
-    if (!key) continue;
+    if (!key) {
+      continue;
+    }
     if (!buckets[key]) {
       buckets[key] = {
         intentKey: key,
@@ -972,12 +944,14 @@ function buildFailureClusters(metrics) {
       avgLatencyMs: average(
         metrics
           .filter((metric) => normalizeKey(metric.question).startsWith(bucket.intentKey))
-          .map((metric) => metric.latencyMs)
+          .map((metric) => metric.latencyMs),
       ),
     }))
     .sort((a, b) => {
-      const aScore = a.fallbackCount * 2 + a.count + (a.avgConfidence === null ? 1 : 1 - a.avgConfidence);
-      const bScore = b.fallbackCount * 2 + b.count + (b.avgConfidence === null ? 1 : 1 - b.avgConfidence);
+      const aScore =
+        a.fallbackCount * 2 + a.count + (a.avgConfidence === null ? 1 : 1 - a.avgConfidence);
+      const bScore =
+        b.fallbackCount * 2 + b.count + (b.avgConfidence === null ? 1 : 1 - b.avgConfidence);
       return bScore - aScore;
     })
     .slice(0, 8);
@@ -985,19 +959,21 @@ function buildFailureClusters(metrics) {
 
 function buildIntrospectionEvidence({ bot, metrics, handoffs, evalRuns, experiments }) {
   const lowConfidence = metrics.filter(
-    (metric) => typeof metric.confidence !== 'number' || metric.confidence < 0.85
+    (metric) => typeof metric.confidence !== 'number' || metric.confidence < 0.85,
   );
-  const unanswered = metrics.filter(
-    (metric) => metric.usedFallback || metric.source === 'none'
-  );
+  const unanswered = metrics.filter((metric) => metric.usedFallback || metric.source === 'none');
   const linkedPhoenixTraces = metrics.filter((metric) => metric.phoenix?.traceId);
   const sourceBreakdown = countBy(metrics, (metric) => metric.source);
-  const fallbackBreakdown = countBy(unanswered, (metric) => metric.trace?.fallback?.source || metric.source);
+  const fallbackBreakdown = countBy(
+    unanswered,
+    (metric) => metric.trace?.fallback?.source || metric.source,
+  );
   const latestJudgeRun = evalRuns.find((run) => run.status === 'completed') || evalRuns[0] || null;
-  const completedExperiments = experiments.filter((experiment) => experiment.status === 'completed');
-  const bestExperiment = completedExperiments
-    .slice()
-    .sort((a, b) => {
+  const completedExperiments = experiments.filter(
+    (experiment) => experiment.status === 'completed',
+  );
+  const bestExperiment =
+    completedExperiments.slice().sort((a, b) => {
       const aScore = a.metrics?.treatmentAverageJudgeScore ?? a.metrics?.treatmentWinRate ?? 0;
       const bScore = b.metrics?.treatmentAverageJudgeScore ?? b.metrics?.treatmentWinRate ?? 0;
       return bScore - aScore;
@@ -1020,15 +996,13 @@ function buildIntrospectionEvidence({ bot, metrics, handoffs, evalRuns, experime
       ...getPhoenixRuntimeInfo(),
       mcpConfig: buildPhoenixMcpConfig(),
       linkedTraceCount: linkedPhoenixTraces.length,
-      recentTraceUrls: linkedPhoenixTraces
-        .slice(0, 8)
-        .map((metric) => ({
-          traceId: metric.phoenix.traceId,
-          spanId: metric.phoenix.spanId,
-          traceUrl: metric.phoenix.traceUrl,
-          question: metric.question,
-          confidence: metric.confidence,
-        })),
+      recentTraceUrls: linkedPhoenixTraces.slice(0, 8).map((metric) => ({
+        traceId: metric.phoenix.traceId,
+        spanId: metric.phoenix.spanId,
+        traceUrl: metric.phoenix.traceUrl,
+        question: metric.question,
+        confidence: metric.confidence,
+      })),
     },
     metrics: {
       sampledInteractions: metrics.length,
@@ -1060,7 +1034,9 @@ function buildIntrospectionEvidence({ bot, metrics, handoffs, evalRuns, experime
     handoffs: {
       sampled: handoffs.length,
       unresolved: handoffs.filter((handoff) => handoff.status !== 'resolved').length,
-      escalated: handoffs.filter((handoff) => handoff.escalated || handoff.escalationHistory?.length).length,
+      escalated: handoffs.filter(
+        (handoff) => handoff.escalated || handoff.escalationHistory?.length,
+      ).length,
       recentQuestions: handoffs.slice(0, 8).map((handoff) => ({
         question:
           handoff.userQuestion ||
@@ -1152,22 +1128,10 @@ exports.askBotSelfIntrospection = async ({ botId, userId, question }) => {
     },
     async (span) => {
       const [metrics, handoffs, evalRuns, experiments] = await Promise.all([
-        BotInteractionMetric.find({ bot: botId })
-          .sort({ createdAt: -1 })
-          .limit(200)
-          .lean(),
-        HandoffSession.find({ bot: botId })
-          .sort({ requestedAt: -1 })
-          .limit(80)
-          .lean(),
-        BotEvalRun.find({ bot: botId })
-          .sort({ createdAt: -1 })
-          .limit(10)
-          .lean(),
-        BotExperiment.find({ bot: botId })
-          .sort({ createdAt: -1 })
-          .limit(10)
-          .lean(),
+        BotInteractionMetric.find({ bot: botId }).sort({ createdAt: -1 }).limit(200).lean(),
+        HandoffSession.find({ bot: botId }).sort({ requestedAt: -1 }).limit(80).lean(),
+        BotEvalRun.find({ bot: botId }).sort({ createdAt: -1 }).limit(10).lean(),
+        BotExperiment.find({ bot: botId }).sort({ createdAt: -1 }).limit(10).lean(),
       ]);
 
       const evidence = buildIntrospectionEvidence({
@@ -1254,7 +1218,7 @@ Return a concise, actionable answer with:
         defaultQuestions: DEFAULT_INTROSPECTION_QUESTIONS,
         evidence: responseEvidence,
       };
-    }
+    },
   );
 };
 
@@ -1324,9 +1288,13 @@ function computeNextAutopilotRun(cadence = 'weekly', timeOfDay = '09:00') {
   next.setUTCHours(hour, minute, 0, 0);
 
   if (next <= new Date()) {
-    if (cadence === 'daily') next.setUTCDate(next.getUTCDate() + 1);
-    else if (cadence === 'monthly') next.setUTCMonth(next.getUTCMonth() + 1);
-    else next.setUTCDate(next.getUTCDate() + 7);
+    if (cadence === 'daily') {
+      next.setUTCDate(next.getUTCDate() + 1);
+    } else if (cadence === 'monthly') {
+      next.setUTCMonth(next.getUTCMonth() + 1);
+    } else {
+      next.setUTCDate(next.getUTCDate() + 7);
+    }
   }
 
   return next;
@@ -1354,7 +1322,10 @@ function buildDefaultAutopilotRecommendations(evidence) {
       priority: 'high',
       title: `Add docs for: ${item.question}`,
       detail: 'Users are asking this and the bot used a fallback or could not answer confidently.',
-      evidence: [item.traceUrl ? `Phoenix trace: ${item.traceUrl}` : 'Local trace metric', `Source: ${item.source}`],
+      evidence: [
+        item.traceUrl ? `Phoenix trace: ${item.traceUrl}` : 'Local trace metric',
+        `Source: ${item.source}`,
+      ],
       suggestedAction: 'Add an approved Q&A answer, source document, or workflow branch.',
       channel: 'knowledge_gap',
     });
@@ -1367,7 +1338,8 @@ function buildDefaultAutopilotRecommendations(evidence) {
       title: 'Handoff should trigger earlier for difficult sessions',
       detail: `${handoff.escalated} escalated and ${handoff.unresolved} unresolved handoff sessions were found in the sample.`,
       evidence: handoff.recentQuestions.slice(0, 3).map((item) => item.question),
-      suggestedAction: 'Add handoff rules for billing, refunds, account disputes, and repeated fallback turns.',
+      suggestedAction:
+        'Add handoff rules for billing, refunds, account disputes, and repeated fallback turns.',
       channel: 'handoff_policy',
     });
   }
@@ -1376,7 +1348,8 @@ function buildDefaultAutopilotRecommendations(evidence) {
     recommendations.push({
       priority: 'low',
       title: 'Keep monitoring Phoenix traces',
-      detail: 'No severe recurring issue was detected in the sampled traces. Create a weekly eval dataset to catch regressions early.',
+      detail:
+        'No severe recurring issue was detected in the sampled traces. Create a weekly eval dataset to catch regressions early.',
       evidence: [`Sampled interactions: ${evidence.metrics.sampledInteractions}`],
       suggestedAction: 'Run LLM-as-a-Judge on recent low-confidence traces.',
       channel: 'monitoring',
@@ -1387,9 +1360,7 @@ function buildDefaultAutopilotRecommendations(evidence) {
 }
 
 function normalizeAutopilotRecommendations(parsed, evidence) {
-  const recommendations = Array.isArray(parsed?.recommendations)
-    ? parsed.recommendations
-    : [];
+  const recommendations = Array.isArray(parsed?.recommendations) ? parsed.recommendations : [];
 
   const clean = recommendations
     .map((item, index) => ({
@@ -1421,7 +1392,7 @@ function renderAutopilotEmail({ bot, run }) {
           <p style="margin:6px 0;color:#374151;line-height:1.5">${item.detail}</p>
           ${item.suggestedAction ? `<p style="margin:6px 0;color:#065f46"><strong>Next:</strong> ${item.suggestedAction}</p>` : ''}
         </li>
-      `
+      `,
     )
     .join('');
 
@@ -1445,10 +1416,12 @@ function renderAutopilotSlackText({ bot, run }) {
     `*Bot Autopilot Recommendations* for *${bot.name}* (${run.period.cadence})`,
     run.summary,
     '',
-    ...run.recommendations.slice(0, 8).map(
-      (item, index) =>
-        `${index + 1}. *[${String(item.priority || 'medium').toUpperCase()}] ${item.title}*\n${item.detail}${item.suggestedAction ? `\nNext: ${item.suggestedAction}` : ''}`
-    ),
+    ...run.recommendations
+      .slice(0, 8)
+      .map(
+        (item, index) =>
+          `${index + 1}. *[${String(item.priority || 'medium').toUpperCase()}] ${item.title}*\n${item.detail}${item.suggestedAction ? `\nNext: ${item.suggestedAction}` : ''}`,
+      ),
   ];
   return lines.join('\n');
 }
@@ -1465,9 +1438,20 @@ async function deliverAutopilotRun({ bot, config, run }) {
           text: `${run.summary}\n\n${run.recommendations.map((item) => `- [${item.priority}] ${item.title}: ${item.detail}`).join('\n')}`,
           html: renderAutopilotEmail({ bot, run }),
         });
-        deliveries.push({ channel: 'email', target: recipient, status: 'sent', sentAt: new Date() });
+        deliveries.push({
+          channel: 'email',
+          target: recipient,
+          status: 'sent',
+          sentAt: new Date(),
+        });
       } catch (error) {
-        deliveries.push({ channel: 'email', target: recipient, status: 'failed', error: error.message, sentAt: new Date() });
+        deliveries.push({
+          channel: 'email',
+          target: recipient,
+          status: 'failed',
+          error: error.message,
+          sentAt: new Date(),
+        });
       }
     }
   }
@@ -1488,11 +1472,22 @@ async function deliverAutopilotRun({ bot, config, run }) {
           headers: {
             Authorization: `Bearer ${integration.slackAccessToken}`,
           },
-        }
+        },
       );
-      deliveries.push({ channel: 'slack', target: config.delivery.slack.channelId, status: 'sent', sentAt: new Date() });
+      deliveries.push({
+        channel: 'slack',
+        target: config.delivery.slack.channelId,
+        status: 'sent',
+        sentAt: new Date(),
+      });
     } catch (error) {
-      deliveries.push({ channel: 'slack', target: config.delivery.slack.channelId, status: 'failed', error: error.message, sentAt: new Date() });
+      deliveries.push({
+        channel: 'slack',
+        target: config.delivery.slack.channelId,
+        status: 'failed',
+        error: error.message,
+        sentAt: new Date(),
+      });
     }
   }
 
@@ -1501,7 +1496,9 @@ async function deliverAutopilotRun({ bot, config, run }) {
 
 exports.getBotAutopilot = async (botId, userId) => {
   const bot = await ChatBot.findOne({ _id: botId, user: userId }).lean();
-  if (!bot) throw new Error('Bot not found');
+  if (!bot) {
+    throw new Error('Bot not found');
+  }
 
   let config = await BotAutopilotConfig.findOne({ bot: botId }).lean();
   if (!config) {
@@ -1518,10 +1515,7 @@ exports.getBotAutopilot = async (botId, userId) => {
     config = config.toObject();
   }
 
-  const runs = await BotAutopilotRun.find({ bot: botId })
-    .sort({ createdAt: -1 })
-    .limit(20)
-    .lean();
+  const runs = await BotAutopilotRun.find({ bot: botId }).sort({ createdAt: -1 }).limit(20).lean();
 
   return {
     config,
@@ -1539,14 +1533,12 @@ exports.getBotAutopilot = async (botId, userId) => {
 
 exports.saveBotAutopilot = async ({ botId, userId, data }) => {
   const bot = await ChatBot.findOne({ _id: botId, user: userId }).lean();
-  if (!bot) throw new Error('Bot not found');
+  if (!bot) {
+    throw new Error('Bot not found');
+  }
 
-  const cadence = ['daily', 'weekly', 'monthly'].includes(data?.cadence)
-    ? data.cadence
-    : 'weekly';
-  const timeOfDay = /^\d{2}:\d{2}$/.test(String(data?.timeOfDay || ''))
-    ? data.timeOfDay
-    : '09:00';
+  const cadence = ['daily', 'weekly', 'monthly'].includes(data?.cadence) ? data.cadence : 'weekly';
+  const timeOfDay = /^\d{2}:\d{2}$/.test(String(data?.timeOfDay || '')) ? data.timeOfDay : '09:00';
 
   const payload = {
     bot: botId,
@@ -1566,14 +1558,14 @@ exports.saveBotAutopilot = async ({ botId, userId, data }) => {
         channelId: String(data?.delivery?.slack?.channelId || '').trim(),
       },
     },
-    nextRunAt: Boolean(data?.enabled) ? computeNextAutopilotRun(cadence, timeOfDay) : null,
+    nextRunAt: data?.enabled ? computeNextAutopilotRun(cadence, timeOfDay) : null,
   };
 
-  const config = await BotAutopilotConfig.findOneAndUpdate(
-    { bot: botId },
-    payload,
-    { upsert: true, new: true, setDefaultsOnInsert: true }
-  ).lean();
+  const config = await BotAutopilotConfig.findOneAndUpdate({ bot: botId }, payload, {
+    upsert: true,
+    new: true,
+    setDefaultsOnInsert: true,
+  }).lean();
 
   return config;
 };
@@ -1586,11 +1578,13 @@ exports.generateBotAutopilotRecommendations = async ({
   promptOverride = null,
 }) => {
   const bot = await ChatBot.findOne({ _id: botId, user: userId }).lean();
-  if (!bot) throw new Error('Bot not found');
+  if (!bot) {
+    throw new Error('Bot not found');
+  }
 
   let config = await BotAutopilotConfig.findOne({ bot: botId }).lean();
   if (!config) {
-    config = (await exports.saveBotAutopilot({ botId, userId, data: {} }));
+    config = await exports.saveBotAutopilot({ botId, userId, data: {} });
   }
 
   const period = getPeriodForCadence(config.cadence);
@@ -1598,14 +1592,20 @@ exports.generateBotAutopilotRecommendations = async ({
     BotInteractionMetric.find({
       bot: botId,
       createdAt: { $gte: period.from, $lte: period.to },
-    }).sort({ createdAt: -1 }).limit(300).lean(),
+    })
+      .sort({ createdAt: -1 })
+      .limit(300)
+      .lean(),
     HandoffSession.find({
       bot: botId,
       $or: [
         { requestedAt: { $gte: period.from, $lte: period.to } },
         { createdAt: { $gte: period.from, $lte: period.to } },
       ],
-    }).sort({ requestedAt: -1 }).limit(100).lean(),
+    })
+      .sort({ requestedAt: -1 })
+      .limit(100)
+      .lean(),
     BotEvalRun.find({ bot: botId }).sort({ createdAt: -1 }).limit(10).lean(),
     BotExperiment.find({ bot: botId }).sort({ createdAt: -1 }).limit(10).lean(),
   ]);
@@ -1671,7 +1671,7 @@ Return only JSON:
         summary = `${recommendations.length} recommendations generated from ${evidence.metrics.sampledInteractions} recent interactions and ${evidence.phoenix.linkedTraceCount} Phoenix-linked traces.`;
       }
 
-      let run = await BotAutopilotRun.create({
+      const run = await BotAutopilotRun.create({
         bot: botId,
         config: config._id,
         trigger,
@@ -1700,7 +1700,9 @@ Return only JSON:
       if (trigger !== 'preview') {
         await BotAutopilotConfig.findByIdAndUpdate(config._id, {
           lastRunAt: new Date(),
-          nextRunAt: config.enabled ? computeNextAutopilotRun(config.cadence, config.timeOfDay) : null,
+          nextRunAt: config.enabled
+            ? computeNextAutopilotRun(config.cadence, config.timeOfDay)
+            : null,
           lastStatus: 'completed',
           lastError: null,
         });
@@ -1714,7 +1716,7 @@ Return only JSON:
       });
 
       return run.toObject();
-    }
+    },
   );
 };
 
@@ -1736,9 +1738,7 @@ exports.getBotObservabilityInsights = async (botId, userId) => {
     .map((item) => item.score)
     .filter((score) => typeof score === 'number' && Number.isFinite(score));
 
-  const metricConfidence = average(
-    recentMetrics.map((metric) => metric.confidence)
-  );
+  const metricConfidence = average(recentMetrics.map((metric) => metric.confidence));
   const averageConfidence = scoreValues.length
     ? scoreValues.reduce((sum, score) => sum + score, 0) / scoreValues.length
     : metricConfidence;
@@ -1765,8 +1765,7 @@ exports.getBotObservabilityInsights = async (botId, userId) => {
     phoenix: {
       projectName: process.env.PHOENIX_PROJECT_NAME || 'tasteAI-Studio',
       tracingEnabled:
-        process.env.PHOENIX_ENABLED === 'true' ||
-        Boolean(process.env.PHOENIX_API_KEY),
+        process.env.PHOENIX_ENABLED === 'true' || Boolean(process.env.PHOENIX_API_KEY),
       mcpServer: 'phoenix',
       mcpConfig: buildPhoenixMcpConfig(),
     },
@@ -1804,20 +1803,15 @@ exports.getBotSelfImprovementDashboard = async (botId, userId) => {
   const [metrics, handoffs] = await loadHealthInputs(botId);
 
   const weakAnswers = metrics
-    .filter(
-      (metric) =>
-        typeof metric.confidence !== 'number' || metric.confidence < 0.85
-    )
+    .filter((metric) => typeof metric.confidence !== 'number' || metric.confidence < 0.85)
     .slice(0, 20)
     .map((metric) =>
       buildImprovementItem('weak_answer', metric, {
         priority:
-          typeof metric.confidence === 'number' && metric.confidence < 0.65
-            ? 'high'
-            : 'medium',
+          typeof metric.confidence === 'number' && metric.confidence < 0.65 ? 'high' : 'medium',
         title: 'Weak answer confidence',
         description: 'The bot answered with low retrieval confidence.',
-      })
+      }),
     );
 
   const unanswered = metrics
@@ -1828,7 +1822,7 @@ exports.getBotSelfImprovementDashboard = async (botId, userId) => {
         priority: 'high',
         title: 'Unanswered or fallback response',
         description: 'The bot could not confidently answer this user question.',
-      })
+      }),
     );
 
   const hallucinationRisk = metrics
@@ -1838,14 +1832,15 @@ exports.getBotSelfImprovementDashboard = async (botId, userId) => {
       buildImprovementItem('hallucination_risk', metric, {
         priority: (metric.hallucinationRisk || 0) >= 0.7 ? 'high' : 'medium',
         title: 'Hallucination or grounding risk',
-        description:
-          'The answer may need grounding, citation, or better training data.',
-      })
+        description: 'The answer may need grounding, citation, or better training data.',
+      }),
     );
 
   const intentCounts = metrics.reduce((acc, metric) => {
     const normalized = normalizeKey(metric.question).split('-').slice(0, 6).join('-');
-    if (!normalized) return acc;
+    if (!normalized) {
+      return acc;
+    }
     if (!acc[normalized]) {
       acc[normalized] = { count: 0, metric };
     }
@@ -1862,7 +1857,7 @@ exports.getBotSelfImprovementDashboard = async (botId, userId) => {
         title: `Repeated intent detected (${entry.count}x)`,
         description:
           'Similar user questions are appearing repeatedly. Consider adding a dedicated training answer or workflow path.',
-      })
+      }),
     );
 
   const handoffItems = handoffs
@@ -1874,10 +1869,7 @@ exports.getBotSelfImprovementDashboard = async (botId, userId) => {
         {
           _id: handoff._id,
           flowSession: handoff.flowSession,
-          question:
-            handoff.userQuestion ||
-            handoff.messages?.[0]?.message ||
-            'Handoff session',
+          question: handoff.userQuestion || handoff.messages?.[0]?.message || 'Handoff session',
           answer: handoff.agentNotes || '',
           source: 'handoff',
           confidence: null,
@@ -1886,13 +1878,11 @@ exports.getBotSelfImprovementDashboard = async (botId, userId) => {
         },
         {
           priority: handoff.escalated ? 'high' : 'medium',
-          title: handoff.escalated
-            ? 'Escalated handoff session'
-            : 'Unresolved handoff session',
+          title: handoff.escalated ? 'Escalated handoff session' : 'Unresolved handoff session',
           description:
             'This session needed human attention. Review whether the bot should answer, clarify, or hand off earlier.',
-        }
-      )
+        },
+      ),
     );
 
   const combined = [
@@ -1903,12 +1893,12 @@ exports.getBotSelfImprovementDashboard = async (botId, userId) => {
     ...handoffItems,
   ];
 
-  const deduped = Array.from(
-    new Map(combined.map((item) => [item.key, item])).values()
-  ).sort((a, b) => {
-    const priorityRank = { high: 0, medium: 1, low: 2 };
-    return priorityRank[a.priority] - priorityRank[b.priority];
-  });
+  const deduped = Array.from(new Map(combined.map((item) => [item.key, item])).values()).sort(
+    (a, b) => {
+      const priorityRank = { high: 0, medium: 1, low: 2 };
+      return priorityRank[a.priority] - priorityRank[b.priority];
+    },
+  );
 
   const actions = await BotImprovementAction.find({
     bot: botId,
@@ -1936,13 +1926,7 @@ exports.getBotSelfImprovementDashboard = async (botId, userId) => {
   };
 };
 
-exports.applyImprovementAction = async ({
-  botId,
-  userId,
-  itemKey,
-  action,
-  item,
-}) => {
+exports.applyImprovementAction = async ({ botId, userId, itemKey, action, item }) => {
   const bot = await ChatBot.findOne({ _id: botId, user: userId });
   if (!bot) {
     throw new Error('Bot not found');
@@ -1991,7 +1975,7 @@ exports.applyImprovementAction = async ({
         },
         createdBy: userId,
       },
-      { upsert: true, new: true, setDefaultsOnInsert: true }
+      { upsert: true, new: true, setDefaultsOnInsert: true },
     );
 
     status = 'completed';
@@ -2067,7 +2051,7 @@ exports.applyImprovementAction = async ({
         handoffResult.handoffSession._id,
         'user',
         reviewQuestion,
-        null
+        null,
       );
     }
 
@@ -2112,9 +2096,7 @@ exports.createEvalDatasetType = async ({ botId, userId, payload }) => {
       ? payload.polarity
       : 'neutral',
     traceSource:
-      payload?.traceSource === 'handoff_sessions'
-        ? 'handoff_sessions'
-        : 'interaction_metrics',
+      payload?.traceSource === 'handoff_sessions' ? 'handoff_sessions' : 'interaction_metrics',
     traceFilters: payload?.traceFilters || {},
     handoffFilters: payload?.handoffFilters || {},
     datasetName: String(payload?.datasetName || name).trim(),
@@ -2130,9 +2112,7 @@ exports.listEvalDatasetTypes = async (botId, userId) => {
     throw new Error('Bot not found');
   }
 
-  return BotEvalDatasetType.find({ bot: botId })
-    .sort({ createdAt: -1 })
-    .lean();
+  return BotEvalDatasetType.find({ bot: botId }).sort({ createdAt: -1 }).lean();
 };
 
 exports.deleteEvalDatasetType = async ({ botId, userId, typeId }) => {
@@ -2153,12 +2133,7 @@ exports.deleteEvalDatasetType = async ({ botId, userId, typeId }) => {
   return { deleted: true, id: String(deleted._id) };
 };
 
-exports.buildEvalDatasetFromProduction = async ({
-  botId,
-  userId,
-  sourceType,
-  customTypeId,
-}) => {
+exports.buildEvalDatasetFromProduction = async ({ botId, userId, sourceType, customTypeId }) => {
   const bot = await ChatBot.findOne({ _id: botId, user: userId }).lean();
   if (!bot) {
     throw new Error('Bot not found');
@@ -2170,8 +2145,7 @@ exports.buildEvalDatasetFromProduction = async ({
   let resolvedCustomTypeId = null;
 
   if (customTypeId || sourceType === 'custom' || String(sourceType).startsWith('custom:')) {
-    const typeId =
-      customTypeId || String(sourceType).replace(/^custom:/, '') || customTypeId;
+    const typeId = customTypeId || String(sourceType).replace(/^custom:/, '') || customTypeId;
     const customType = await BotEvalDatasetType.findOne({
       _id: typeId,
       bot: botId,
@@ -2187,7 +2161,7 @@ exports.buildEvalDatasetFromProduction = async ({
 
     if (customType.traceSource === 'handoff_sessions') {
       const handoffs = await HandoffSession.find(
-        buildHandoffQueryFromFilters(botId, customType.handoffFilters || {})
+        buildHandoffQueryFromFilters(botId, customType.handoffFilters || {}),
       )
         .sort({ requestedAt: -1 })
         .limit(100)
@@ -2201,11 +2175,11 @@ exports.buildEvalDatasetFromProduction = async ({
           userId,
           datasetName,
           customTypeId: resolvedCustomTypeId,
-        })
+        }),
       );
     } else {
       const metrics = await BotInteractionMetric.find(
-        buildMetricQueryFromFilters(botId, customType.traceFilters || {})
+        buildMetricQueryFromFilters(botId, customType.traceFilters || {}),
       )
         .sort({ createdAt: -1 })
         .limit(100)
@@ -2219,7 +2193,7 @@ exports.buildEvalDatasetFromProduction = async ({
           userId,
           datasetName,
           customTypeId: resolvedCustomTypeId,
-        })
+        }),
       );
     }
   } else if (!BUILTIN_EVAL_SOURCE_TYPES.includes(sourceType)) {
@@ -2244,14 +2218,14 @@ exports.buildEvalDatasetFromProduction = async ({
     if (metricSources.includes(sourceType)) {
       const metrics = await fetchMetricsForBuiltinSource(botId, sourceType);
       records = metrics.map((metric) =>
-        metricToDatasetRecord({ botId, sourceType, metric, userId })
+        metricToDatasetRecord({ botId, sourceType, metric, userId }),
       );
     }
 
     if (handoffSources.includes(sourceType)) {
       const handoffs = await fetchHandoffsForBuiltinSource(botId, sourceType);
       records = handoffs.map((handoff) =>
-        handoffToDatasetRecord({ botId, sourceType, handoff, userId })
+        handoffToDatasetRecord({ botId, sourceType, handoff, userId }),
       );
     }
 
@@ -2259,7 +2233,7 @@ exports.buildEvalDatasetFromProduction = async ({
   }
 
   const saved = await upsertDatasetItems(
-    records.filter((record) => record.question && record.question.trim())
+    records.filter((record) => record.question && record.question.trim()),
   );
 
   return {
@@ -2308,32 +2282,22 @@ exports.getEvalDatasets = async (botId, userId) => {
         acc[key].latestItemAt = item.createdAt;
       }
       return acc;
-    }, {})
+    }, {}),
   ).map((dataset) => {
     const sourceTypes = Array.from(dataset.sourceTypes);
-    const polarity = inferDatasetPolarity(
-      sourceTypes,
-      customTypes,
-      dataset.datasetName
-    );
+    const polarity = inferDatasetPolarity(sourceTypes, customTypes, dataset.datasetName);
     return {
       ...dataset,
       sourceTypes,
       polarity,
-      description: datasetDescriptionFor(
-        sourceTypes,
-        customTypes,
-        dataset.datasetName
-      ),
+      description: datasetDescriptionFor(sourceTypes, customTypes, dataset.datasetName),
       latestRun: latestRunByDataset[dataset.datasetName] || null,
     };
   });
 
   const totalItems = items.length;
   const completedRuns = runs.filter((run) => run.status === 'completed');
-  const averageOverallScore = averageNumbers(
-    completedRuns.map((run) => run.overallScore)
-  );
+  const averageOverallScore = averageNumbers(completedRuns.map((run) => run.overallScore));
 
   return {
     datasets,
@@ -2491,9 +2455,7 @@ exports.runLLMJudgeForBot = async ({
       return acc;
     }, {});
 
-    const overallScore = averageNumbers(
-      explanations.map((entry) => entry.overallItemScore)
-    );
+    const overallScore = averageNumbers(explanations.map((entry) => entry.overallItemScore));
 
     const passedCount = explanations.filter((entry) => entry.verdict === 'pass').length;
     const failedCount = explanations.filter((entry) => entry.verdict === 'fail').length;
@@ -2673,11 +2635,8 @@ exports.runBotExperiment = async ({ botId, userId, experimentId }) => {
       });
     }
 
-    const treatmentWins = samples.filter(
-      (sample) => sample.winner === 'treatment'
-    ).length;
-    const controlWins = samples.filter((sample) => sample.winner === 'control')
-      .length;
+    const treatmentWins = samples.filter((sample) => sample.winner === 'treatment').length;
+    const controlWins = samples.filter((sample) => sample.winner === 'control').length;
     const ties = samples.filter((sample) => sample.winner === 'tie').length;
 
     experiment.status = 'completed';
@@ -2687,25 +2646,17 @@ exports.runBotExperiment = async ({ botId, userId, experimentId }) => {
       treatmentWins,
       ties,
       treatmentWinRate: samples.length ? treatmentWins / samples.length : 0,
-      controlAverageJudgeScore: averageNumbers(
-        samples.map((sample) => sample.controlScore)
-      ),
-      treatmentAverageJudgeScore: averageNumbers(
-        samples.map((sample) => sample.treatmentScore)
-      ),
-      controlAverageLatencyMs: averageNumbers(
-        samples.map((sample) => sample.controlLatencyMs)
-      ),
-      treatmentAverageLatencyMs: averageNumbers(
-        samples.map((sample) => sample.treatmentLatencyMs)
-      ),
+      controlAverageJudgeScore: averageNumbers(samples.map((sample) => sample.controlScore)),
+      treatmentAverageJudgeScore: averageNumbers(samples.map((sample) => sample.treatmentScore)),
+      controlAverageLatencyMs: averageNumbers(samples.map((sample) => sample.controlLatencyMs)),
+      treatmentAverageLatencyMs: averageNumbers(samples.map((sample) => sample.treatmentLatencyMs)),
       controlEstimatedCost: samples.reduce(
         (sum, sample) => sum + (sample.controlEstimatedCost || 0),
-        0
+        0,
       ),
       treatmentEstimatedCost: samples.reduce(
         (sum, sample) => sum + (sample.treatmentEstimatedCost || 0),
-        0
+        0,
       ),
     };
     experiment.completedAt = new Date();

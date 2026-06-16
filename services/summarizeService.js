@@ -2,7 +2,12 @@ const genAIClient = require('../config/genAIClient');
 const { getLLMClient } = require('../utils/llmClientUtils');
 const logger = require('../utils/logger');
 
-exports.summarizeConversationWithGemini = async (messages, botName, botId = null, userId = null) => {
+exports.summarizeConversationWithGemini = async (
+  messages,
+  botName,
+  botId = null,
+  userId = null,
+) => {
   try {
     logger.info('Initializing conversation summarization', {
       botName,
@@ -12,10 +17,7 @@ exports.summarizeConversationWithGemini = async (messages, botName, botId = null
     });
 
     const conversationText = messages
-      .map(
-        (msg) =>
-          `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`
-      )
+      .map((msg) => `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`)
       .join('\n\n');
 
     logger.debug('Summarization prompt prepared', {
@@ -40,9 +42,9 @@ ${conversationText}
         const { generateSummary } = await getLLMClient(botId, userId);
         text = await generateSummary(prompt);
       } catch (error) {
-        logger.error('Error summarizing with custom LLM, falling back to default Gemini', { 
-          botId, 
-          error: error.message 
+        logger.error('Error summarizing with custom LLM, falling back to default Gemini', {
+          botId,
+          error: error.message,
         });
         // Fallback to default Gemini
         const model = genAIClient.getGenerativeModel({

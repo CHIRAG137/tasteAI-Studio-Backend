@@ -16,7 +16,7 @@ exports.crawlWebsite = async (req, res) => {
   }
 };
 
-// scrape multiple urls 
+// scrape multiple urls
 exports.scrapeUrls = async (req, res) => {
   try {
     logger.info('Scrape URLs request received', { body: req.body });
@@ -26,11 +26,7 @@ exports.scrapeUrls = async (req, res) => {
     return responseBuilder.ok(res, result, 'Batch URLs scraped successfully');
   } catch (error) {
     logger.error('Firecrawl scrapeUrls error', { error: error.message });
-    return responseBuilder.internalError(
-      res,
-      null,
-      'Failed to scrape batch URLs'
-    );
+    return responseBuilder.internalError(res, null, 'Failed to scrape batch URLs');
   }
 };
 
@@ -46,18 +42,9 @@ exports.getScrapeResultByJobId = async (req, res) => {
       jobId,
       statusCode: result.statusCode,
     });
-    return responseBuilder.ok(
-      res,
-      result.statusCode,
-      result.response,
-      'Scrape result fetched'
-    );
+    return responseBuilder.ok(res, result.statusCode, result.response, 'Scrape result fetched');
   } catch (error) {
     logger.error('Firecrawl getScrapeResult error', { error: error.message });
-    return responseBuilder.internalError(
-      res,
-      null,
-      'Failed to fetch job result'
-    );
+    return responseBuilder.internalError(res, null, 'Failed to fetch job result');
   }
 };

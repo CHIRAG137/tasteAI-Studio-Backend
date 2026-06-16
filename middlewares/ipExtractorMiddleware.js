@@ -5,10 +5,14 @@ function extractIpAddress(req) {
   }
 
   const realIp = req.headers['x-real-ip'];
-  if (realIp) return realIp;
+  if (realIp) {
+    return realIp;
+  }
 
   const cfConnectingIp = req.headers['cf-connecting-ip'];
-  if (cfConnectingIp) return cfConnectingIp;
+  if (cfConnectingIp) {
+    return cfConnectingIp;
+  }
 
   return (
     req.connection?.remoteAddress ||

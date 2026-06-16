@@ -90,10 +90,10 @@ function normalizeKey(value) {
 }
 
 function average(values) {
-  const clean = values.filter(
-    (value) => typeof value === 'number' && Number.isFinite(value)
-  );
-  if (!clean.length) return null;
+  const clean = values.filter((value) => typeof value === 'number' && Number.isFinite(value));
+  if (!clean.length) {
+    return null;
+  }
   return clean.reduce((sum, value) => sum + value, 0) / clean.length;
 }
 
@@ -101,7 +101,9 @@ function percentile(values, p) {
   const clean = values
     .filter((value) => typeof value === 'number' && Number.isFinite(value))
     .sort((a, b) => a - b);
-  if (!clean.length) return null;
+  if (!clean.length) {
+    return null;
+  }
   const index = Math.min(clean.length - 1, Math.ceil((p / 100) * clean.length) - 1);
   return clean[Math.max(0, index)];
 }
@@ -121,7 +123,9 @@ function buildIntentClusters(metrics, minOccurrences = 2) {
 
   for (const metric of metrics) {
     const key = normalizeKey(metric.question).split('-').slice(0, 5).join('-');
-    if (!key) continue;
+    if (!key) {
+      continue;
+    }
     if (!buckets[key]) {
       buckets[key] = { intentKey: key, count: 0, examples: [] };
     }
@@ -160,7 +164,7 @@ function computeMonitoringSnapshot(metrics, handoffs, windowHours = 24) {
 
   const total = windowMetrics.length;
   const lowConfidenceCount = windowMetrics.filter(
-    (metric) => typeof metric.confidence !== 'number' || metric.confidence < 0.85
+    (metric) => typeof metric.confidence !== 'number' || metric.confidence < 0.85,
   ).length;
   const fallbackCount = windowMetrics.filter((metric) => metric.usedFallback).length;
 
@@ -171,9 +175,7 @@ function computeMonitoringSnapshot(metrics, handoffs, windowHours = 24) {
     .filter((key) => !prevClusters.some((item) => item.intentKey === key));
 
   const windowHandoffRate = total ? windowHandoffs.length / total : 0;
-  const prevHandoffRate = prevMetrics.length
-    ? prevHandoffs.length / prevMetrics.length
-    : 0;
+  const prevHandoffRate = prevMetrics.length ? prevHandoffs.length / prevMetrics.length : 0;
   const handoffSpikeRatio =
     prevHandoffs.length > 0
       ? windowHandoffs.length / prevHandoffs.length
@@ -186,16 +188,12 @@ function computeMonitoringSnapshot(metrics, handoffs, windowHours = 24) {
     sampledInteractions: total,
     sampledHandoffs: windowHandoffs.length,
     low_confidence_rate: total ? lowConfidenceCount / total : 0,
-    groundedness_score: average(
-      windowMetrics.map((metric) => metric.groundednessScore)
-    ),
-    hallucination_risk_avg: average(
-      windowMetrics.map((metric) => metric.hallucinationRisk)
-    ),
+    groundedness_score: average(windowMetrics.map((metric) => metric.groundednessScore)),
+    hallucination_risk_avg: average(windowMetrics.map((metric) => metric.hallucinationRisk)),
     latency_avg_ms: average(windowMetrics.map((metric) => metric.latencyMs)),
     latency_p95_ms: percentile(
       windowMetrics.map((metric) => metric.latencyMs),
-      95
+      95,
     ),
     handoff_rate: windowHandoffRate,
     handoff_rate_spike: handoffSpikeRatio,
@@ -203,23 +201,28 @@ function computeMonitoringSnapshot(metrics, handoffs, windowHours = 24) {
     unknown_intent_cluster_count: clusters.length,
     largest_unknown_cluster: clusters[0]?.count || 0,
     clusters: clusters.slice(0, 5),
-    newIntentClusters: clusters.filter((cluster) =>
-      newClusterKeys.includes(cluster.intentKey)
-    ),
-    phoenixLinkedTraces: windowMetrics.filter((metric) => metric.phoenix?.traceId)
-      .length,
+    newIntentClusters: clusters.filter((cluster) => newClusterKeys.includes(cluster.intentKey)),
+    phoenixLinkedTraces: windowMetrics.filter((metric) => metric.phoenix?.traceId).length,
   };
 }
 
 function severityForRule(rule, currentValue) {
-  if (rule.metricType === 'low_confidence_rate' && currentValue >= 0.4) return 'critical';
-  if (rule.metricType === 'latency_avg_ms' && currentValue >= 12000) return 'critical';
-  if (rule.metricType === 'groundedness_score' && currentValue < 0.5) return 'critical';
+  if (rule.metricType === 'low_confidence_rate' && currentValue >= 0.4) {
+    return 'critical';
+  }
+  if (rule.metricType === 'latency_avg_ms' && currentValue >= 12000) {
+    return 'critical';
+  }
+  if (rule.metricType === 'groundedness_score' && currentValue < 0.5) {
+    return 'critical';
+  }
   return 'warning';
 }
 
 function formatMetricValue(metricType, value) {
-  if (value === null || value === undefined) return 'N/A';
+  if (value === null || value === undefined) {
+    return 'N/A';
+  }
   if (metricType.includes('rate') && !metricType.includes('ms')) {
     return `${Math.round(value * 100)}%`;
   }
@@ -241,8 +244,7 @@ function evaluateRule(rule, snapshot) {
     return { triggered: false, currentValue: null };
   }
 
-  const triggered =
-    rule.operator === 'above' ? value > rule.threshold : value < rule.threshold;
+  const triggered = rule.operator === 'above' ? value > rule.threshold : value < rule.threshold;
 
   return { triggered, currentValue: value };
 }
@@ -252,14 +254,17 @@ function buildAlertPayload(rule, snapshot, evaluation) {
   const current = formatMetricValue(rule.metricType, evaluation.currentValue);
   const threshold = formatMetricValue(rule.metricType, rule.threshold);
 
-  let evidence = {
+  const evidence = {
     metricType: rule.metricType,
     windowHours: rule.windowHours,
     sampledInteractions: snapshot.sampledInteractions,
     phoenixLinkedTraces: snapshot.phoenixLinkedTraces,
   };
 
-  if (rule.metricType === 'largest_unknown_cluster' || rule.metricType === 'unknown_intent_cluster_count') {
+  if (
+    rule.metricType === 'largest_unknown_cluster' ||
+    rule.metricType === 'unknown_intent_cluster_count'
+  ) {
     evidence.clusters = snapshot.newIntentClusters.length
       ? snapshot.newIntentClusters
       : snapshot.clusters.slice(0, 3);
@@ -288,7 +293,7 @@ function renderMonitoringEmail({ bot, alerts }) {
         <strong>[${alert.severity.toUpperCase()}] ${alert.title}</strong>
         <p style="margin:6px 0;color:#374151">${alert.message}</p>
       </li>
-    `
+    `,
     )
     .join('');
 
@@ -307,7 +312,7 @@ function renderMonitoringSlack({ bot, alerts }) {
     `*Production Monitoring Alert* for *${bot.name}*`,
     ...alerts.map(
       (alert, index) =>
-        `${index + 1}. *[${alert.severity.toUpperCase()}] ${alert.title}*\n${alert.message}`
+        `${index + 1}. *[${alert.severity.toUpperCase()}] ${alert.title}*\n${alert.message}`,
     ),
   ].join('\n');
 }
@@ -321,10 +326,17 @@ async function deliverMonitoringAlerts({ bot, config, alerts }) {
         await sendEmail({
           to: recipient,
           subject: `Monitoring alert: ${bot.name} (${alerts.length} breach${alerts.length === 1 ? '' : 'es'})`,
-          text: alerts.map((alert) => `- [${alert.severity}] ${alert.title}: ${alert.message}`).join('\n'),
+          text: alerts
+            .map((alert) => `- [${alert.severity}] ${alert.title}: ${alert.message}`)
+            .join('\n'),
           html: renderMonitoringEmail({ bot, alerts }),
         });
-        deliveries.push({ channel: 'email', target: recipient, status: 'sent', sentAt: new Date() });
+        deliveries.push({
+          channel: 'email',
+          target: recipient,
+          status: 'sent',
+          sentAt: new Date(),
+        });
       } catch (error) {
         deliveries.push({
           channel: 'email',
@@ -349,7 +361,7 @@ async function deliverMonitoringAlerts({ bot, config, alerts }) {
           channel: config.delivery.slack.channelId,
           text: renderMonitoringSlack({ bot, alerts }),
         },
-        { headers: { Authorization: `Bearer ${integration.slackAccessToken}` } }
+        { headers: { Authorization: `Bearer ${integration.slackAccessToken}` } },
       );
       deliveries.push({
         channel: 'slack',
@@ -384,7 +396,9 @@ function mergeRules(existingRules = []) {
 
 exports.getBotMonitoring = async (botId, userId) => {
   const bot = await ChatBot.findOne({ _id: botId, user: userId }).lean();
-  if (!bot) throw new Error('Bot not found');
+  if (!bot) {
+    throw new Error('Bot not found');
+  }
 
   let config = await BotMonitoringConfig.findOne({ bot: botId }).lean();
   if (!config) {
@@ -410,10 +424,7 @@ exports.getBotMonitoring = async (botId, userId) => {
       .sort({ triggeredAt: -1 })
       .limit(50)
       .lean(),
-    BotMonitoringAlert.find({ bot: botId })
-      .sort({ triggeredAt: -1 })
-      .limit(30)
-      .lean(),
+    BotMonitoringAlert.find({ bot: botId }).sort({ triggeredAt: -1 }).limit(30).lean(),
   ]);
 
   const snapshot = computeMonitoringSnapshot(metrics, handoffs, 24);
@@ -451,7 +462,9 @@ exports.getBotMonitoring = async (botId, userId) => {
 
 exports.saveBotMonitoring = async ({ botId, userId, data }) => {
   const bot = await ChatBot.findOne({ _id: botId, user: userId }).lean();
-  if (!bot) throw new Error('Bot not found');
+  if (!bot) {
+    throw new Error('Bot not found');
+  }
 
   const existing = await BotMonitoringConfig.findOne({ bot: botId }).lean();
   const mergedRules = data?.rules
@@ -461,46 +474,49 @@ exports.saveBotMonitoring = async ({ botId, userId, data }) => {
   const payload = {
     bot: botId,
     user: userId,
-    enabled: data?.enabled !== undefined ? Boolean(data.enabled) : existing?.enabled ?? true,
-    checkIntervalMinutes: Number(data?.checkIntervalMinutes) || existing?.checkIntervalMinutes || 15,
+    enabled: data?.enabled !== undefined ? Boolean(data.enabled) : (existing?.enabled ?? true),
+    checkIntervalMinutes:
+      Number(data?.checkIntervalMinutes) || existing?.checkIntervalMinutes || 15,
     cooldownMinutes: Number(data?.cooldownMinutes) || existing?.cooldownMinutes || 60,
-    notifyOnDashboard: data?.notifyOnDashboard !== undefined
-      ? Boolean(data.notifyOnDashboard)
-      : existing?.notifyOnDashboard ?? true,
+    notifyOnDashboard:
+      data?.notifyOnDashboard !== undefined
+        ? Boolean(data.notifyOnDashboard)
+        : (existing?.notifyOnDashboard ?? true),
     rules: mergedRules,
     delivery: {
       email: {
-        enabled: Boolean(data?.delivery?.email?.enabled ?? existing?.delivery?.email?.enabled ?? true),
+        enabled: Boolean(
+          data?.delivery?.email?.enabled ?? existing?.delivery?.email?.enabled ?? true,
+        ),
         recipients: normalizeEmailList(
-          data?.delivery?.email?.recipients ?? existing?.delivery?.email?.recipients
+          data?.delivery?.email?.recipients ?? existing?.delivery?.email?.recipients,
         ),
       },
       slack: {
-        enabled: Boolean(data?.delivery?.slack?.enabled ?? existing?.delivery?.slack?.enabled ?? false),
+        enabled: Boolean(
+          data?.delivery?.slack?.enabled ?? existing?.delivery?.slack?.enabled ?? false,
+        ),
         channelId: String(
-          data?.delivery?.slack?.channelId ?? existing?.delivery?.slack?.channelId ?? ''
+          data?.delivery?.slack?.channelId ?? existing?.delivery?.slack?.channelId ?? '',
         ).trim(),
       },
     },
   };
 
-  const config = await BotMonitoringConfig.findOneAndUpdate(
-    { bot: botId },
-    payload,
-    { upsert: true, new: true, setDefaultsOnInsert: true }
-  ).lean();
+  const config = await BotMonitoringConfig.findOneAndUpdate({ bot: botId }, payload, {
+    upsert: true,
+    new: true,
+    setDefaultsOnInsert: true,
+  }).lean();
 
   return config;
 };
 
-exports.evaluateBotMonitoring = async ({
-  botId,
-  userId,
-  notify = false,
-  trigger = 'manual',
-}) => {
+exports.evaluateBotMonitoring = async ({ botId, userId, notify = false, trigger = 'manual' }) => {
   const bot = await ChatBot.findOne({ _id: botId, user: userId }).lean();
-  if (!bot) throw new Error('Bot not found');
+  if (!bot) {
+    throw new Error('Bot not found');
+  }
 
   let config = await BotMonitoringConfig.findOne({ bot: botId }).lean();
   if (!config) {
@@ -517,13 +533,11 @@ exports.evaluateBotMonitoring = async ({
   const cooldownMs = (config.cooldownMinutes || 60) * 60 * 1000;
 
   for (const rule of config.rules.filter((item) => item.enabled)) {
-    const snapshot = computeMonitoringSnapshot(
-      metrics,
-      handoffs,
-      rule.windowHours || 24
-    );
+    const snapshot = computeMonitoringSnapshot(metrics, handoffs, rule.windowHours || 24);
     const evaluation = evaluateRule(rule, snapshot);
-    if (!evaluation.triggered) continue;
+    if (!evaluation.triggered) {
+      continue;
+    }
 
     const recent = await BotMonitoringAlert.findOne({
       bot: botId,
@@ -532,7 +546,9 @@ exports.evaluateBotMonitoring = async ({
       triggeredAt: { $gte: new Date(Date.now() - cooldownMs) },
     }).lean();
 
-    if (recent) continue;
+    if (recent) {
+      continue;
+    }
 
     const payload = buildAlertPayload(rule, snapshot, evaluation);
     const alert = await BotMonitoringAlert.create({
@@ -552,7 +568,7 @@ exports.evaluateBotMonitoring = async ({
     });
     await BotMonitoringAlert.updateMany(
       { _id: { $in: triggeredAlerts.map((alert) => alert._id) } },
-      { $set: { notifications: deliveries } }
+      { $set: { notifications: deliveries } },
     );
   }
 
@@ -567,7 +583,7 @@ exports.evaluateBotMonitoring = async ({
       lastCheckedAt: new Date(),
       lastStatus: triggeredAlerts.length ? 'alerting' : 'ok',
       lastError: null,
-    }
+    },
   );
 
   const snapshot = computeMonitoringSnapshot(metrics, handoffs, 24);
@@ -584,28 +600,36 @@ exports.evaluateBotMonitoring = async ({
 
 exports.acknowledgeMonitoringAlert = async ({ botId, userId, alertId }) => {
   const bot = await ChatBot.findOne({ _id: botId, user: userId }).lean();
-  if (!bot) throw new Error('Bot not found');
+  if (!bot) {
+    throw new Error('Bot not found');
+  }
 
   const alert = await BotMonitoringAlert.findOneAndUpdate(
     { _id: alertId, bot: botId },
     { status: 'acknowledged', acknowledgedAt: new Date() },
-    { new: true }
+    { new: true },
   ).lean();
 
-  if (!alert) throw new Error('Alert not found');
+  if (!alert) {
+    throw new Error('Alert not found');
+  }
   return alert;
 };
 
 exports.resolveMonitoringAlert = async ({ botId, userId, alertId }) => {
   const bot = await ChatBot.findOne({ _id: botId, user: userId }).lean();
-  if (!bot) throw new Error('Bot not found');
+  if (!bot) {
+    throw new Error('Bot not found');
+  }
 
   const alert = await BotMonitoringAlert.findOneAndUpdate(
     { _id: alertId, bot: botId },
     { status: 'resolved', resolvedAt: new Date() },
-    { new: true }
+    { new: true },
   ).lean();
 
-  if (!alert) throw new Error('Alert not found');
+  if (!alert) {
+    throw new Error('Alert not found');
+  }
   return alert;
 };

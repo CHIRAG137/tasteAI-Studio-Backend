@@ -21,7 +21,7 @@ function setLastLogin(user, method, ip = 'Unknown', device = 'Unknown', deviceId
 exports.registerUser = async (email, password, name, loginMeta = {}) => {
   try {
     let user = await User.findOne({ email });
-    
+
     if (user) {
       // User exists from another auth method (Auth0 or Google)
       // Allow cross-method registration by linking password to existing account
@@ -32,8 +32,13 @@ exports.registerUser = async (email, password, name, loginMeta = {}) => {
       }
       // Link password to existing user from OAuth method
       user.password = await bcrypt.hash(password, 10);
-      if (!user.name && name) user.name = name;
-      logger.info('Cross-method registration: linked password to OAuth user', { userId: user._id, email });
+      if (!user.name && name) {
+        user.name = name;
+      }
+      logger.info('Cross-method registration: linked password to OAuth user', {
+        userId: user._id,
+        email,
+      });
     } else {
       // New user registration
       const hashedPassword = await bcrypt.hash(password, 10);
@@ -67,7 +72,9 @@ exports.loginUser = async (email, password, loginMeta = {}) => {
     // If user has no password, they registered via Auth0/Google
     if (!user.password) {
       logger.warn('Login failed - user has no password (registered via OAuth)', { email });
-      throw new Error('This email is registered with Auth0 or Google. Please login using your original method.');
+      throw new Error(
+        'This email is registered with Auth0 or Google. Please login using your original method.',
+      );
     }
 
     const match = await bcrypt.compare(password, user.password);
@@ -77,7 +84,7 @@ exports.loginUser = async (email, password, loginMeta = {}) => {
     }
 
     const token = createToken(user);
-    
+
     // Store token, expiry, and last login metadata in database
     user.authToken = token;
     user.authTokenExpiresAt = getTokenExpiry();
@@ -142,7 +149,9 @@ exports.auth0LoginUser = async (accessToken, loginMeta = {}) => {
       user.auth0Id = auth0Id;
       logger.info('Cross-method: linked Auth0 to existing user', { userId: user._id, email });
     }
-    if (name && !user.name) user.name = name;
+    if (name && !user.name) {
+      user.name = name;
+    }
     await user.save();
     logger.info('Auth0 user session (cross-method or existing)', { userId: user._id, email });
   }
@@ -174,7 +183,9 @@ exports.googleLoginUser = async (googleToken, loginMeta = {}) => {
         headers: { Authorization: `Bearer ${googleToken}` },
       });
       payload = response.data;
-      if (!payload.id) payload.id = payload.userid;
+      if (!payload.id) {
+        payload.id = payload.userid;
+      }
     }
 
     const { email, name, sub: googleId, id } = payload;
@@ -191,12 +202,14 @@ exports.googleLoginUser = async (googleToken, loginMeta = {}) => {
         user.googleId = finalGoogleId;
         logger.info('Cross-method: linked Google to existing user', { userId: user._id, email });
       }
-      if (name && !user.name) user.name = name;
+      if (name && !user.name) {
+        user.name = name;
+      }
       logger.info('Google user logged in (cross-method or existing)', { userId: user._id, email });
     }
 
     const token = createToken(user);
-    
+
     // Store token, expiry, and last login metadata in database
     user.authToken = token;
     user.authTokenExpiresAt = getTokenExpiry();
@@ -266,9 +279,13 @@ exports.getUserDetailsByUserId = async (userId) => {
 };
 
 function normalizeName(name) {
-  if (typeof name !== 'string') return null;
+  if (typeof name !== 'string') {
+    return null;
+  }
   const trimmed = name.trim().replace(/\s+/g, ' ');
-  if (!trimmed) return '';
+  if (!trimmed) {
+    return '';
+  }
   return trimmed;
 }
 
@@ -308,13 +325,13 @@ exports.logoutAgent = async (userId) => {
   try {
     const user = await User.findByIdAndUpdate(
       userId,
-      { 
-        lastLogoutAt: new Date(), 
+      {
+        lastLogoutAt: new Date(),
         isActive: false,
         authToken: null,
-        authTokenExpiresAt: null
+        authTokenExpiresAt: null,
       },
-      { new: true }
+      { new: true },
     );
     logger.info('Agent logged out', { userId });
     return { message: 'Agent logout successful', user };
@@ -329,13 +346,13 @@ exports.logoutBot = async (userId) => {
   try {
     const user = await User.findByIdAndUpdate(
       userId,
-      { 
-        lastLogoutAt: new Date(), 
+      {
+        lastLogoutAt: new Date(),
         isActive: false,
         authToken: null,
-        authTokenExpiresAt: null
+        authTokenExpiresAt: null,
       },
-      { new: true }
+      { new: true },
     );
     logger.info('Bot dashboard user logged out', { userId });
     return { message: 'Bot dashboard logout successful', user };

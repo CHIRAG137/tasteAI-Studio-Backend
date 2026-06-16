@@ -27,7 +27,7 @@ const BotSelfIntrospectionRunSchema = new mongoose.Schema(
       phoenixProjectName: { type: String, default: null },
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 BotSelfIntrospectionRunSchema.index({ bot: 1, createdAt: -1 });

@@ -1,10 +1,9 @@
 const dns = require('dns');
+
 dns.setDefaultResultOrder('ipv4first');
 require('dotenv').config();
-const {
-  initPhoenixTracing,
-  shutdownPhoenixTracing,
-} = require('./config/phoenixTracing');
+const { initPhoenixTracing, shutdownPhoenixTracing } = require('./config/phoenixTracing');
+
 initPhoenixTracing();
 const express = require('express');
 const mongoose = require('mongoose');
@@ -16,6 +15,7 @@ const botRoutes = require('./routes/botRoutes');
 const crawlRoutes = require('./routes/crawlRoutes');
 const slackRoutes = require('./routes/slackRoutes');
 const authRoutes = require('./routes/authRoutes');
+const authRoutesV2 = require('./auth/routes/authRoutes');
 const flowRoutes = require('./routes/flowRoutes');
 const summarizeRoutes = require('./routes/summarizeRoutes');
 const elevenlabsRoutes = require('./routes/elevenlabsRoutes');
@@ -44,7 +44,7 @@ app.use(
       'X-Visitor-Verification-Token',
       'X-Visitor-Device-Id',
     ],
-  })
+  }),
 );
 
 app.use(bodyParser.json());
@@ -56,7 +56,7 @@ const limiter = rateLimit({
   max: 100, // limit each IP to 100 requests per windowMs
   message: {
     error: 'Too many requests from this IP, please try again later.',
-    retryAfter: Math.ceil((15 * 60 * 1000) / 1000) // seconds
+    retryAfter: Math.ceil((15 * 60 * 1000) / 1000), // seconds
   },
   standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
   legacyHeaders: false, // Disable the `X-RateLimit-*` headers
@@ -68,10 +68,10 @@ app.use('/api/', limiter);
 // Stricter rate limiting for authentication routes
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 6, // limit each IP to 10 auth requests per windowMs
+  max: 20, // limit each IP to 10 auth requests per windowMs
   message: {
     error: 'Too many authentication attempts, please try again later.',
-    retryAfter: Math.ceil((15 * 60 * 1000) / 1000)
+    retryAfter: Math.ceil((15 * 60 * 1000) / 1000),
   },
   standardHeaders: true,
   legacyHeaders: false,
@@ -85,7 +85,7 @@ const chatbotLimiter = rateLimit({
   max: 20, // limit each IP to 20 chatbot questions per windowMs
   message: {
     error: 'Too many chatbot requests from this IP, please try again later.',
-    retryAfter: Math.ceil((15 * 60 * 1000) / 1000)
+    retryAfter: Math.ceil((15 * 60 * 1000) / 1000),
   },
   standardHeaders: true,
   legacyHeaders: false,
@@ -100,7 +100,7 @@ const embedChatbotLimiter = rateLimit({
   max: 50, // limit each IP to 50 flow interactions per windowMs
   message: {
     error: 'Too many embed chatbot requests from this IP, please try again later.',
-    retryAfter: Math.ceil((15 * 60 * 1000) / 1000)
+    retryAfter: Math.ceil((15 * 60 * 1000) / 1000),
   },
   standardHeaders: true,
   legacyHeaders: false,
@@ -131,6 +131,7 @@ app.use('/api/handoff', handoffRoutes);
 app.use('/api/issue-reports', issueReportRoutes);
 app.use('/api/visitor-auth', visitorAuthRoutes);
 app.use('/api/user', userRoutes);
+app.use('/api/auth/user', authRoutesV2);
 app.get('/widget.js', (req, res) => {
   res.sendFile(path.join(__dirname, 'public/widget.js'));
 });

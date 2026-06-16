@@ -75,19 +75,18 @@ exports.requestHumanHandoff = async ({
     await HumanAgent.findByIdAndUpdate(
       assignmentResult.agent._id,
       { $inc: { totalChatsAssigned: 1 } },
-      { new: false }
+      { new: false },
     );
 
     const agent = assignmentResult.agent;
 
-    const shouldAutoAccept =
-      agent.autoAcceptChats && agent.isAvailableForChat();
+    const shouldAutoAccept = agent.autoAcceptChats && agent.isAvailableForChat();
 
     if (shouldAutoAccept) {
       await HumanAgent.findByIdAndUpdate(
         agent._id,
         { $inc: { currentActiveChats: 1 } },
-        { new: true }
+        { new: true },
       );
 
       if (updatedAgent.currentActiveChats >= updatedAgent.maxConcurrentChats) {
@@ -103,11 +102,7 @@ exports.requestHumanHandoff = async ({
     }
 
     // 7. Send notifications
-    await sendHandoffNotifications(
-      handoffSession,
-      assignmentResult,
-      eligibleAgents
-    );
+    await sendHandoffNotifications(handoffSession, assignmentResult, eligibleAgents);
 
     // 8. Update flow session
     await FlowSession.findByIdAndUpdate(flowSessionId, {
@@ -205,13 +200,13 @@ async function findBestAgent(agents, botId) {
     (agent) =>
       agent.isOnline &&
       agent.availabilityStatus === 'available' &&
-      agent.currentActiveChats < agent.maxConcurrentChats
+      agent.currentActiveChats < agent.maxConcurrentChats,
   );
 
   if (onlineAvailableAgents.length > 0) {
     // Use least-busy algorithm for online agents
     const leastBusyAgent = onlineAvailableAgents.reduce((prev, current) =>
-      prev.currentActiveChats < current.currentActiveChats ? prev : current
+      prev.currentActiveChats < current.currentActiveChats ? prev : current,
     );
 
     logger.info('Assigned to least busy online agent', {
@@ -260,11 +255,7 @@ function getRoundRobinAgent(agents, botId) {
 /**
  * Send notifications to agents
  */
-async function sendHandoffNotifications(
-  handoffSession,
-  assignmentResult,
-  allAgents
-) {
+async function sendHandoffNotifications(handoffSession, assignmentResult, allAgents) {
   const { agent, method } = assignmentResult;
 
   // If agent is online, in-app notification will be handled by real-time system
@@ -294,7 +285,7 @@ async function sendHandoffNotifications(
     () => {
       checkAndEscalate(handoffSession._id, allAgents);
     },
-    2 * 60 * 1000
+    2 * 60 * 1000,
   ); // 2 minutes
 }
 
@@ -427,9 +418,7 @@ exports.acceptHandoffSession = async (agentId, handoffSessionId) => {
       throw new Error('Session already resolved');
     }
 
-    const responseTime = Math.floor(
-      (Date.now() - session.requestedAt.getTime()) / 1000
-    );
+    const responseTime = Math.floor((Date.now() - session.requestedAt.getTime()) / 1000);
 
     // Update session
     await HandoffSession.findByIdAndUpdate(handoffSessionId, {
@@ -471,11 +460,7 @@ exports.acceptHandoffSession = async (agentId, handoffSessionId) => {
 /**
  * Agent resolves handoff session
  */
-exports.resolveHandoffSession = async (
-  agentId,
-  handoffSessionId,
-  notes = ''
-) => {
+exports.resolveHandoffSession = async (agentId, handoffSessionId, notes = '') => {
   try {
     const session = await HandoffSession.findById(handoffSessionId);
 
@@ -487,9 +472,7 @@ exports.resolveHandoffSession = async (
       throw new Error('Session already resolved');
     }
 
-    const resolutionTime = Math.floor(
-      (Date.now() - session.requestedAt.getTime()) / 1000
-    );
+    const resolutionTime = Math.floor((Date.now() - session.requestedAt.getTime()) / 1000);
     const responseTime = session.responseTime || resolutionTime;
 
     // Update session
@@ -581,7 +564,6 @@ exports.resolveHandoffSessionByClient = async (flowSessionId, handoffSessionId) 
   }
 };
 
-
 /**
  * Client re-opens a resolved handoff session (user requests reopen)
  */
@@ -589,7 +571,9 @@ exports.reopenHandoffSessionByClient = async (flowSessionId, handoffSessionId) =
   try {
     const session = await HandoffSession.findById(handoffSessionId);
 
-    if (!session) throw new Error('Handoff session not found');
+    if (!session) {
+      throw new Error('Handoff session not found');
+    }
 
     if (session.flowSession.toString() !== flowSessionId) {
       throw new Error('Not authorized to reopen this session');
@@ -634,16 +618,19 @@ exports.reopenHandoffSessionByClient = async (flowSessionId, handoffSessionId) =
     });
 
     // Send notifications to assigned agent
-      await sendHandoffNotifications(session, assignmentResult, eligibleAgents);
+    await sendHandoffNotifications(session, assignmentResult, eligibleAgents);
 
-      // Also send an explicit email notifying the assigned agent that the client reopened the chat
-      try {
-        if (assignmentResult?.agent) {
-          await sendClientReopenEmail(assignmentResult.agent, session);
-        }
-      } catch (e) {
-        logger.error('Failed to send client reopen email', { error: e.message, handoffSessionId: handoffSessionId });
+    // Also send an explicit email notifying the assigned agent that the client reopened the chat
+    try {
+      if (assignmentResult?.agent) {
+        await sendClientReopenEmail(assignmentResult.agent, session);
       }
+    } catch (e) {
+      logger.error('Failed to send client reopen email', {
+        error: e.message,
+        handoffSessionId,
+      });
+    }
 
     return { success: true, handoffSessionId, assignedAgent: assignmentResult.agent };
   } catch (error) {
@@ -655,14 +642,15 @@ exports.reopenHandoffSessionByClient = async (flowSessionId, handoffSessionId) =
     throw error;
   }
 
-
   /**
    * Send a styled email to agent when a client re-opens a resolved handoff session
    */
   async function sendClientReopenEmail(agent, session) {
     try {
       if (!agent.emailNotifications) {
-        logger.info('Agent has email notifications disabled; skipping reopen email', { agentEmail: agent.email });
+        logger.info('Agent has email notifications disabled; skipping reopen email', {
+          agentEmail: agent.email,
+        });
         return;
       }
 
@@ -693,13 +681,19 @@ exports.reopenHandoffSessionByClient = async (flowSessionId, handoffSessionId) =
         `,
       });
 
-      logger.info('Client reopen email sent to agent', { agentEmail: agent.email, handoffSessionId: session._id });
+      logger.info('Client reopen email sent to agent', {
+        agentEmail: agent.email,
+        handoffSessionId: session._id,
+      });
     } catch (error) {
-      logger.error('Failed to send client reopen email', { error: error.message, agentEmail: agent.email, handoffSessionId: session._id });
+      logger.error('Failed to send client reopen email', {
+        error: error.message,
+        agentEmail: agent.email,
+        handoffSessionId: session._id,
+      });
     }
   }
 };
-
 
 /**
  * Agent re-opens a resolved handoff session (agent reassigns / re-activates)
@@ -708,7 +702,9 @@ exports.reopenHandoffSessionByAgent = async (agentId, handoffSessionId) => {
   try {
     const session = await HandoffSession.findById(handoffSessionId);
 
-    if (!session) throw new Error('Handoff session not found');
+    if (!session) {
+      throw new Error('Handoff session not found');
+    }
 
     if (session.status !== 'resolved') {
       return { success: true, message: 'Session is not resolved' };
@@ -756,17 +752,9 @@ exports.reopenHandoffSessionByAgent = async (agentId, handoffSessionId) => {
 /**
  * Get handoff sessions for an agent
  */
-exports.getHumanAgentHandoffSessions = async (
-  agentId,
-  filters = {}
-) => {
+exports.getHumanAgentHandoffSessions = async (agentId, filters = {}) => {
   try {
-    const {
-      status = 'all',
-      includeEscalated = true,
-      page = 1,
-      limit = 50,
-    } = filters;
+    const { status = 'all', includeEscalated = true, page = 1, limit = 50 } = filters;
 
     // Build the query
     let query = {};
@@ -774,10 +762,7 @@ exports.getHumanAgentHandoffSessions = async (
     if (includeEscalated) {
       // Include sessions currently assigned OR previously assigned (escalated away)
       query = {
-        $or: [
-          { assignedAgent: agentId },
-          { 'escalationHistory.previousAgent': agentId },
-        ],
+        $or: [{ assignedAgent: agentId }, { 'escalationHistory.previousAgent': agentId }],
       };
     } else {
       // Only currently assigned sessions
@@ -813,15 +798,14 @@ exports.getHumanAgentHandoffSessions = async (
     // Enrich sessions with escalation metadata
     const enrichedSessions = sessions.map((session) => {
       // Check if this agent is the current assignee or was escalated
-      const isCurrentAssignee =
-        session.assignedAgent._id.toString() === agentId.toString();
+      const isCurrentAssignee = session.assignedAgent._id.toString() === agentId.toString();
 
       let escalationInfo = null;
 
       if (!isCurrentAssignee && session.escalationHistory?.length > 0) {
         // Find the escalation record where this agent was the previous agent
         const relevantEscalation = session.escalationHistory.find(
-          (esc) => esc.previousAgent._id.toString() === agentId.toString()
+          (esc) => esc.previousAgent._id.toString() === agentId.toString(),
         );
 
         if (relevantEscalation) {
@@ -873,12 +857,7 @@ exports.getHumanAgentHandoffSessions = async (
 /**
  * Add a message to handoff session
  */
-exports.addMessageToSession = async (
-  handoffSessionId,
-  sender,
-  message,
-  agentId = null
-) => {
+exports.addMessageToSession = async (handoffSessionId, sender, message, agentId = null) => {
   try {
     const session = await HandoffSession.findById(handoffSessionId);
 
@@ -917,9 +896,9 @@ exports.addMessageToSession = async (
           flowSession.history.push({
             mode: 'handoff',
             messageText: message,
-            sender: sender,
+            sender,
             agentId: agentId || null,
-            handoffSessionId: handoffSessionId,
+            handoffSessionId,
             timestamp: new Date(),
             fromUser: sender === 'user',
           });
@@ -954,7 +933,7 @@ exports.addMessageToSession = async (
     return {
       success: true,
       message: newMessage,
-      session: session,
+      session,
     };
   } catch (error) {
     logger.error('Error adding message', {

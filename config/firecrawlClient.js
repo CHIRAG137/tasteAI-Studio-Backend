@@ -26,7 +26,7 @@ firecrawlClient.interceptors.response.use(
       message: error.message,
     });
     return Promise.reject(error);
-  }
+  },
 );
 
 module.exports = firecrawlClient;

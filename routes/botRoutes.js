@@ -1,6 +1,8 @@
 const express = require('express');
+
 const router = express.Router();
 const multer = require('multer');
+
 const upload = multer({ dest: 'uploads/' });
 const botController = require('../controllers/botController');
 const { authMiddleware } = require('../middlewares/authMiddleware');
@@ -14,23 +16,14 @@ router.use(attachIpAddress);
  * @desc    Create a new chatbot with optional training files (PDF, TXT, DOC/DOCX, XLS/XLSX, CSV) or scraped content
  * @access  Private (Authenticated user)
  */
-router.post(
-  '/create',
-  authMiddleware,
-  upload.array('files'),
-  botController.createBot
-);
+router.post('/create', authMiddleware, upload.array('files'), botController.createBot);
 
 /**
  * @route   POST /api/bots/test-custom-llm
  * @desc    Validate a custom LLM provider, API key, and model before saving
  * @access  Private
  */
-router.post(
-  '/test-custom-llm',
-  authMiddleware,
-  botController.testCustomLLMConnection
-);
+router.post('/test-custom-llm', authMiddleware, botController.testCustomLLMConnection);
 
 /**
  * @route   POST /api/bots/ask
@@ -58,11 +51,7 @@ router.get('/:botId', optionalUserAuth, botController.getBotByBotId);
  * @desc    Delete a chatbot owned by the authenticated user
  * @access  Private
  */
-router.delete(
-  '/:botId',
-  authMiddleware,
-  botController.deleteBotByBotId
-);
+router.delete('/:botId', authMiddleware, botController.deleteBotByBotId);
 
 /**
  * @route   PUT /api/bots/:botId
@@ -70,56 +59,35 @@ router.delete(
  *         Supports new file uploads for PDF, TXT, DOC/DOCX, XLS/XLSX, CSV ingestion
  * @access  Private
  */
-router.put(
-  '/:botId',
-  authMiddleware,
-  upload.array('files'),
-  botController.updateBotByBotId
-);
+router.put('/:botId', authMiddleware, upload.array('files'), botController.updateBotByBotId);
 
 /**
  * @route   GET /api/bots/customisation/:botId
  * @desc    Get UI / behavior customization settings for a chatbot
  * @access  Public / Private
  */
-router.get(
-  '/customisation/:botId',
-  optionalUserAuth,
-  botController.getBotCustomizationByBotId
-);
+router.get('/customisation/:botId', optionalUserAuth, botController.getBotCustomizationByBotId);
 
 /**
  * @route   POST /api/bots/customisation/:botId
  * @desc    Save or update chatbot customization settings
  * @access  Private
  */
-router.post(
-  '/customisation/:botId',
-  authMiddleware,
-  botController.saveBotCustomization
-);
+router.post('/customisation/:botId', authMiddleware, botController.saveBotCustomization);
 
 /**
  * @route   GET /api/bots/:botId/history
  * @desc    Get paginated chat session history for a chatbot
  * @access  Private
  */
-router.get(
-  '/:botId/history',
-  authMiddleware,
-  botController.getAllChatHistoriesByBotId
-);
+router.get('/:botId/history', authMiddleware, botController.getAllChatHistoriesByBotId);
 
 /**
  * @route   GET /api/bots/:botId/history/:sessionId
  * @desc    Get full chat history for a specific session
  * @access  Private
  */
-router.get(
-  '/:botId/history/:sessionId',
-  authMiddleware,
-  botController.getChatHistoryBySessionId
-);
+router.get('/:botId/history/:sessionId', authMiddleware, botController.getChatHistoryBySessionId);
 
 /**
  * @route   GET /api/bots/:botId/history/:sessionId/trace
@@ -129,7 +97,7 @@ router.get(
 router.get(
   '/:botId/history/:sessionId/trace',
   authMiddleware,
-  botController.getSessionTraceTimeline
+  botController.getSessionTraceTimeline,
 );
 
 /**
@@ -137,11 +105,7 @@ router.get(
  * @desc    Get spreadsheet configuration for a bot
  * @access  Private
  */
-router.get(
-  '/:botId/spreadsheet-config',
-  authMiddleware,
-  botController.getSpreadsheetConfig
-);
+router.get('/:botId/spreadsheet-config', authMiddleware, botController.getSpreadsheetConfig);
 
 /**
  * @route   POST /api/bots/:botId/spreadsheet-config/columns
@@ -151,7 +115,7 @@ router.get(
 router.post(
   '/:botId/spreadsheet-config/columns',
   authMiddleware,
-  botController.configureSpreadsheetColumns
+  botController.configureSpreadsheetColumns,
 );
 
 /**
@@ -162,7 +126,7 @@ router.post(
 router.get(
   '/:botId/spreadsheet-config/suggestions',
   authMiddleware,
-  botController.getSuggestedColumnConfiguration
+  botController.getSuggestedColumnConfiguration,
 );
 
 /**
@@ -170,22 +134,14 @@ router.get(
  * @desc    Get Arize/Phoenix MCP setup and bot self-improvement insights
  * @access  Private
  */
-router.get(
-  '/:botId/observability',
-  authMiddleware,
-  botController.getBotObservabilityInsights
-);
+router.get('/:botId/observability', authMiddleware, botController.getBotObservabilityInsights);
 
 /**
  * @route   GET /api/bots/:botId/improvements
  * @desc    Get bot health and self-improvement inbox items
  * @access  Private
  */
-router.get(
-  '/:botId/improvements',
-  authMiddleware,
-  botController.getBotSelfImprovementDashboard
-);
+router.get('/:botId/improvements', authMiddleware, botController.getBotSelfImprovementDashboard);
 
 /**
  * @route   POST /api/bots/:botId/improvements/actions
@@ -195,7 +151,7 @@ router.get(
 router.post(
   '/:botId/improvements/actions',
   authMiddleware,
-  botController.applyBotImprovementAction
+  botController.applyBotImprovementAction,
 );
 
 /**
@@ -206,7 +162,7 @@ router.post(
 router.get(
   '/:botId/improvements/introspect/history',
   authMiddleware,
-  botController.getBotSelfIntrospectionHistory
+  botController.getBotSelfIntrospectionHistory,
 );
 
 /**
@@ -217,7 +173,7 @@ router.get(
 router.post(
   '/:botId/improvements/introspect',
   authMiddleware,
-  botController.askBotSelfIntrospection
+  botController.askBotSelfIntrospection,
 );
 
 /**
@@ -225,22 +181,14 @@ router.post(
  * @desc    Get bot autopilot recommendation config and recent runs
  * @access  Private
  */
-router.get(
-  '/:botId/autopilot',
-  authMiddleware,
-  botController.getBotAutopilot
-);
+router.get('/:botId/autopilot', authMiddleware, botController.getBotAutopilot);
 
 /**
  * @route   PUT /api/bots/:botId/autopilot
  * @desc    Save bot autopilot schedule, prompt, and notification settings
  * @access  Private
  */
-router.put(
-  '/:botId/autopilot',
-  authMiddleware,
-  botController.saveBotAutopilot
-);
+router.put('/:botId/autopilot', authMiddleware, botController.saveBotAutopilot);
 
 /**
  * @route   POST /api/bots/:botId/autopilot/generate
@@ -250,7 +198,7 @@ router.put(
 router.post(
   '/:botId/autopilot/generate',
   authMiddleware,
-  botController.generateBotAutopilotRecommendations
+  botController.generateBotAutopilotRecommendations,
 );
 
 /**
@@ -258,33 +206,21 @@ router.post(
  * @desc    Get production monitoring alert config, snapshot, and active alerts
  * @access  Private
  */
-router.get(
-  '/:botId/monitoring',
-  authMiddleware,
-  botController.getBotMonitoring
-);
+router.get('/:botId/monitoring', authMiddleware, botController.getBotMonitoring);
 
 /**
  * @route   PUT /api/bots/:botId/monitoring
  * @desc    Save monitoring alert rules and notification settings
  * @access  Private
  */
-router.put(
-  '/:botId/monitoring',
-  authMiddleware,
-  botController.saveBotMonitoring
-);
+router.put('/:botId/monitoring', authMiddleware, botController.saveBotMonitoring);
 
 /**
  * @route   POST /api/bots/:botId/monitoring/evaluate
  * @desc    Run monitoring threshold checks (optionally notify)
  * @access  Private
  */
-router.post(
-  '/:botId/monitoring/evaluate',
-  authMiddleware,
-  botController.evaluateBotMonitoring
-);
+router.post('/:botId/monitoring/evaluate', authMiddleware, botController.evaluateBotMonitoring);
 
 /**
  * @route   POST /api/bots/:botId/monitoring/alerts/:alertId/acknowledge
@@ -294,7 +230,7 @@ router.post(
 router.post(
   '/:botId/monitoring/alerts/:alertId/acknowledge',
   authMiddleware,
-  botController.acknowledgeMonitoringAlert
+  botController.acknowledgeMonitoringAlert,
 );
 
 /**
@@ -305,7 +241,7 @@ router.post(
 router.post(
   '/:botId/monitoring/alerts/:alertId/resolve',
   authMiddleware,
-  botController.resolveMonitoringAlert
+  botController.resolveMonitoringAlert,
 );
 
 /**
@@ -313,44 +249,28 @@ router.post(
  * @desc    List eval datasets and judge runs for a bot
  * @access  Private
  */
-router.get(
-  '/:botId/eval-datasets',
-  authMiddleware,
-  botController.getBotEvalDatasets
-);
+router.get('/:botId/eval-datasets', authMiddleware, botController.getBotEvalDatasets);
 
 /**
  * @route   POST /api/bots/:botId/eval-datasets/build
  * @desc    Build a Phoenix-ready eval dataset from production conversations
  * @access  Private
  */
-router.post(
-  '/:botId/eval-datasets/build',
-  authMiddleware,
-  botController.buildBotEvalDataset
-);
+router.post('/:botId/eval-datasets/build', authMiddleware, botController.buildBotEvalDataset);
 
 /**
  * @route   GET /api/bots/:botId/eval-dataset-types
  * @desc    List custom eval dataset types for a bot
  * @access  Private
  */
-router.get(
-  '/:botId/eval-dataset-types',
-  authMiddleware,
-  botController.getBotEvalDatasetTypes
-);
+router.get('/:botId/eval-dataset-types', authMiddleware, botController.getBotEvalDatasetTypes);
 
 /**
  * @route   POST /api/bots/:botId/eval-dataset-types
  * @desc    Create a custom eval dataset type with trace filters
  * @access  Private
  */
-router.post(
-  '/:botId/eval-dataset-types',
-  authMiddleware,
-  botController.createBotEvalDatasetType
-);
+router.post('/:botId/eval-dataset-types', authMiddleware, botController.createBotEvalDatasetType);
 
 /**
  * @route   DELETE /api/bots/:botId/eval-dataset-types/:typeId
@@ -360,7 +280,7 @@ router.post(
 router.delete(
   '/:botId/eval-dataset-types/:typeId',
   authMiddleware,
-  botController.deleteBotEvalDatasetType
+  botController.deleteBotEvalDatasetType,
 );
 
 /**
@@ -368,33 +288,21 @@ router.delete(
  * @desc    Run LLM-as-a-Judge grading over a bot eval dataset
  * @access  Private
  */
-router.post(
-  '/:botId/evals/judge',
-  authMiddleware,
-  botController.runBotLLMJudge
-);
+router.post('/:botId/evals/judge', authMiddleware, botController.runBotLLMJudge);
 
 /**
  * @route   GET /api/bots/:botId/experiments
  * @desc    List bot experiment lab runs
  * @access  Private
  */
-router.get(
-  '/:botId/experiments',
-  authMiddleware,
-  botController.getBotExperiments
-);
+router.get('/:botId/experiments', authMiddleware, botController.getBotExperiments);
 
 /**
  * @route   POST /api/bots/:botId/experiments
  * @desc    Create a control/treatment bot experiment
  * @access  Private
  */
-router.post(
-  '/:botId/experiments',
-  authMiddleware,
-  botController.createBotExperiment
-);
+router.post('/:botId/experiments', authMiddleware, botController.createBotExperiment);
 
 /**
  * @route   POST /api/bots/:botId/experiments/:experimentId/run
@@ -404,7 +312,7 @@ router.post(
 router.post(
   '/:botId/experiments/:experimentId/run',
   authMiddleware,
-  botController.runBotExperiment
+  botController.runBotExperiment,
 );
 
 const regressionTestController = require('../controllers/regressionTestController');
@@ -417,7 +325,7 @@ const regressionTestController = require('../controllers/regressionTestControlle
 router.post(
   '/:botId/regression-tests',
   authMiddleware,
-  regressionTestController.createRegressionTests
+  regressionTestController.createRegressionTests,
 );
 
 /**
@@ -425,11 +333,7 @@ router.post(
  * @desc    Get all regression test suites for a bot
  * @access  Private
  */
-router.get(
-  '/:botId/regression-tests',
-  authMiddleware,
-  regressionTestController.getRegressionTests
-);
+router.get('/:botId/regression-tests', authMiddleware, regressionTestController.getRegressionTests);
 
 /**
  * @route   POST /api/bots/:botId/regression-tests/:testSuiteId/run
@@ -439,7 +343,7 @@ router.get(
 router.post(
   '/:botId/regression-tests/:testSuiteId/run',
   authMiddleware,
-  regressionTestController.runRegressionTests
+  regressionTestController.runRegressionTests,
 );
 
 /**
@@ -450,7 +354,7 @@ router.post(
 router.get(
   '/:botId/regression-tests/:testSuiteId',
   authMiddleware,
-  regressionTestController.getTestSuiteDetails
+  regressionTestController.getTestSuiteDetails,
 );
 
 /**
@@ -461,7 +365,7 @@ router.get(
 router.post(
   '/:botId/regression-tests/:testSuiteId/test-cases',
   authMiddleware,
-  regressionTestController.addTestCase
+  regressionTestController.addTestCase,
 );
 
 module.exports = router;

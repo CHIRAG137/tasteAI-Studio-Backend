@@ -19,7 +19,7 @@ const QAHistorySchema = new mongoose.Schema(
     sourceFileName: String,
     sourceFileHash: String,
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 module.exports = mongoose.model('QAHistory', QAHistorySchema);

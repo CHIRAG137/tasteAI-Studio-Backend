@@ -11,7 +11,7 @@ exports.textToSpeech = async (text, voiceId) => {
   }
 
   logger.info('Starting textToSpeech request', {
-    voiceId: voiceId,
+    voiceId,
     textLength: text.length,
   });
 
@@ -28,18 +28,18 @@ exports.textToSpeech = async (text, voiceId) => {
           'xi-api-key': ELEVENLABS_API_KEY,
           'Content-Type': 'application/json',
         },
-      }
+      },
     );
 
     logger.info('TextToSpeech completed successfully', {
-      voiceId: voiceId,
+      voiceId,
       audioBytes: resp.data?.byteLength,
     });
 
     return resp.data;
   } catch (error) {
     logger.error('Error in textToSpeech', {
-      voiceId: voiceId,
+      voiceId,
       error: error.response?.data || error.message,
     });
     throw error;
@@ -65,16 +65,12 @@ exports.speechToText = async (audioBuffer) => {
   });
 
   try {
-    const resp = await axios.post(
-      'https://api.elevenlabs.io/v1/speech-to-text',
-      formData,
-      {
-        headers: {
-          'xi-api-key': ELEVENLABS_API_KEY,
-          ...formData.getHeaders(),
-        },
-      }
-    );
+    const resp = await axios.post('https://api.elevenlabs.io/v1/speech-to-text', formData, {
+      headers: {
+        'xi-api-key': ELEVENLABS_API_KEY,
+        ...formData.getHeaders(),
+      },
+    });
 
     const { text, language_code, language_probability } = resp.data || {};
 
@@ -128,14 +124,11 @@ exports.getVoiceById = async (voiceId) => {
   logger.info('Fetching ElevenLabs voice', { voiceId });
 
   try {
-    const resp = await axios.get(
-      `https://api.elevenlabs.io/v1/voices/${voiceId}`,
-      {
-        headers: {
-          'xi-api-key': ELEVENLABS_API_KEY,
-        },
-      }
-    );
+    const resp = await axios.get(`https://api.elevenlabs.io/v1/voices/${voiceId}`, {
+      headers: {
+        'xi-api-key': ELEVENLABS_API_KEY,
+      },
+    });
 
     return resp.data;
   } catch (error) {
@@ -172,16 +165,12 @@ exports.cloneVoice = async ({ name, description, audioFiles }) => {
   });
 
   try {
-    const resp = await axios.post(
-      'https://api.elevenlabs.io/v1/voices/add',
-      formData,
-      {
-        headers: {
-          'xi-api-key': ELEVENLABS_API_KEY,
-          ...formData.getHeaders(),
-        },
-      }
-    );
+    const resp = await axios.post('https://api.elevenlabs.io/v1/voices/add', formData, {
+      headers: {
+        'xi-api-key': ELEVENLABS_API_KEY,
+        ...formData.getHeaders(),
+      },
+    });
 
     logger.info('Voice cloning completed', {
       voiceId: resp.data?.voice_id,

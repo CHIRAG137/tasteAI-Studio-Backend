@@ -50,4 +50,3 @@ exports.testMyApiKey = async (req, res) => {
     return responseBuilder.badRequest(res, null, err.message);
   }
 };
-

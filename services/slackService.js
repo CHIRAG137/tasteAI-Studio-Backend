@@ -58,7 +58,7 @@ exports.processSlackOAuthCallback = async (code, state) => {
         slackTeamName: team.name,
         slackAuthedUserId: authed_user.id,
       },
-      { upsert: true, new: true }
+      { upsert: true, new: true },
     );
 
     logger.info('Slack OAuth callback processed successfully', {
@@ -114,15 +114,15 @@ exports.handleSlackEvent = async (body) => {
         try {
           await slackClient.post(
             '/chat.postMessage',
-            { 
-              channel: event.channel, 
-              text: data.answer || data.message 
+            {
+              channel: event.channel,
+              text: data.answer || data.message,
             },
             {
               headers: {
                 Authorization: `Bearer ${slackIntegration.slackAccessToken}`,
               },
-            }
+            },
           );
           logger.info('Posted message to Slack channel', {
             channel: event.channel,

@@ -24,8 +24,7 @@ exports.exchangeThirdPartyToken = async ({ auth0AccessToken, connection }) => {
     client_secret: clientSecret,
     subject_token: auth0AccessToken,
     subject_token_type: 'urn:ietf:params:oauth:token-type:access_token',
-    requested_token_type:
-      'urn:auth0:params:oauth:token-type:third-party-access-token',
+    requested_token_type: 'urn:auth0:params:oauth:token-type:third-party-access-token',
     connection,
   });
 

@@ -18,11 +18,11 @@ exports.startBotMonitoringScheduler = (schedule = '*/15 * * * *') => {
 
       for (const config of configs) {
         const intervalMs = (config.checkIntervalMinutes || 15) * 60 * 1000;
-        const lastChecked = config.lastCheckedAt
-          ? new Date(config.lastCheckedAt).getTime()
-          : 0;
+        const lastChecked = config.lastCheckedAt ? new Date(config.lastCheckedAt).getTime() : 0;
 
-        if (now - lastChecked < intervalMs) continue;
+        if (now - lastChecked < intervalMs) {
+          continue;
+        }
 
         try {
           await botMonitoringService.evaluateBotMonitoring({

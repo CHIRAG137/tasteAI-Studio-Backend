@@ -13,7 +13,9 @@ const VERIFICATION_TTL_DAYS = 30;
 const MAX_OTP_ATTEMPTS = 8;
 
 function normalizeEmail(email) {
-  return String(email || '').trim().toLowerCase();
+  return String(email || '')
+    .trim()
+    .toLowerCase();
 }
 
 function isValidEmail(email) {
@@ -30,16 +32,26 @@ exports.requestOtp = async (req, res) => {
     const normalizedEmail = normalizeEmail(email);
     const ipAddress = req.clientIp || extractIpAddress(req);
 
-    if (!botId) return responseBuilder.badRequest(res, null, 'botId is required');
-    if (!deviceId) return responseBuilder.badRequest(res, null, 'deviceId is required');
+    if (!botId) {
+      return responseBuilder.badRequest(res, null, 'botId is required');
+    }
+    if (!deviceId) {
+      return responseBuilder.badRequest(res, null, 'deviceId is required');
+    }
     if (!normalizedEmail || !isValidEmail(normalizedEmail)) {
       return responseBuilder.badRequest(res, null, 'A valid email is required');
     }
 
     const bot = await ChatBot.findById(botId).lean();
-    if (!bot) return responseBuilder.notFound(res, null, 'Bot not found');
+    if (!bot) {
+      return responseBuilder.notFound(res, null, 'Bot not found');
+    }
     if (!bot.require_visitor_email_verification) {
-      return responseBuilder.badRequest(res, null, 'Visitor verification is not enabled for this bot');
+      return responseBuilder.badRequest(
+        res,
+        null,
+        'Visitor verification is not enabled for this bot',
+      );
     }
 
     const otp = generateOtp();
@@ -48,7 +60,7 @@ exports.requestOtp = async (req, res) => {
     await VisitorOtp.findOneAndUpdate(
       { botId: bot._id, email: normalizedEmail, deviceId, ipAddress },
       { codeHash: sha256(otp), expiresAt, attempts: 0 },
-      { upsert: true, new: true, setDefaultsOnInsert: true }
+      { upsert: true, new: true, setDefaultsOnInsert: true },
     );
 
     const subject = `Your verification code for ${bot.name || 'TasteAI Studio'}`;
@@ -78,8 +90,12 @@ exports.verifyOtp = async (req, res) => {
     const normalizedEmail = normalizeEmail(email);
     const ipAddress = req.clientIp || extractIpAddress(req);
 
-    if (!botId) return responseBuilder.badRequest(res, null, 'botId is required');
-    if (!deviceId) return responseBuilder.badRequest(res, null, 'deviceId is required');
+    if (!botId) {
+      return responseBuilder.badRequest(res, null, 'botId is required');
+    }
+    if (!deviceId) {
+      return responseBuilder.badRequest(res, null, 'deviceId is required');
+    }
     if (!normalizedEmail || !isValidEmail(normalizedEmail)) {
       return responseBuilder.badRequest(res, null, 'A valid email is required');
     }
@@ -88,12 +104,23 @@ exports.verifyOtp = async (req, res) => {
     }
 
     const bot = await ChatBot.findById(botId).lean();
-    if (!bot) return responseBuilder.notFound(res, null, 'Bot not found');
+    if (!bot) {
+      return responseBuilder.notFound(res, null, 'Bot not found');
+    }
     if (!bot.require_visitor_email_verification) {
-      return responseBuilder.badRequest(res, null, 'Visitor verification is not enabled for this bot');
+      return responseBuilder.badRequest(
+        res,
+        null,
+        'Visitor verification is not enabled for this bot',
+      );
     }
 
-    const record = await VisitorOtp.findOne({ botId: bot._id, email: normalizedEmail, deviceId, ipAddress });
+    const record = await VisitorOtp.findOne({
+      botId: bot._id,
+      email: normalizedEmail,
+      deviceId,
+      ipAddress,
+    });
     if (!record || record.expiresAt <= new Date()) {
       return responseBuilder.badRequest(res, null, 'OTP expired. Please request a new code.');
     }
@@ -123,7 +150,7 @@ exports.verifyOtp = async (req, res) => {
         verifiedAt: new Date(),
         expiresAt,
       },
-      { upsert: true, new: true, setDefaultsOnInsert: true }
+      { upsert: true, new: true, setDefaultsOnInsert: true },
     );
 
     await VisitorOtp.deleteOne({ _id: record._id });
@@ -132,11 +159,10 @@ exports.verifyOtp = async (req, res) => {
     return responseBuilder.ok(
       res,
       { verified: true, token, email: normalizedEmail, expiresAt },
-      'Verified'
+      'Verified',
     );
   } catch (error) {
     logger.error('Failed to verify visitor OTP', { error: error.message });
     return responseBuilder.internalError(res, null, 'Failed to verify code');
   }
 };
-

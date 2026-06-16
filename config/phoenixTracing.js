@@ -20,7 +20,9 @@ function getPhoenixBaseUrl() {
 }
 
 function buildPhoenixTraceUrl(traceId) {
-  if (!traceId) return null;
+  if (!traceId) {
+    return null;
+  }
 
   const template = process.env.PHOENIX_TRACE_URL_TEMPLATE;
   if (template) {
@@ -41,9 +43,7 @@ function getPhoenixRuntimeInfo(traceId = null) {
       process.env.PHOENIX_COLLECTOR_ENDPOINT || process.env.PHOENIX_BASE_URL || null,
     mcpServer: 'phoenix',
     traceUrl: buildPhoenixTraceUrl(traceId),
-    traceUrlSource: process.env.PHOENIX_TRACE_URL_TEMPLATE
-      ? 'template'
-      : 'default',
+    traceUrlSource: process.env.PHOENIX_TRACE_URL_TEMPLATE ? 'template' : 'default',
   };
 }
 
@@ -55,7 +55,7 @@ function shouldEnableTracing() {
     process.env.PHOENIX_ENABLED === 'true' ||
     process.env.PHOENIX_API_KEY ||
     process.env.PHOENIX_COLLECTOR_ENDPOINT ||
-    process.env.PHOENIX_BASE_URL
+    process.env.PHOENIX_BASE_URL,
   );
 }
 
@@ -79,7 +79,7 @@ function initPhoenixTracing() {
 
   if (!shouldEnableTracing()) {
     logger.info(
-      'Phoenix tracing disabled; set PHOENIX_ENABLED=true or PHOENIX_API_KEY to enable it'
+      'Phoenix tracing disabled; set PHOENIX_ENABLED=true or PHOENIX_API_KEY to enable it',
     );
     return { enabled: false, provider: null };
   }
@@ -90,15 +90,9 @@ function initPhoenixTracing() {
   }
 
   const instrumentations = [];
-  const httpInstrumentation = safeRequire(
-    '@opentelemetry/instrumentation-http'
-  );
-  const expressInstrumentation = safeRequire(
-    '@opentelemetry/instrumentation-express'
-  );
-  const openAIInstrumentation = safeRequire(
-    '@arizeai/openinference-instrumentation-openai'
-  );
+  const httpInstrumentation = safeRequire('@opentelemetry/instrumentation-http');
+  const expressInstrumentation = safeRequire('@opentelemetry/instrumentation-express');
+  const openAIInstrumentation = safeRequire('@arizeai/openinference-instrumentation-openai');
 
   if (httpInstrumentation?.HttpInstrumentation) {
     instrumentations.push(new httpInstrumentation.HttpInstrumentation());
@@ -115,8 +109,7 @@ function initPhoenixTracing() {
   try {
     provider = phoenix.register({
       projectName: getPhoenixProjectName(),
-      url:
-        process.env.PHOENIX_COLLECTOR_ENDPOINT || process.env.PHOENIX_BASE_URL,
+      url: process.env.PHOENIX_COLLECTOR_ENDPOINT || process.env.PHOENIX_BASE_URL,
       apiKey: process.env.PHOENIX_API_KEY,
       batch: process.env.PHOENIX_BATCH !== 'false',
       instrumentations,
@@ -128,12 +121,9 @@ function initPhoenixTracing() {
       instrumentations: instrumentations.length,
     });
   } catch (error) {
-    logger.warn(
-      'Phoenix tracing failed to initialize; continuing without tracing',
-      {
-        error: error.message,
-      }
-    );
+    logger.warn('Phoenix tracing failed to initialize; continuing without tracing', {
+      error: error.message,
+    });
   }
 
   return { enabled, provider };

@@ -10,15 +10,21 @@ const jwt = require('jsonwebtoken');
 exports.optionalUserAuth = (req, _res, next) => {
   try {
     const authHeader = req.header('Authorization') || '';
-    if (!authHeader.startsWith('Bearer ')) return next();
+    if (!authHeader.startsWith('Bearer ')) {
+      return next();
+    }
 
     const token = authHeader.slice('Bearer '.length).trim();
-    if (!token) return next();
+    if (!token) {
+      return next();
+    }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
     // Avoid treating agent tokens as user tokens
-    if (decoded?.type === 'human_agent') return next();
+    if (decoded?.type === 'human_agent') {
+      return next();
+    }
 
     if (decoded?.id) {
       req.user = { id: decoded.id, email: decoded.email };
@@ -28,4 +34,3 @@ exports.optionalUserAuth = (req, _res, next) => {
     return next();
   }
 };
-

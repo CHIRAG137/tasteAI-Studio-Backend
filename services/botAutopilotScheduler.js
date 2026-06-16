@@ -18,7 +18,9 @@ exports.startBotAutopilotScheduler = (schedule = '*/15 * * * *') => {
         nextRunAt: { $lte: new Date() },
       }).lean();
 
-      if (!dueConfigs.length) return;
+      if (!dueConfigs.length) {
+        return;
+      }
 
       logger.info('Bot autopilot scheduler processing due configs', {
         count: dueConfigs.length,

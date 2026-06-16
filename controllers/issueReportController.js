@@ -28,7 +28,7 @@ exports.createIssueReport = async (req, res) => {
     return responseBuilder.created(
       res,
       { id: report._id, status: report.status },
-      'Issue reported successfully'
+      'Issue reported successfully',
     );
   } catch (error) {
     logger.error('Failed to submit issue report', {

@@ -38,7 +38,7 @@ const BotAutopilotRunSchema = new mongoose.Schema(
     deliveries: { type: [mongoose.Schema.Types.Mixed], default: [] },
     error: { type: String, default: null },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 BotAutopilotRunSchema.index({ bot: 1, createdAt: -1 });

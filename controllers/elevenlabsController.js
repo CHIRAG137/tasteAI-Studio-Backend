@@ -103,11 +103,7 @@ exports.cloneVoice = async (req, res) => {
 
     if (!req.files || req.files.length === 0) {
       logger.warn('Voice clone failed: audio file missing');
-      return responseBuilder.badRequest(
-        res,
-        null,
-        'At least one audio file is required'
-      );
+      return responseBuilder.badRequest(res, null, 'At least one audio file is required');
     }
 
     const audioFiles = req.files.map((file) => file.buffer);
@@ -122,11 +118,7 @@ exports.cloneVoice = async (req, res) => {
       voiceId: voice.voice_id,
     });
 
-    return responseBuilder.ok(
-      res,
-      voice,
-      'Voice cloned successfully'
-    );
+    return responseBuilder.ok(res, voice, 'Voice cloned successfully');
   } catch (err) {
     logger.error('Voice cloning failed', {
       error: err.response?.data || err.message,

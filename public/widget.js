@@ -5,7 +5,7 @@ window.ChatBotWidget = {
   isInitialized: false,
   customization: null,
 
-  init: function (config) {
+  init(config) {
     // Prevent running inside iframe
     if (window.self !== window.top) {
       return;
@@ -29,10 +29,10 @@ window.ChatBotWidget = {
     this.isInitialized = true;
   },
 
-  fetchCustomization: async function () {
+  async fetchCustomization() {
     try {
       const response = await fetch(
-        `https://tastebot-studio-backend-gvvb.onrender.com/api/bots/customisation/${this.config.botId}`
+        `https://tastebot-studio-backend-gvvb.onrender.com/api/bots/customisation/${this.config.botId}`,
       );
       const data = await response.json();
 
@@ -49,7 +49,7 @@ window.ChatBotWidget = {
     }
   },
 
-  checkAndRender: function () {
+  checkAndRender() {
     const shouldShow = this.shouldShowOnCurrentPage(this.config.allowedPages);
 
     if (shouldShow) {
@@ -59,7 +59,7 @@ window.ChatBotWidget = {
     }
   },
 
-  showWidget: function () {
+  showWidget() {
     // If widget already exists and is visible, do nothing
     if (this.button && this.iframe) {
       this.button.style.display = 'flex';
@@ -73,7 +73,7 @@ window.ChatBotWidget = {
     }
   },
 
-  hideWidget: function () {
+  hideWidget() {
     console.log('ChatBotWidget: Hiding widget - not allowed on this page');
 
     if (this.button) {
@@ -84,7 +84,7 @@ window.ChatBotWidget = {
     }
   },
 
-  applyCustomStyles: function (element, customStyles, defaultStyles) {
+  applyCustomStyles(element, customStyles, defaultStyles) {
     // Apply default styles first
     Object.assign(element.style, defaultStyles);
 
@@ -94,7 +94,7 @@ window.ChatBotWidget = {
     }
   },
 
-  getAnimationCSS: function (animation) {
+  getAnimationCSS(animation) {
     const animations = {
       bounce: `
         @keyframes bounce-widget {
@@ -150,7 +150,7 @@ window.ChatBotWidget = {
     return animations[animation] || '';
   },
 
-  getHoverAnimationCSS: function (animation) {
+  getHoverAnimationCSS(animation) {
     const hoverAnimations = {
       scale: 'transform: scale(1.15) !important;',
       lift: 'transform: translateY(-8px) !important; box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3) !important;',
@@ -161,12 +161,11 @@ window.ChatBotWidget = {
     return hoverAnimations[animation] || '';
   },
 
-  getIconSVG: function (iconType, customIcon, iconValue, color, iconSize) {
+  getIconSVG(iconType, customIcon, iconValue, color, iconSize) {
     const size = iconSize || '24';
     const iconPaths = {
       chat: 'M2 2v20l4-4h14V2H2zm16 10H6v-2h12v2z',
-      message:
-        'M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z',
+      message: 'M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z',
       support:
         'M11 18h2v-2h-2v2zm1-16C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm0-14c-2.21 0-4 1.79-4 4h2c0-1.1.9-2 2-2s2 .9 2 2c0 2-3 1.75-3 5h2c0-2.25 3-2.5 3-5 0-2.21-1.79-4-4-4z',
       help: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm2.07-7.75l-.9.92C13.45 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H8c0-2.21 1.79-4 4-4s4 1.79 4 4c0 .88-.36 1.68-.93 2.25z',
@@ -174,30 +173,20 @@ window.ChatBotWidget = {
     };
 
     if (iconType === 'emoji' && customIcon) {
-      return (
-        '<span style="font-size: ' + size + 'px;">' + customIcon + '</span>'
-      );
+      return `<span style="font-size: ${size}px;">${customIcon}</span>`;
     } else if (iconType === 'custom' && customIcon) {
       return customIcon;
     } else if (iconType === 'none') {
       return '';
     } else {
       const path = iconPaths[iconValue] || iconPaths.chat;
-      return (
-        '<svg xmlns="http://www.w3.org/2000/svg" height="' +
-        size +
-        '" width="' +
-        size +
-        '" fill="' +
-        color +
-        '" viewBox="0 0 24 24"><path d="' +
-        path +
-        '"/></svg>'
-      );
+      return `<svg xmlns="http://www.w3.org/2000/svg" height="${size}" width="${size}" fill="${
+        color
+      }" viewBox="0 0 24 24"><path d="${path}"/></svg>`;
     }
   },
 
-  createWidget: function () {
+  createWidget() {
     // Prevent duplication
     if (
       document.getElementById('chatbot-widget-button') ||
@@ -303,12 +292,12 @@ window.ChatBotWidget = {
 
     // If user provided custom button CSS from backend, append it
     if (useButtonCustomCSS && c.buttonCustomCSS) {
-      defaultCSS += '\n' + c.buttonCustomCSS;
+      defaultCSS += `\n${c.buttonCustomCSS}`;
     }
 
     // If user provided custom CSS via init config, append it (backward compatibility)
     if (this.config.customCSS) {
-      defaultCSS += '\n' + this.config.customCSS;
+      defaultCSS += `\n${this.config.customCSS}`;
     }
 
     style.innerHTML = defaultCSS;
@@ -318,8 +307,7 @@ window.ChatBotWidget = {
     const position = c.buttonPosition || this.config.position || 'bottom-right';
     const buttonSize = c.buttonSize || '56';
     const buttonBorderRadius = c.buttonBorderRadius || '50';
-    const buttonBackground =
-      c.buttonBackground || 'linear-gradient(135deg, #9b5de5, #f15bb5)';
+    const buttonBackground = c.buttonBackground || 'linear-gradient(135deg, #9b5de5, #f15bb5)';
     const buttonColor = c.buttonColor || '#ffffff';
     const buttonBottom = c.buttonBottom || '20';
     const buttonRight = c.buttonRight || '20';
@@ -336,17 +324,17 @@ window.ChatBotWidget = {
       buttonCustomIcon,
       buttonIcon,
       buttonColor,
-      buttonIconSize
+      buttonIconSize,
     );
 
     // Create main button container
-    let buttonContainer = document.createElement('div');
+    const buttonContainer = document.createElement('div');
     buttonContainer.id = 'chatbot-widget-container';
     buttonContainer.style.cssText = `
     position: fixed;
     bottom: ${buttonBottom}px;
-    right: ${position === 'bottom-left' ? 'auto' : buttonRight + 'px'};
-    left: ${position === 'bottom-left' ? buttonLeft + 'px' : 'auto'};
+    right: ${position === 'bottom-left' ? 'auto' : `${buttonRight}px`};
+    left: ${position === 'bottom-left' ? `${buttonLeft}px` : 'auto'};
     z-index: 9999;
     display: flex;
     flex-direction: column;
@@ -412,9 +400,9 @@ window.ChatBotWidget = {
       background: buttonBackground,
       color: buttonColor,
       border: 'none',
-      borderRadius: buttonBorderRadius + '%',
-      width: buttonSize + 'px',
-      height: buttonSize + 'px',
+      borderRadius: `${buttonBorderRadius}%`,
+      width: `${buttonSize}px`,
+      height: `${buttonSize}px`,
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -436,11 +424,7 @@ window.ChatBotWidget = {
       });
     } else {
       // Apply default styles and custom button styles from config if provided
-      this.applyCustomStyles(
-        this.button,
-        this.config.buttonStyles,
-        defaultButtonStyles
-      );
+      this.applyCustomStyles(this.button, this.config.buttonStyles, defaultButtonStyles);
     }
 
     // Add button to inner wrapper
@@ -499,15 +483,14 @@ window.ChatBotWidget = {
 
     // Calculate iframe bottom position to avoid overlap
     // Button height + bottom spacing + branding height + extra gap
-    const iframeBottomPosition =
-      parseInt(buttonBottom) + parseInt(buttonSize) + 60;
+    const iframeBottomPosition = parseInt(buttonBottom) + parseInt(buttonSize) + 60;
 
     // Default iframe styles
     const defaultIframeStyles = {
       position: 'fixed',
-      bottom: iframeBottomPosition + 'px',
-      right: position === 'bottom-left' ? 'auto' : buttonRight + 'px',
-      left: position === 'bottom-left' ? buttonLeft + 'px' : 'auto',
+      bottom: `${iframeBottomPosition}px`,
+      right: position === 'bottom-left' ? 'auto' : `${buttonRight}px`,
+      left: position === 'bottom-left' ? `${buttonLeft}px` : 'auto',
       width: '360px',
       height: '500px',
       border: 'none',
@@ -519,11 +502,7 @@ window.ChatBotWidget = {
     };
 
     // Apply default styles and custom iframe styles if provided
-    this.applyCustomStyles(
-      this.iframe,
-      this.config.iframeStyles,
-      defaultIframeStyles
-    );
+    this.applyCustomStyles(this.iframe, this.config.iframeStyles, defaultIframeStyles);
 
     // Append elements to the DOM
     document.body.appendChild(buttonContainer);
@@ -532,7 +511,7 @@ window.ChatBotWidget = {
     console.log('ChatBotWidget: Widget created successfully with branding');
   },
 
-  setupRouteChangeListeners: function () {
+  setupRouteChangeListeners() {
     const self = this;
 
     // Listen for popstate (browser back/forward buttons)
@@ -574,7 +553,7 @@ window.ChatBotWidget = {
     console.log('ChatBotWidget: Route change listeners set up');
   },
 
-  shouldShowOnCurrentPage: function (allowedPages) {
+  shouldShowOnCurrentPage(allowedPages) {
     // If no allowedPages specified, show on all pages
     if (!allowedPages || allowedPages.length === 0) {
       return true;
@@ -585,17 +564,15 @@ window.ChatBotWidget = {
     const currentOrigin = window.location.origin;
 
     console.log('ChatBotWidget: Checking page access', {
-      currentUrl: currentUrl,
-      currentPath: currentPath,
-      allowedPages: allowedPages,
+      currentUrl,
+      currentPath,
+      allowedPages,
     });
 
     // Check each allowed page pattern
     for (let i = 0; i < allowedPages.length; i++) {
       const pattern = allowedPages[i];
-      if (
-        this.matchesPattern(pattern, currentUrl, currentPath, currentOrigin)
-      ) {
+      if (this.matchesPattern(pattern, currentUrl, currentPath, currentOrigin)) {
         console.log('ChatBotWidget: Page matched pattern:', pattern);
         return true;
       }
@@ -605,7 +582,7 @@ window.ChatBotWidget = {
     return false;
   },
 
-  matchesPattern: function (pattern, currentUrl, currentPath, currentOrigin) {
+  matchesPattern(pattern, currentUrl, currentPath, currentOrigin) {
     // Remove trailing slashes for consistent comparison
     const normalizedPattern = pattern.replace(/\/$/, '');
     const normalizedUrl = currentUrl.replace(/\/$/, '');
@@ -629,7 +606,7 @@ window.ChatBotWidget = {
       }
 
       // Check if pattern is a base path (e.g., /edit should match /edit/123)
-      if (currentPath.startsWith(normalizedPattern + '/')) {
+      if (currentPath.startsWith(`${normalizedPattern}/`)) {
         return true;
       }
 
@@ -654,7 +631,7 @@ window.ChatBotWidget = {
     return false;
   },
 
-  wildcardMatch: function (pattern, str) {
+  wildcardMatch(pattern, str) {
     // Remove trailing slashes for consistent matching
     const normalizedPattern = pattern.replace(/\/$/, '');
     const normalizedStr = str.replace(/\/$/, '');
@@ -671,7 +648,7 @@ window.ChatBotWidget = {
     for (let i = 0; i < parts.length; i++) {
       escapedParts.push(escapeRegex(parts[i]));
     }
-    const regexPattern = '^' + escapedParts.join('.*') + '$';
+    const regexPattern = `^${escapedParts.join('.*')}$`;
 
     const regex = new RegExp(regexPattern);
     return regex.test(normalizedStr);

@@ -15,7 +15,7 @@ const TraceFiltersSchema = new mongoose.Schema(
     latencyMsMax: { type: Number, default: null },
     retrievalScoreMin: { type: Number, default: null },
   },
-  { _id: false }
+  { _id: false },
 );
 
 const HandoffFiltersSchema = new mongoose.Schema(
@@ -26,7 +26,7 @@ const HandoffFiltersSchema = new mongoose.Schema(
     userRatingMax: { type: Number, default: null },
     hasFeedback: { type: Boolean, default: null },
   },
-  { _id: false }
+  { _id: false },
 );
 
 const BotEvalDatasetTypeSchema = new mongoose.Schema(
@@ -55,7 +55,7 @@ const BotEvalDatasetTypeSchema = new mongoose.Schema(
     datasetName: { type: String, default: null },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 BotEvalDatasetTypeSchema.index({ bot: 1, name: 1 }, { unique: true });

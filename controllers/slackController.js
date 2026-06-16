@@ -18,11 +18,7 @@ exports.initiateSlackOAuth = (req, res) => {
       error: error.message,
       userId: req.user?._id,
     });
-    return responseBuilder.internalError(
-      res,
-      null,
-      'Failed to initiate Slack OAuth'
-    );
+    return responseBuilder.internalError(res, null, 'Failed to initiate Slack OAuth');
   }
 };
 
@@ -38,11 +34,7 @@ exports.handleSlackOAuthCallback = async (req, res) => {
   try {
     await slackService.processSlackOAuthCallback(code, state);
     logger.info('Slack OAuth callback processed successfully', { state });
-    return responseBuilder.ok(
-      res,
-      null,
-      'Slack app successfully installed for your account!'
-    );
+    return responseBuilder.ok(res, null, 'Slack app successfully installed for your account!');
   } catch (error) {
     logger.error('Slack OAuth callback error', { error: error.message, state });
     return responseBuilder.internalError(res, null, 'Internal Server Error');

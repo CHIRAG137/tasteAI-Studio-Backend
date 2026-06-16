@@ -69,7 +69,7 @@ exports.syncBotAndHumanAgents = async ({ botId, emails, invitedBy }) => {
       const mapping = await BotAgent.findOneAndUpdate(
         { bot: botId, humanAgent: humanAgent._id },
         { isEnabled: true },
-        { upsert: true, new: true }
+        { upsert: true, new: true },
       );
 
       logger.info('Bot-agent mapping synced', {
@@ -128,8 +128,7 @@ exports.syncBotAndHumanAgents = async ({ botId, emails, invitedBy }) => {
           `,
         });
 
-          logger.info('Invite email sent to agent', { email });
-
+        logger.info('Invite email sent to agent', { email });
       } else {
         logger.debug('Agent already has password set, skipping invite', {
           email,
@@ -266,7 +265,7 @@ exports.humanAgentLogin = async (email, password) => {
       type: 'human_agent',
     },
     process.env.JWT_SECRET || 'your-secret-key',
-    { expiresIn: '7d' }
+    { expiresIn: '7d' },
   );
 
   // Store token and expiry in database
@@ -300,9 +299,7 @@ exports.humanAgentAuth0Login = async (accessToken) => {
   }
 
   if (!email) {
-    throw new Error(
-      'Could not resolve email from Auth0 — use openid profile email scopes',
-    );
+    throw new Error('Could not resolve email from Auth0 — use openid profile email scopes');
   }
 
   const normalizedEmail = email.toLowerCase();
@@ -320,9 +317,7 @@ exports.humanAgentAuth0Login = async (accessToken) => {
   }
 
   if (humanAgent.auth0Id && humanAgent.auth0Id !== auth0Sub) {
-    throw new Error(
-      'This agent profile is linked to a different Auth0 account',
-    );
+    throw new Error('This agent profile is linked to a different Auth0 account');
   }
 
   if (!humanAgent.auth0Id) {
@@ -346,9 +341,7 @@ exports.humanAgentAuth0Login = async (accessToken) => {
   );
 
   humanAgent.agentAuthToken = token;
-  humanAgent.agentAuthTokenExpiresAt = new Date(
-    Date.now() + 7 * 24 * 60 * 60 * 1000,
-  );
+  humanAgent.agentAuthTokenExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
   await humanAgent.save();
 
   logger.info('Agent Auth0 login successful', {
@@ -385,9 +378,7 @@ exports.humanAgentGoogleLogin = async (googleToken) => {
     }
 
     if (humanAgent.googleId && humanAgent.googleId !== googleId) {
-      throw new Error(
-        'This agent profile is linked to a different Google account',
-      );
+      throw new Error('This agent profile is linked to a different Google account');
     }
 
     if (!humanAgent.googleId) {
@@ -411,9 +402,7 @@ exports.humanAgentGoogleLogin = async (googleToken) => {
     );
 
     humanAgent.agentAuthToken = token;
-    humanAgent.agentAuthTokenExpiresAt = new Date(
-      Date.now() + 7 * 24 * 60 * 60 * 1000,
-    );
+    humanAgent.agentAuthTokenExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
     await humanAgent.save();
 
     logger.info('Agent Google login successful', {
@@ -432,9 +421,7 @@ exports.humanAgentGoogleLogin = async (googleToken) => {
 exports.humanAgentVerifyInviteToken = async (token) => {
   logger.info('Verifying invite token', { token: token.substring(0, 8) });
 
-  const inviteToken = await HumanAgentInviteToken.findOne({ token }).populate(
-    'humanAgent'
-  );
+  const inviteToken = await HumanAgentInviteToken.findOne({ token }).populate('humanAgent');
 
   if (!inviteToken) {
     logger.warn('Invalid token', { token: token.substring(0, 8) });
@@ -479,7 +466,9 @@ exports.getBotsByHumanAgentId = async (agentId) => {
   const disabledBots = [];
 
   for (const ba of botAgents) {
-    if (!ba.bot) continue;
+    if (!ba.bot) {
+      continue;
+    }
 
     if (ba.isEnabled) {
       enabledBots.push(ba.bot);
@@ -523,13 +512,13 @@ exports.getHumanAgentStatsById = async (agentId) => {
       currentlyActiveEscalated,
       totalEscalatedAway,
       resolvedEscalatedSessions,
-      
+
       // Escalation reason breakdown
       escalationReasonsRaw,
     ] = await Promise.all([
       // Total sessions ever assigned to this agent (current assignee)
-      HandoffSession.countDocuments({ 
-        assignedAgent: agentId 
+      HandoffSession.countDocuments({
+        assignedAgent: agentId,
       }),
 
       // Active/pending sessions currently assigned to this agent
@@ -687,7 +676,7 @@ exports.updateHumanAgentStatus = async (agentId, status) => {
 // get human agent profile by agent id
 exports.getHumanAgentProfileByAgentId = async (agentId) => {
   const agent = await HumanAgent.findById(agentId).select(
-    'displayName avatarUrl phoneNumber availabilityStatus timezone skills workingHours emailNotifications soundNotifications autoAcceptChats'
+    'displayName avatarUrl phoneNumber availabilityStatus timezone skills workingHours emailNotifications soundNotifications autoAcceptChats',
   );
 
   if (!agent) {
@@ -716,9 +705,9 @@ exports.updateHumanAgentProfileByAgentId = async (agentId, data) => {
   const agent = await HumanAgent.findByIdAndUpdate(
     agentId,
     { $set: allowedUpdates },
-    { new: true }
+    { new: true },
   ).select(
-    'displayName avatarUrl phoneNumber availabilityStatus timezone skills workingHours emailNotifications soundNotifications autoAcceptChats'
+    'displayName avatarUrl phoneNumber availabilityStatus timezone skills workingHours emailNotifications soundNotifications autoAcceptChats',
   );
 
   if (!agent) {
@@ -769,27 +758,17 @@ exports.getAgentsByBotId = async (botId) => {
         (session) =>
           session.assignedAgent.toString() === agentId.toString() ||
           session.escalationHistory.some(
-            (esc) => esc.previousAgent.toString() === agentId.toString()
-          )
+            (esc) => esc.previousAgent.toString() === agentId.toString(),
+          ),
       );
 
       // Calculate stats
       const totalHandoffs = agentSessions.length;
-      const resolvedHandoffs = agentSessions.filter(
-        (s) => s.status === 'resolved'
-      ).length;
-      const activeHandoffs = agentSessions.filter(
-        (s) => s.status === 'active'
-      ).length;
-      const pendingHandoffs = agentSessions.filter(
-        (s) => s.status === 'pending'
-      ).length;
-      const abandonedHandoffs = agentSessions.filter(
-        (s) => s.status === 'abandoned'
-      ).length;
-      const transferredHandoffs = agentSessions.filter(
-        (s) => s.status === 'transferred'
-      ).length;
+      const resolvedHandoffs = agentSessions.filter((s) => s.status === 'resolved').length;
+      const activeHandoffs = agentSessions.filter((s) => s.status === 'active').length;
+      const pendingHandoffs = agentSessions.filter((s) => s.status === 'pending').length;
+      const abandonedHandoffs = agentSessions.filter((s) => s.status === 'abandoned').length;
+      const transferredHandoffs = agentSessions.filter((s) => s.status === 'transferred').length;
 
       // Calculate escalations
       const escalatedSessions = agentSessions.filter((s) => s.escalated);
@@ -797,45 +776,39 @@ exports.getAgentsByBotId = async (botId) => {
 
       // Calculate average response time from sessions that have this metric
       const sessionsWithResponseTime = agentSessions.filter(
-        (s) => s.responseTime !== undefined && s.responseTime !== null
+        (s) => s.responseTime !== undefined && s.responseTime !== null,
       );
       const avgResponseTime =
         sessionsWithResponseTime.length > 0
           ? Math.round(
               sessionsWithResponseTime.reduce((sum, s) => sum + s.responseTime, 0) /
-                sessionsWithResponseTime.length
+                sessionsWithResponseTime.length,
             )
           : 0;
 
       // Calculate average resolution time
       const sessionsWithResolutionTime = agentSessions.filter(
-        (s) => s.resolutionTime !== undefined && s.resolutionTime !== null
+        (s) => s.resolutionTime !== undefined && s.resolutionTime !== null,
       );
       const avgResolutionTime =
         sessionsWithResolutionTime.length > 0
           ? Math.round(
-              sessionsWithResolutionTime.reduce(
-                (sum, s) => sum + s.resolutionTime,
-                0
-              ) / sessionsWithResolutionTime.length
+              sessionsWithResolutionTime.reduce((sum, s) => sum + s.resolutionTime, 0) /
+                sessionsWithResolutionTime.length,
             )
           : 0;
 
       // Calculate resolution rate
       const resolutionRate =
-        totalHandoffs > 0
-          ? Math.round((resolvedHandoffs / totalHandoffs) * 100)
-          : 0;
+        totalHandoffs > 0 ? Math.round((resolvedHandoffs / totalHandoffs) * 100) : 0;
 
       // Calculate escalation rate
       const escalationRate =
-        totalHandoffs > 0
-          ? Math.round((totalEscalations / totalHandoffs) * 100)
-          : 0;
+        totalHandoffs > 0 ? Math.round((totalEscalations / totalHandoffs) * 100) : 0;
 
       // Get average rating from sessions that have ratings
       const sessionsWithRating = agentSessions.filter(
-        (s) => s.userRating !== undefined && s.userRating !== null
+        (s) => s.userRating !== undefined && s.userRating !== null,
       );
       const avgUserRating =
         sessionsWithRating.length > 0
@@ -865,15 +838,12 @@ exports.getAgentsByBotId = async (botId) => {
         totalChatsAssigned: agent.totalChatsAssigned,
         currentActiveChats: agent.currentActiveChats,
         maxConcurrentChats: agent.maxConcurrentChats,
-        loadPercentage: Math.round(
-          (agent.currentActiveChats / agent.maxConcurrentChats) * 100
-        ),
+        loadPercentage: Math.round((agent.currentActiveChats / agent.maxConcurrentChats) * 100),
         hasCapacity: agent.currentActiveChats < agent.maxConcurrentChats,
 
         // Performance metrics
         averageResponseTime: agent.averageResponseTime || avgResponseTime,
-        averageResolutionTime:
-          agent.averageResolutionTime || avgResolutionTime,
+        averageResolutionTime: agent.averageResolutionTime || avgResolutionTime,
         averageRating: agent.averageRating || avgUserRating,
         totalRatings: agent.totalRatings,
 
@@ -933,14 +903,14 @@ exports.humanAgentLogout = async (agentId) => {
   try {
     const agent = await HumanAgent.findByIdAndUpdate(
       agentId,
-      { 
+      {
         lastLogoutAt: new Date(),
         agentAuthToken: null,
         agentAuthTokenExpiresAt: null,
         isOnline: false,
-        availabilityStatus: 'offline'
+        availabilityStatus: 'offline',
       },
-      { new: true }
+      { new: true },
     );
 
     if (!agent) {
@@ -948,14 +918,14 @@ exports.humanAgentLogout = async (agentId) => {
       throw new Error('Agent not found');
     }
 
-    logger.info('Agent logged out successfully', { 
+    logger.info('Agent logged out successfully', {
       agentId: agent._id,
-      email: agent.email 
+      email: agent.email,
     });
 
     return {
       message: 'Logout successful',
-      agent
+      agent,
     };
   } catch (error) {
     logger.error('Logout error', { agentId, error: error.message });

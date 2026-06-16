@@ -21,11 +21,12 @@ exports.generateImage = async (req, res) => {
     const geminiResponse = await imageGenerationService.generateImage(
       req.file.buffer,
       req.file.mimetype,
-      prompt
+      prompt,
     );
 
-    const imagePart =
-      geminiResponse.candidates?.[0]?.content?.parts?.find(part => part.inlineData);
+    const imagePart = geminiResponse.candidates?.[0]?.content?.parts?.find(
+      (part) => part.inlineData,
+    );
 
     if (!imagePart) {
       logger.error('No image returned from Gemini', { prompt, geminiResponse });
@@ -37,11 +38,14 @@ exports.generateImage = async (req, res) => {
 
     logger.info('Image generated successfully', { prompt });
 
-    return responseBuilder.ok(res, {
-      video_bot_image_base64: generatedImageBase64,
-      video_bot_image_mime_type: mimeType,
-    }, 'Image generated successfully');
-
+    return responseBuilder.ok(
+      res,
+      {
+        video_bot_image_base64: generatedImageBase64,
+        video_bot_image_mime_type: mimeType,
+      },
+      'Image generated successfully',
+    );
   } catch (error) {
     logger.error('Image generation failed', { error: error.message, body: req.body });
     return responseBuilder.internalError(res, null, 'Image generation failed');
@@ -60,16 +64,19 @@ exports.uploadCroppedImage = async (req, res) => {
 
     const cloudinaryResult = await imageGenerationService.uploadBufferToCloudinary(
       req.file.buffer,
-      'video-bot-avatars'
+      'video-bot-avatars',
     );
 
     logger.info('Cropped image uploaded successfully', { public_id: cloudinaryResult.public_id });
 
-    return responseBuilder.ok(res, {
-      video_bot_image_url: cloudinaryResult.secure_url,
-      video_bot_image_public_id: cloudinaryResult.public_id,
-    }, 'Cropped image uploaded successfully');
-
+    return responseBuilder.ok(
+      res,
+      {
+        video_bot_image_url: cloudinaryResult.secure_url,
+        video_bot_image_public_id: cloudinaryResult.public_id,
+      },
+      'Cropped image uploaded successfully',
+    );
   } catch (error) {
     logger.error('Failed to upload cropped image', { error: error.message });
     return responseBuilder.internalError(res, null, 'Failed to upload cropped image');

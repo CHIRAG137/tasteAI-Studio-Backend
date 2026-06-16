@@ -4,10 +4,7 @@ const { decryptApiKey } = require('./encryptionUtils');
 const logger = require('./logger');
 const ChatBot = require('../models/ChatBot');
 const UserApiKey = require('../models/UserApiKey');
-const {
-  runPhoenixSpan,
-  setPhoenixSpanAttributes,
-} = require('../config/phoenixTracing');
+const { runPhoenixSpan, setPhoenixSpanAttributes } = require('../config/phoenixTracing');
 
 async function traceLLMCall({ provider, modelName, operation, input }, fn) {
   return runPhoenixSpan(
@@ -27,7 +24,7 @@ async function traceLLMCall({ provider, modelName, operation, input }, fn) {
         'output.mime_type': typeof output === 'string' ? 'text/plain' : 'application/json',
       });
       return output;
-    }
+    },
   );
 }
 
@@ -47,7 +44,7 @@ async function traceEmbeddingCall({ provider, modelName, input }, fn) {
         'embedding.vector_length': output?.length || 0,
       });
       return output;
-    }
+    },
   );
 }
 
@@ -57,7 +54,7 @@ async function traceEmbeddingCall({ provider, modelName, input }, fn) {
  */
 function createOpenRouterInterface(apiKey, modelName = 'google/gemma-4-31b-it') {
   const client = new OpenAI({
-    apiKey: apiKey,
+    apiKey,
     baseURL: 'https://openrouter.ai/api/v1',
   });
 
@@ -73,7 +70,7 @@ function createOpenRouterInterface(apiKey, modelName = 'google/gemma-4-31b-it') 
         async () => {
           const result = await embeddingModel.embedContent(text);
           return new Float32Array(result.embedding.values);
-        }
+        },
       );
     },
     generateQAs: async (textChunk, botName, botDescription, personaContext = null) => {
@@ -112,7 +109,7 @@ Return only a list of 10–15 questions and answers in JSON format like this:
           const jsonMatch = responseText.match(/\[[\s\S]*\]/);
           const qas = jsonMatch ? JSON.parse(jsonMatch[0]) : [];
           return Array.isArray(qas) ? qas : [];
-        }
+        },
       );
     },
     generateSummary: async (prompt) => {
@@ -125,7 +122,7 @@ Return only a list of 10–15 questions and answers in JSON format like this:
             temperature: 0.7,
           });
           return completion.choices[0].message.content;
-        }
+        },
       );
     },
   };
@@ -138,7 +135,7 @@ Return only a list of 10–15 questions and answers in JSON format like this:
 exports.getLLMClient = async (botIdOrBot, userId = null) => {
   try {
     let bot;
-    
+
     // Handle both bot object and botId string
     if (typeof botIdOrBot === 'string') {
       bot = await ChatBot.findById(botIdOrBot);
@@ -151,7 +148,10 @@ exports.getLLMClient = async (botIdOrBot, userId = null) => {
     }
 
     // Check if bot has custom LLM configured (bot key or saved user key)
-    if (bot.custom_llm_provider && (bot.encrypted_api_key || bot.custom_api_key_source === 'user')) {
+    if (
+      bot.custom_llm_provider &&
+      (bot.encrypted_api_key || bot.custom_api_key_source === 'user')
+    ) {
       try {
         let decrypted = null;
 
@@ -221,7 +221,7 @@ function createDefaultLLMInterface() {
         async () => {
           const result = await embeddingModel.embedContent(text);
           return new Float32Array(result.embedding.values);
-        }
+        },
       );
     },
     generateQAs: async (textChunk, botName, botDescription, personaContext = null) => {
@@ -246,7 +246,12 @@ Return only a list of 10–15 questions and answers in JSON format like this:
       const prompt = `${systemPrompt}\n\n${userPrompt}`;
 
       return traceLLMCall(
-        { provider: 'gemini', modelName: 'gemini-3.1-pro-preview', operation: 'generate_qas', input: prompt },
+        {
+          provider: 'gemini',
+          modelName: 'gemini-3.1-pro-preview',
+          operation: 'generate_qas',
+          input: prompt,
+        },
         async () => {
           const result = await model.generateContent(prompt);
           const responseText = result.response.text();
@@ -254,16 +259,21 @@ Return only a list of 10–15 questions and answers in JSON format like this:
           const jsonMatch = responseText.match(/\[[\s\S]*\]/);
           const qas = jsonMatch ? JSON.parse(jsonMatch[0]) : [];
           return Array.isArray(qas) ? qas : [];
-        }
+        },
       );
     },
     generateSummary: async (prompt) => {
       return traceLLMCall(
-        { provider: 'gemini', modelName: 'gemini-3.1-pro-preview', operation: 'generate_summary', input: prompt },
+        {
+          provider: 'gemini',
+          modelName: 'gemini-3.1-pro-preview',
+          operation: 'generate_summary',
+          input: prompt,
+        },
         async () => {
           const result = await model.generateContent(prompt);
           return result.response.text();
-        }
+        },
       );
     },
   };
@@ -285,7 +295,7 @@ function createOpenAIInterface(apiKey, modelName = 'gpt-4') {
             input: text,
           });
           return new Float32Array(result.data[0].embedding);
-        }
+        },
       );
     },
     generateQAs: async (textChunk, botName, botDescription, personaContext = null) => {
@@ -324,7 +334,7 @@ Return only a list of 10–15 questions and answers in JSON format like this:
           const jsonMatch = responseText.match(/\[[\s\S]*\]/);
           const qas = jsonMatch ? JSON.parse(jsonMatch[0]) : [];
           return Array.isArray(qas) ? qas : [];
-        }
+        },
       );
     },
     generateSummary: async (prompt) => {
@@ -337,7 +347,7 @@ Return only a list of 10–15 questions and answers in JSON format like this:
             temperature: 0.7,
           });
           return completion.choices[0].message.content;
-        }
+        },
       );
     },
   };
@@ -360,7 +370,7 @@ function createGeminiInterface(apiKey, modelName = 'gemini-3.1-pro-preview') {
         async () => {
           const result = await embeddingModel.embedContent(text);
           return new Float32Array(result.embedding.values);
-        }
+        },
       );
     },
     generateQAs: async (textChunk, botName, botDescription, personaContext = null) => {
@@ -393,7 +403,7 @@ Return only a list of 10–15 questions and answers in JSON format like this:
           const jsonMatch = responseText.match(/\[[\s\S]*\]/);
           const qas = jsonMatch ? JSON.parse(jsonMatch[0]) : [];
           return Array.isArray(qas) ? qas : [];
-        }
+        },
       );
     },
     generateSummary: async (prompt) => {
@@ -402,7 +412,7 @@ Return only a list of 10–15 questions and answers in JSON format like this:
         async () => {
           const result = await model.generateContent(prompt);
           return result.response.text();
-        }
+        },
       );
     },
   };
@@ -427,7 +437,14 @@ exports.generateEmbedding = async (text, botIdOrBot, userId = null) => {
 /**
  * Generate Q&A pairs using appropriate LLM (custom or default)
  */
-exports.generateQAsWithLLM = async (textChunk, botName, botDescription, botIdOrBot, userId = null, personaContext = null) => {
+exports.generateQAsWithLLM = async (
+  textChunk,
+  botName,
+  botDescription,
+  botIdOrBot,
+  userId = null,
+  personaContext = null,
+) => {
   try {
     const llmClient = await exports.getLLMClient(botIdOrBot, userId);
     return await llmClient.generateQAs(textChunk, botName, botDescription, personaContext);
@@ -442,7 +459,10 @@ exports.generateQAsWithLLM = async (textChunk, botName, botDescription, botIdOrB
 
 exports.testCustomLLMConnection = async (provider, apiKey, model = null) => {
   const normalizedProvider = typeof provider === 'string' ? provider.toLowerCase() : null;
-  if (!normalizedProvider || !['openai', 'gemini', 'openrouter', 'gemma'].includes(normalizedProvider)) {
+  if (
+    !normalizedProvider ||
+    !['openai', 'gemini', 'openrouter', 'gemma'].includes(normalizedProvider)
+  ) {
     throw new Error('Invalid custom LLM provider. Must be openai, gemini, openrouter, or gemma.');
   }
 
@@ -450,12 +470,13 @@ exports.testCustomLLMConnection = async (provider, apiKey, model = null) => {
     throw new Error('API key is required for custom LLM validation.');
   }
 
-  const testModel = model || 
-    (normalizedProvider === 'openai' 
-      ? 'gpt-4' 
-      : (normalizedProvider === 'gemini' 
-        ? 'gemini-3.1-pro-preview' 
-        : 'google/gemma-4-31b-it'));
+  const testModel =
+    model ||
+    (normalizedProvider === 'openai'
+      ? 'gpt-4'
+      : normalizedProvider === 'gemini'
+        ? 'gemini-3.1-pro-preview'
+        : 'google/gemma-4-31b-it');
   const prompt = 'Please respond with the single word OK to validate your API key.';
 
   if (normalizedProvider === 'openai') {

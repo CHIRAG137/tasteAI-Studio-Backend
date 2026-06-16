@@ -50,7 +50,7 @@ const BotEvalDatasetItemSchema = new mongoose.Schema(
     metadata: { type: mongoose.Schema.Types.Mixed, default: {} },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 BotEvalDatasetItemSchema.index({ bot: 1, itemKey: 1 }, { unique: true });

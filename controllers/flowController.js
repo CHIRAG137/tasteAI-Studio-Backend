@@ -33,7 +33,7 @@ const formatMessagesForDisplay = (outputs, pausedFor = null) => {
     if (output.type === 'message' || output.type === 'redirect') {
       messages.push({
         type: output.type,
-        content: content,
+        content,
         nodeId: output.nodeId,
         awaitingInput: false,
       });
@@ -68,7 +68,9 @@ exports.startFlow = async (req, res) => {
     }
 
     const ok = await enforceVisitorEmailVerificationForBot(req, res, bot);
-    if (!ok) return;
+    if (!ok) {
+      return;
+    }
 
     const ipAddress = req.clientIp;
     const userAgent = req.userAgent || 'Unknown';
@@ -76,8 +78,8 @@ exports.startFlow = async (req, res) => {
     const session = new FlowSession({
       bot: bot._id,
       variables: {},
-      ipAddress: ipAddress,
-      userAgent: userAgent,
+      ipAddress,
+      userAgent,
     });
 
     // Find the start node
@@ -94,11 +96,7 @@ exports.startFlow = async (req, res) => {
     }
 
     // Run flow until a pause
-    const runResult = await flowEngine.runFrom(
-      bot.conversationFlow,
-      session,
-      startNode.id
-    );
+    const runResult = await flowEngine.runFrom(bot.conversationFlow, session, startNode.id);
 
     // Save outputs to history with flow mode
     if (runResult.outputs && runResult.outputs.length > 0) {
@@ -110,7 +108,7 @@ exports.startFlow = async (req, res) => {
           content: o.content,
           timestamp: new Date(),
           fromUser: false,
-        }))
+        })),
       );
     }
 
@@ -127,9 +125,7 @@ exports.startFlow = async (req, res) => {
       });
     }
 
-    session.currentNodeId = runResult.pausedFor
-      ? runResult.pausedFor.nodeId
-      : runResult.nextNodeId;
+    session.currentNodeId = runResult.pausedFor ? runResult.pausedFor.nodeId : runResult.nextNodeId;
 
     if (!session.currentNodeId) {
       session.isFinished = true;
@@ -143,14 +139,11 @@ exports.startFlow = async (req, res) => {
     await session.save();
 
     // Format response with all messages to display
-    const messages = formatMessagesForDisplay(
-      runResult.outputs || [],
-      runResult.pausedFor
-    );
+    const messages = formatMessagesForDisplay(runResult.outputs || [], runResult.pausedFor);
 
     return res.json({
       sessionId: session._id,
-      messages: messages,
+      messages,
       awaitingInput: runResult.pausedFor
         ? {
             type: runResult.pausedFor.type,
@@ -197,7 +190,9 @@ exports.respondToFlow = async (req, res) => {
     }
 
     const ok = await enforceVisitorEmailVerificationForBot(req, res, bot);
-    if (!ok) return;
+    if (!ok) {
+      return;
+    }
 
     const nodeMap = flowEngine.buildNodeMap(bot.conversationFlow);
 
@@ -232,26 +227,20 @@ exports.respondToFlow = async (req, res) => {
 
     switch (waitingNode.type) {
       case 'branch':
-        if (
-          typeof optionIndexOrLabel === 'undefined' &&
-          typeof input === 'undefined'
-        ) {
+        if (typeof optionIndexOrLabel === 'undefined' && typeof input === 'undefined') {
           return res.status(400).json({
-            error:
-              'Please provide optionIndexOrLabel (index or label) to select branch option.',
+            error: 'Please provide optionIndexOrLabel (index or label) to select branch option.',
           });
         }
 
         const optNodeId = flowEngine.findBranchOptionNode(
           nodeMap,
           waitingNode,
-          typeof optionIndexOrLabel !== 'undefined' ? optionIndexOrLabel : input
+          typeof optionIndexOrLabel !== 'undefined' ? optionIndexOrLabel : input,
         );
 
         if (!optNodeId) {
-          return res
-            .status(400)
-            .json({ error: 'Branch option not recognized' });
+          return res.status(400).json({ error: 'Branch option not recognized' });
         }
 
         // Save user choice
@@ -267,19 +256,13 @@ exports.respondToFlow = async (req, res) => {
           fromUser: true,
         });
 
-        runResult = await flowEngine.runFrom(
-          bot.conversationFlow,
-          session,
-          optNodeId
-        );
+        runResult = await flowEngine.runFrom(bot.conversationFlow, session, optNodeId);
         break;
 
       case 'question':
       case 'confirmation':
         if (typeof input === 'undefined') {
-          return res
-            .status(400)
-            .json({ error: 'Please provide input for this node.' });
+          return res.status(400).json({ error: 'Please provide input for this node.' });
         }
 
         // Save user input
@@ -292,21 +275,12 @@ exports.respondToFlow = async (req, res) => {
           fromUser: true,
         });
 
-        runResult = await flowEngine.runFrom(
-          bot.conversationFlow,
-          session,
-          waitingNode.id,
-          input
-        );
+        runResult = await flowEngine.runFrom(bot.conversationFlow, session, waitingNode.id, input);
         break;
 
       default:
         // For message, redirect, branchOption, unknown, continue flow
-        runResult = await flowEngine.runFrom(
-          bot.conversationFlow,
-          session,
-          waitingNode.id
-        );
+        runResult = await flowEngine.runFrom(bot.conversationFlow, session, waitingNode.id);
         break;
     }
 
@@ -320,7 +294,7 @@ exports.respondToFlow = async (req, res) => {
           content: o.content,
           timestamp: new Date(),
           fromUser: false,
-        }))
+        })),
       );
     }
 
@@ -337,9 +311,7 @@ exports.respondToFlow = async (req, res) => {
       });
     }
 
-    session.currentNodeId = runResult.pausedFor
-      ? runResult.pausedFor.nodeId
-      : runResult.nextNodeId;
+    session.currentNodeId = runResult.pausedFor ? runResult.pausedFor.nodeId : runResult.nextNodeId;
 
     if (!session.currentNodeId) {
       session.isFinished = true;
@@ -353,13 +325,10 @@ exports.respondToFlow = async (req, res) => {
     await session.save();
 
     // Format response with all messages to display
-    const messages = formatMessagesForDisplay(
-      runResult.outputs || [],
-      runResult.pausedFor
-    );
+    const messages = formatMessagesForDisplay(runResult.outputs || [], runResult.pausedFor);
 
     return res.json({
-      messages: messages,
+      messages,
       awaitingInput: runResult.pausedFor
         ? {
             type: runResult.pausedFor.type,
@@ -385,11 +354,7 @@ exports.respondToFlow = async (req, res) => {
 exports.addSystemMessage = async (req, res) => {
   try {
     const { sessionId } = req.params;
-    const {
-      message,
-      messageType = 'system',
-      handoffSessionId = null,
-    } = req.body;
+    const { message, messageType = 'system', handoffSessionId = null } = req.body;
 
     if (!message) {
       return res.status(400).json({ error: 'Message is required' });

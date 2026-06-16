@@ -14,17 +14,11 @@ const { consumeAuth0SubRateLimit } = require('../utils/auth0SubRateLimiter');
  */
 exports.requestHandoff = async (req, res) => {
   try {
-    const { botId, flowSessionId, userQuestion, userIpAddress, userAgent } =
-      req.body;
+    const { botId, flowSessionId, userQuestion, userIpAddress, userAgent } = req.body;
 
     if (!botId || !flowSessionId) {
-      return responseBuilder.badRequest(
-        res,
-        null,
-        'Bot ID and Flow Session ID are required'
-      );
+      return responseBuilder.badRequest(res, null, 'Bot ID and Flow Session ID are required');
     }
-
 
     const result = await humanHandoffService.requestHumanHandoff({
       botId,
@@ -59,10 +53,7 @@ exports.acceptHandoff = async (req, res) => {
     const { id: handoffSessionId } = req.params;
     const agentId = req.agent.id;
 
-    const result = await humanHandoffService.acceptHandoffSession(
-      agentId,
-      handoffSessionId
-    );
+    const result = await humanHandoffService.acceptHandoffSession(agentId, handoffSessionId);
 
     logger.info('Handoff accepted', { agentId, handoffSessionId });
 
@@ -90,7 +81,7 @@ exports.resolveHandoff = async (req, res) => {
     const result = await humanHandoffService.resolveHandoffSession(
       agentId,
       handoffSessionId,
-      notes
+      notes,
     );
 
     logger.info('Handoff resolved', { agentId, handoffSessionId });
@@ -110,12 +101,7 @@ exports.resolveHandoff = async (req, res) => {
 exports.getHumanAgentHandoffs = async (req, res) => {
   try {
     const agentId = req.agent.id;
-    const {
-      status = 'all',
-      includeEscalated = 'true',
-      page = 1,
-      limit = 50,
-    } = req.query;
+    const { status = 'all', includeEscalated = 'true', page = 1, limit = 50 } = req.query;
 
     logger.info('Fetching human agent handoff sessions', {
       agentId,
@@ -125,15 +111,12 @@ exports.getHumanAgentHandoffs = async (req, res) => {
       limit,
     });
 
-    const result = await humanHandoffService.getHumanAgentHandoffSessions(
-      agentId,
-      {
-        status,
-        includeEscalated: includeEscalated === 'true',
-        page: parseInt(page, 10),
-        limit: parseInt(limit, 10),
-      }
-    );
+    const result = await humanHandoffService.getHumanAgentHandoffSessions(agentId, {
+      status,
+      includeEscalated: includeEscalated === 'true',
+      page: parseInt(page, 10),
+      limit: parseInt(limit, 10),
+    });
 
     logger.info('Handoff sessions fetched successfully', {
       agentId,
@@ -147,7 +130,7 @@ exports.getHumanAgentHandoffs = async (req, res) => {
         sessions: result.sessions,
         pagination: result.pagination,
       },
-      'Handoff sessions retrieved successfully'
+      'Handoff sessions retrieved successfully',
     );
   } catch (error) {
     logger.error('Error fetching human agent handoff sessions', {
@@ -159,7 +142,7 @@ exports.getHumanAgentHandoffs = async (req, res) => {
 
     return responseBuilder.internalError(
       res,
-      error.message || 'Failed to retrieve handoff sessions'
+      error.message || 'Failed to retrieve handoff sessions',
     );
   }
 };
@@ -181,7 +164,7 @@ exports.addMessage = async (req, res) => {
 
     // Check if session exists and is active
     const session = await HandoffSession.findById(handoffSessionId);
-    
+
     if (!session) {
       return responseBuilder.notFound(res, null, 'Session not found');
     }
@@ -203,13 +186,13 @@ exports.addMessage = async (req, res) => {
       handoffSessionId,
       'agent',
       message.trim(),
-      agentId
+      agentId,
     );
 
     console.log('Message sent successfully:', {
       sessionId: handoffSessionId,
       agentId,
-      messageLength: message.length
+      messageLength: message.length,
     });
 
     logger.info('Message added to handoff session', {
@@ -218,11 +201,14 @@ exports.addMessage = async (req, res) => {
       messageCount: result.session.messages.length,
     });
 
-    return responseBuilder.ok(res, {
-      message: result.message,
-      sessionId: handoffSessionId,
-    }, 'Message sent successfully');
-
+    return responseBuilder.ok(
+      res,
+      {
+        message: result.message,
+        sessionId: handoffSessionId,
+      },
+      'Message sent successfully',
+    );
   } catch (error) {
     logger.error('Error adding message', {
       error: error.message,
@@ -232,9 +218,10 @@ exports.addMessage = async (req, res) => {
     });
 
     // Return more specific error message in development
-    const errorMessage = process.env.NODE_ENV === 'development' 
-      ? `Failed to send message: ${error.message}`
-      : 'Failed to send message';
+    const errorMessage =
+      process.env.NODE_ENV === 'development'
+        ? `Failed to send message: ${error.message}`
+        : 'Failed to send message';
 
     return responseBuilder.internalError(res, errorMessage);
   }
@@ -260,11 +247,7 @@ exports.getMessages = async (req, res) => {
       messageCount: session.messages.length,
     });
 
-    return responseBuilder.ok(
-      res,
-      { messages: session.messages },
-      'Messages fetched successfully'
-    );
+    return responseBuilder.ok(res, { messages: session.messages }, 'Messages fetched successfully');
   } catch (error) {
     logger.error('Error fetching messages', {
       error: error.message,
@@ -295,7 +278,7 @@ exports.addClientMessage = async (req, res) => {
       return responseBuilder.forbidden(
         res,
         null,
-        'Not authorized to send messages to this session'
+        'Not authorized to send messages to this session',
       );
     }
 
@@ -303,7 +286,7 @@ exports.addClientMessage = async (req, res) => {
       handoffSessionId,
       'user',
       message,
-      null // No agent ID for client messages
+      null, // No agent ID for client messages
     );
 
     logger.info('Client message added to handoff session', {
@@ -331,11 +314,7 @@ exports.getClientMessages = async (req, res) => {
     const { flowSessionId } = req.query;
 
     if (!flowSessionId) {
-      return responseBuilder.badRequest(
-        res,
-        null,
-        'Flow Session ID is required'
-      );
+      return responseBuilder.badRequest(res, null, 'Flow Session ID is required');
     }
 
     const HandoffSession = require('../models/HandoffSession');
@@ -350,7 +329,7 @@ exports.getClientMessages = async (req, res) => {
       return responseBuilder.forbidden(
         res,
         null,
-        'Not authorized to view messages for this session'
+        'Not authorized to view messages for this session',
       );
     }
 
@@ -367,7 +346,7 @@ exports.getClientMessages = async (req, res) => {
         status: session.status,
         assignedAgent: session.assignedAgent,
       },
-      'Messages fetched successfully'
+      'Messages fetched successfully',
     );
   } catch (error) {
     logger.error('Error fetching client messages', {
@@ -377,7 +356,6 @@ exports.getClientMessages = async (req, res) => {
     return responseBuilder.internalError(res, 'Failed to fetch messages');
   }
 };
-
 
 /**
  * Client resolves a handoff session (public)
@@ -394,18 +372,20 @@ exports.resolveByClient = async (req, res) => {
 
     const result = await humanHandoffService.resolveHandoffSessionByClient(
       flowSessionId,
-      handoffSessionId
+      handoffSessionId,
     );
 
     logger.info('Client resolved handoff', { handoffSessionId, flowSessionId });
 
     return responseBuilder.ok(res, result, 'Handoff session resolved by client');
   } catch (error) {
-    logger.error('Error client resolving handoff', { error: error.message, handoffSessionId: req.params.id });
+    logger.error('Error client resolving handoff', {
+      error: error.message,
+      handoffSessionId: req.params.id,
+    });
     return responseBuilder.internalError(res, error.message);
   }
 };
-
 
 /**
  * Client reopens a resolved handoff session (public)
@@ -422,18 +402,20 @@ exports.reopenByClient = async (req, res) => {
 
     const result = await humanHandoffService.reopenHandoffSessionByClient(
       flowSessionId,
-      handoffSessionId
+      handoffSessionId,
     );
 
     logger.info('Client reopened handoff', { handoffSessionId, flowSessionId });
 
     return responseBuilder.ok(res, result, 'Handoff session reopened by client');
   } catch (error) {
-    logger.error('Error client reopening handoff', { error: error.message, handoffSessionId: req.params.id });
+    logger.error('Error client reopening handoff', {
+      error: error.message,
+      handoffSessionId: req.params.id,
+    });
     return responseBuilder.internalError(res, error.message);
   }
 };
-
 
 /**
  * Agent reopens a resolved handoff session (agent)
@@ -450,7 +432,11 @@ exports.reopenByAgent = async (req, res) => {
 
     return responseBuilder.ok(res, result, 'Handoff session reopened by agent');
   } catch (error) {
-    logger.error('Error agent reopening handoff', { error: error.message, agentId: req.agent?.id, handoffSessionId: req.params.id });
+    logger.error('Error agent reopening handoff', {
+      error: error.message,
+      agentId: req.agent?.id,
+      handoffSessionId: req.params.id,
+    });
     return responseBuilder.internalError(res, error.message);
   }
 };
@@ -485,7 +471,9 @@ exports.rateByClient = async (req, res) => {
     // Save rating and feedback
     const previousRating = session.userRating || null;
     session.userRating = rating;
-    if (feedback) session.userFeedback = feedback;
+    if (feedback) {
+      session.userFeedback = feedback;
+    }
     await session.save();
 
     // Update agent aggregate rating
@@ -496,14 +484,14 @@ exports.rateByClient = async (req, res) => {
         // adjust average without changing totalRatings
         const total = agent.totalRatings || 0;
         if (total > 0) {
-          agent.averageRating = ((agent.averageRating * total) - previousRating + rating) / total;
+          agent.averageRating = (agent.averageRating * total - previousRating + rating) / total;
         } else {
           agent.averageRating = rating;
           agent.totalRatings = 1;
         }
       } else {
         const total = agent.totalRatings || 0;
-        agent.averageRating = ((agent.averageRating * total) + rating) / (total + 1);
+        agent.averageRating = (agent.averageRating * total + rating) / (total + 1);
         agent.totalRatings = total + 1;
       }
       await agent.save();
@@ -511,7 +499,10 @@ exports.rateByClient = async (req, res) => {
 
     return responseBuilder.ok(res, { success: true }, 'Rating submitted');
   } catch (error) {
-    logger.error('Error submitting rating', { error: error.message, handoffSessionId: req.params.id });
+    logger.error('Error submitting rating', {
+      error: error.message,
+      handoffSessionId: req.params.id,
+    });
     return responseBuilder.internalError(res, error.message);
   }
 };
@@ -531,7 +522,7 @@ exports.getSessionRating = async (req, res) => {
 
     const HandoffSession = require('../models/HandoffSession');
     const session = await HandoffSession.findById(handoffSessionId);
-    
+
     if (!session) {
       return responseBuilder.notFound(res, null, 'Handoff session not found');
     }
@@ -545,12 +536,19 @@ exports.getSessionRating = async (req, res) => {
       hasRating: !!session.userRating,
     });
 
-    return responseBuilder.ok(res, {
-      userRating: session.userRating || null,
-      userFeedback: session.userFeedback || null,
-    }, 'Rating retrieved successfully');
+    return responseBuilder.ok(
+      res,
+      {
+        userRating: session.userRating || null,
+        userFeedback: session.userFeedback || null,
+      },
+      'Rating retrieved successfully',
+    );
   } catch (error) {
-    logger.error('Error retrieving rating', { error: error.message, handoffSessionId: req.params.id });
+    logger.error('Error retrieving rating', {
+      error: error.message,
+      handoffSessionId: req.params.id,
+    });
     return responseBuilder.internalError(res, error.message);
   }
 };

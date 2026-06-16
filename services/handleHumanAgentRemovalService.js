@@ -34,10 +34,7 @@ exports.handleHumanAgentRemovalEscalation = async (botId, removedAgentIds) => {
       });
 
       // Get eligible agents for reassignment (excluding the removed agent)
-      const eligibleAgents = await getEligibleHumanAgentsForReassignment(
-        botId,
-        agentId
-      );
+      const eligibleAgents = await getEligibleHumanAgentsForReassignment(botId, agentId);
 
       if (eligibleAgents.length === 0) {
         logger.error('No eligible agents for reassignment', { botId, agentId });
@@ -52,9 +49,8 @@ exports.handleHumanAgentRemovalEscalation = async (botId, removedAgentIds) => {
             status: 'abandoned',
             escalated: true,
             escalatedAt: new Date(),
-            agentNotes:
-              'Agent removed from bot - no agents available for reassignment',
-          }
+            agentNotes: 'Agent removed from bot - no agents available for reassignment',
+          },
         );
         continue;
       }
@@ -65,9 +61,7 @@ exports.handleHumanAgentRemovalEscalation = async (botId, removedAgentIds) => {
       }
 
       // Decrement the removed agent's active chat count
-      const activeSessionsCount = sessionsToEscalate.filter(
-        (s) => s.status === 'active'
-      ).length;
+      const activeSessionsCount = sessionsToEscalate.filter((s) => s.status === 'active').length;
 
       if (activeSessionsCount > 0) {
         await HumanAgent.findByIdAndUpdate(agentId, {
@@ -136,10 +130,7 @@ async function escalateHandoffSession(session, eligibleAgents, botId) {
     const previousAgent = session.assignedAgent;
 
     // Find best agent using the same logic as requestHumanHandoff
-    const assignmentResult = await findBestHumanAgentForEscalation(
-      eligibleAgents,
-      botId
-    );
+    const assignmentResult = await findBestHumanAgentForEscalation(eligibleAgents, botId);
 
     // Update the session with escalation metadata
     await HandoffSession.findByIdAndUpdate(session._id, {
@@ -151,7 +142,7 @@ async function escalateHandoffSession(session, eligibleAgents, botId) {
       $push: {
         escalationHistory: {
           previousAgent: previousAgent._id,
-          previousStatus: previousStatus,
+          previousStatus,
           newAgent: assignmentResult.agent._id,
           escalatedAt: new Date(),
           reason: 'agent_removed_from_bot',
@@ -202,13 +193,13 @@ async function findBestHumanAgentForEscalation(agents, botId) {
     (agent) =>
       agent.isOnline &&
       agent.availabilityStatus === 'available' &&
-      agent.currentActiveChats < agent.maxConcurrentChats
+      agent.currentActiveChats < agent.maxConcurrentChats,
   );
 
   if (onlineAvailableAgents.length > 0) {
     // Use least-busy algorithm for online agents
     const leastBusyAgent = onlineAvailableAgents.reduce((prev, current) =>
-      prev.currentActiveChats < current.currentActiveChats ? prev : current
+      prev.currentActiveChats < current.currentActiveChats ? prev : current,
     );
 
     logger.info('Assigned to least busy online agent for escalation', {

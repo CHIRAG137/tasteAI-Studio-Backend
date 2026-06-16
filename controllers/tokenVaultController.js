@@ -33,11 +33,7 @@ exports.exchangeConnectionToken = async (req, res) => {
       logger.warn('Auth0 token sub mismatch for Token Vault', {
         userId: req.user._id,
       });
-      return responseBuilder.forbidden(
-        res,
-        null,
-        'Auth0 access token does not match this user',
-      );
+      return responseBuilder.forbidden(res, null, 'Auth0 access token does not match this user');
     }
 
     const result = await exchangeThirdPartyToken({
@@ -48,10 +44,7 @@ exports.exchangeConnectionToken = async (req, res) => {
     return responseBuilder.ok(res, result, 'Third-party token retrieved');
   } catch (err) {
     logger.error('Token Vault exchange failed', { error: err.message });
-    const msg =
-      err.response?.data?.error_description ||
-      err.response?.data?.error ||
-      err.message;
+    const msg = err.response?.data?.error_description || err.response?.data?.error || err.message;
     return responseBuilder.badRequest(res, null, msg || 'Token exchange failed');
   }
 };

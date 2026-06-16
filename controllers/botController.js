@@ -29,13 +29,16 @@ exports.createBot = async (req, res) => {
 // ask a query to a bot
 exports.askBot = async (req, res) => {
   try {
-    const { question, botId, sessionId, flowSessionId, chatHistory, matchedAnswer, userEmotion } = req.body;
+    const { question, botId, sessionId, flowSessionId, chatHistory, matchedAnswer, userEmotion } =
+      req.body;
     const resolvedSessionId = sessionId || flowSessionId;
 
     const bot = await ChatBot.findById(botId).lean();
     if (bot) {
       const ok = await enforceVisitorEmailVerificationForBot(req, res, bot);
-      if (!ok) return;
+      if (!ok) {
+        return;
+      }
     }
 
     const result = await botService.askBot(
@@ -45,18 +48,18 @@ exports.askBot = async (req, res) => {
       null, // userId
       chatHistory,
       matchedAnswer,
-      userEmotion
+      userEmotion,
     );
 
-    const llmType = bot?.custom_llm_provider 
+    const llmType = bot?.custom_llm_provider
       ? `custom (${bot.custom_llm_provider}, model: ${bot.custom_model || 'default'})`
       : 'default';
-    
-    logger.info('Bot answered question', { 
-      botId, 
-      question, 
+
+    logger.info('Bot answered question', {
+      botId,
+      question,
       sessionId: resolvedSessionId,
-      llmProvider: llmType
+      llmProvider: llmType,
     });
     return responseBuilder.ok(res, result, 'Bot responded successfully');
   } catch (error) {
@@ -74,10 +77,7 @@ exports.getAllChatBots = async (req, res) => {
     const limit = Math.min(parseInt(req.query.limit, 10) || 10, 50);
     const skip = (page - 1) * limit;
 
-    const { bots, pagination } = await botService.getAllChatBots(
-      userId,
-      { skip, limit, page }
-    );
+    const { bots, pagination } = await botService.getAllChatBots(userId, { skip, limit, page });
 
     logger.info('Fetched chat bots', {
       userId,
@@ -87,11 +87,7 @@ exports.getAllChatBots = async (req, res) => {
       totalBots: pagination.total,
     });
 
-    return responseBuilder.ok(
-      res,
-      { bots, pagination },
-      'Chat bots fetched successfully'
-    );
+    return responseBuilder.ok(res, { bots, pagination }, 'Chat bots fetched successfully');
   } catch (error) {
     logger.error('Error fetching all chat bots', {
       userId: req.user?.id,
@@ -132,11 +128,7 @@ exports.deleteBotByBotId = async (req, res) => {
     await botService.deleteBotByBotId(botId, userId);
 
     logger.info('Bot deleted successfully', { botId, userId });
-    return responseBuilder.ok(
-      res,
-      null,
-      'Bot and associated data deleted successfully'
-    );
+    return responseBuilder.ok(res, null, 'Bot and associated data deleted successfully');
   } catch (error) {
     logger.error('Error deleting bot', {
       error: error.message,
@@ -154,18 +146,13 @@ exports.updateBotByBotId = async (req, res) => {
     const botId = req.params.botId;
     const files = req.files;
 
-    const updatedBot = await botService.updateBotByBotId(
-      botId,
-      userId,
-      req.body,
-      files
-    );
+    const updatedBot = await botService.updateBotByBotId(botId, userId, req.body, files);
 
     logger.info('Bot updated successfully', { botId, userId });
     return responseBuilder.ok(
       res,
       updatedBot,
-      'Bot updated successfully. Previous QAs replaced with new ones (if file uploaded) and added to Slack channel (if enabled).'
+      'Bot updated successfully. Previous QAs replaced with new ones (if file uploaded) and added to Slack channel (if enabled).',
     );
   } catch (error) {
     logger.error('Error updating bot', {
@@ -179,7 +166,9 @@ exports.updateBotByBotId = async (req, res) => {
 
 const extractErrorMessage = (error) => {
   let message = 'Unable to validate custom LLM configuration.';
-  if (!error) return message;
+  if (!error) {
+    return message;
+  }
   if (typeof error === 'string') {
     message = error;
   } else if (error.message) {
@@ -202,7 +191,7 @@ exports.testCustomLLMConnection = async (req, res) => {
       return responseBuilder.badRequest(
         res,
         null,
-        'Invalid or missing custom_llm_provider. Must be "openai", "gemini", or "gemma".'
+        'Invalid or missing custom_llm_provider. Must be "openai", "gemini", or "gemma".',
       );
     }
 
@@ -210,7 +199,7 @@ exports.testCustomLLMConnection = async (req, res) => {
       return responseBuilder.badRequest(
         res,
         null,
-        'API key is required to validate custom LLM configuration.'
+        'API key is required to validate custom LLM configuration.',
       );
     }
 
@@ -219,7 +208,7 @@ exports.testCustomLLMConnection = async (req, res) => {
     return responseBuilder.ok(
       res,
       { validated: true },
-      'Custom LLM provider and API key validated successfully.'
+      'Custom LLM provider and API key validated successfully.',
     );
   } catch (error) {
     logger.error('Error validating custom LLM connection', {
@@ -242,22 +231,14 @@ exports.getBotCustomizationByBotId = async (req, res) => {
       botId,
       userId: req.user?.id,
     });
-    return responseBuilder.ok(
-      res,
-      customization,
-      'Customization fetched successfully'
-    );
+    return responseBuilder.ok(res, customization, 'Customization fetched successfully');
   } catch (error) {
     logger.error('Error fetching customization', {
       error: error.message,
       botId: req.params.botId,
       userId: req.user?.id,
     });
-    return responseBuilder.internalError(
-      res,
-      null,
-      'Failed to fetch customization'
-    );
+    return responseBuilder.internalError(res, null, 'Failed to fetch customization');
   }
 };
 
@@ -277,22 +258,14 @@ exports.saveBotCustomization = async (req, res) => {
       botId,
       userId: req.user?.id,
     });
-    return responseBuilder.ok(
-      res,
-      customization,
-      'Customization saved successfully'
-    );
+    return responseBuilder.ok(res, customization, 'Customization saved successfully');
   } catch (error) {
     logger.error('Error saving customization', {
       error: error.message,
       botId: req.params.botId,
       userId: req.user?.id,
     });
-    return responseBuilder.internalError(
-      res,
-      null,
-      'Failed to save customization'
-    );
+    return responseBuilder.internalError(res, null, 'Failed to save customization');
   }
 };
 
@@ -310,11 +283,7 @@ exports.getAllChatHistoriesByBotId = async (req, res) => {
       limit,
     });
 
-    const result = await botService.getAllChatHistoriesByBotId(
-      botId,
-      page,
-      limit
-    );
+    const result = await botService.getAllChatHistoriesByBotId(botId, page, limit);
 
     logger.info('Fetched all chat histories successfully', {
       botId,
@@ -325,11 +294,7 @@ exports.getAllChatHistoriesByBotId = async (req, res) => {
       totalPages: result.totalPages,
     });
 
-    return responseBuilder.ok(
-      res,
-      result,
-      'Chat histories fetched successfully'
-    );
+    return responseBuilder.ok(res, result, 'Chat histories fetched successfully');
   } catch (error) {
     logger.error('Error fetching all chat histories', {
       error: error.message,
@@ -337,11 +302,7 @@ exports.getAllChatHistoriesByBotId = async (req, res) => {
       userId: req.user?.id,
     });
 
-    return responseBuilder.internalError(
-      res,
-      null,
-      'Failed to fetch chat histories'
-    );
+    return responseBuilder.internalError(res, null, 'Failed to fetch chat histories');
   }
 };
 
@@ -372,11 +333,7 @@ exports.getChatHistoryBySessionId = async (req, res) => {
       userId: req.user?.id,
     });
 
-    return responseBuilder.internalError(
-      res,
-      null,
-      'Failed to fetch chat history'
-    );
+    return responseBuilder.internalError(res, null, 'Failed to fetch chat history');
   }
 };
 
@@ -393,11 +350,7 @@ exports.getSessionTraceTimeline = async (req, res) => {
 
     const result = await botService.getSessionTraceTimeline(botId, sessionId);
 
-    return responseBuilder.ok(
-      res,
-      result,
-      'Session trace timeline fetched successfully'
-    );
+    return responseBuilder.ok(res, result, 'Session trace timeline fetched successfully');
   } catch (error) {
     logger.error('Error fetching session trace timeline', {
       error: error.message,
@@ -410,11 +363,7 @@ exports.getSessionTraceTimeline = async (req, res) => {
       return responseBuilder.notFound(res, null, error.message);
     }
 
-    return responseBuilder.internalError(
-      res,
-      null,
-      'Failed to fetch session trace timeline'
-    );
+    return responseBuilder.internalError(res, null, 'Failed to fetch session trace timeline');
   }
 };
 
@@ -434,11 +383,7 @@ exports.getSpreadsheetConfig = async (req, res) => {
       userId: req.user?.id,
     });
 
-    return responseBuilder.internalError(
-      res,
-      null,
-      'Failed to fetch spreadsheet configuration'
-    );
+    return responseBuilder.internalError(res, null, 'Failed to fetch spreadsheet configuration');
   }
 };
 
@@ -455,18 +400,14 @@ exports.configureSpreadsheetColumns = async (req, res) => {
     });
 
     if (!outputColumn || !inputColumns || inputColumns.length === 0) {
-      return responseBuilder.badRequest(
-        res,
-        null,
-        'outputColumn and inputColumns are required'
-      );
+      return responseBuilder.badRequest(res, null, 'outputColumn and inputColumns are required');
     }
 
     const result = await botService.configureSpreadsheetColumns(
       botId,
       req.user?.id,
       outputColumn,
-      inputColumns
+      inputColumns,
     );
 
     logger.info('Spreadsheet columns configured successfully', { botId });
@@ -479,11 +420,7 @@ exports.configureSpreadsheetColumns = async (req, res) => {
       userId: req.user?.id,
     });
 
-    return responseBuilder.internalError(
-      res,
-      null,
-      'Failed to configure spreadsheet columns'
-    );
+    return responseBuilder.internalError(res, null, 'Failed to configure spreadsheet columns');
   }
 };
 
@@ -503,11 +440,7 @@ exports.getSuggestedColumnConfiguration = async (req, res) => {
       userId: req.user?.id,
     });
 
-    return responseBuilder.internalError(
-      res,
-      null,
-      'Failed to get column suggestions'
-    );
+    return responseBuilder.internalError(res, null, 'Failed to get column suggestions');
   }
 };
 
@@ -516,16 +449,9 @@ exports.getBotObservabilityInsights = async (req, res) => {
   const { botId } = req.params;
 
   try {
-    const result = await arizeInsightService.getBotObservabilityInsights(
-      botId,
-      req.user?.id
-    );
+    const result = await arizeInsightService.getBotObservabilityInsights(botId, req.user?.id);
 
-    return responseBuilder.ok(
-      res,
-      result,
-      'Bot observability insights fetched successfully'
-    );
+    return responseBuilder.ok(res, result, 'Bot observability insights fetched successfully');
   } catch (error) {
     logger.error('Error fetching bot observability insights', {
       error: error.message,
@@ -537,11 +463,7 @@ exports.getBotObservabilityInsights = async (req, res) => {
       return responseBuilder.notFound(res, null, 'Bot not found');
     }
 
-    return responseBuilder.internalError(
-      res,
-      null,
-      'Failed to fetch bot observability insights'
-    );
+    return responseBuilder.internalError(res, null, 'Failed to fetch bot observability insights');
   }
 };
 
@@ -550,16 +472,9 @@ exports.getBotSelfImprovementDashboard = async (req, res) => {
   const { botId } = req.params;
 
   try {
-    const result = await arizeInsightService.getBotSelfImprovementDashboard(
-      botId,
-      req.user?.id
-    );
+    const result = await arizeInsightService.getBotSelfImprovementDashboard(botId, req.user?.id);
 
-    return responseBuilder.ok(
-      res,
-      result,
-      'Bot self-improvement dashboard fetched successfully'
-    );
+    return responseBuilder.ok(res, result, 'Bot self-improvement dashboard fetched successfully');
   } catch (error) {
     logger.error('Error fetching bot self-improvement dashboard', {
       error: error.message,
@@ -574,7 +489,7 @@ exports.getBotSelfImprovementDashboard = async (req, res) => {
     return responseBuilder.internalError(
       res,
       null,
-      'Failed to fetch bot self-improvement dashboard'
+      'Failed to fetch bot self-improvement dashboard',
     );
   }
 };
@@ -585,11 +500,7 @@ exports.applyBotImprovementAction = async (req, res) => {
   const { itemKey, action, item } = req.body || {};
 
   if (!itemKey || !action) {
-    return responseBuilder.badRequest(
-      res,
-      null,
-      'itemKey and action are required'
-    );
+    return responseBuilder.badRequest(res, null, 'itemKey and action are required');
   }
 
   try {
@@ -601,11 +512,7 @@ exports.applyBotImprovementAction = async (req, res) => {
       item,
     });
 
-    return responseBuilder.ok(
-      res,
-      result,
-      'Bot improvement action applied successfully'
-    );
+    return responseBuilder.ok(res, result, 'Bot improvement action applied successfully');
   } catch (error) {
     logger.error('Error applying bot improvement action', {
       error: error.message,
@@ -622,7 +529,7 @@ exports.applyBotImprovementAction = async (req, res) => {
     return responseBuilder.badRequest(
       res,
       null,
-      error.message || 'Failed to apply bot improvement action'
+      error.message || 'Failed to apply bot improvement action',
     );
   }
 };
@@ -632,17 +539,13 @@ exports.getBotSelfIntrospectionHistory = async (req, res) => {
   const { page, pageSize, search } = req.query || {};
 
   try {
-    const result = await arizeInsightService.getBotSelfIntrospectionHistory(
-      botId,
-      req.user?.id,
-      { page, pageSize, search }
-    );
+    const result = await arizeInsightService.getBotSelfIntrospectionHistory(botId, req.user?.id, {
+      page,
+      pageSize,
+      search,
+    });
 
-    return responseBuilder.ok(
-      res,
-      result,
-      'Self-introspection history retrieved successfully'
-    );
+    return responseBuilder.ok(res, result, 'Self-introspection history retrieved successfully');
   } catch (error) {
     logger.error('Error fetching self-introspection history', {
       error: error.message,
@@ -657,7 +560,7 @@ exports.getBotSelfIntrospectionHistory = async (req, res) => {
     return responseBuilder.internalError(
       res,
       null,
-      error.message || 'Failed to fetch self-introspection history'
+      error.message || 'Failed to fetch self-introspection history',
     );
   }
 };
@@ -668,11 +571,7 @@ exports.askBotSelfIntrospection = async (req, res) => {
   const { question } = req.body || {};
 
   if (!question || !String(question).trim()) {
-    return responseBuilder.badRequest(
-      res,
-      null,
-      'question is required'
-    );
+    return responseBuilder.badRequest(res, null, 'question is required');
   }
 
   try {
@@ -682,11 +581,7 @@ exports.askBotSelfIntrospection = async (req, res) => {
       question,
     });
 
-    return responseBuilder.ok(
-      res,
-      result,
-      'Bot self-introspection completed successfully'
-    );
+    return responseBuilder.ok(res, result, 'Bot self-introspection completed successfully');
   } catch (error) {
     logger.error('Error running bot self-introspection', {
       error: error.message,
@@ -701,7 +596,7 @@ exports.askBotSelfIntrospection = async (req, res) => {
     return responseBuilder.badRequest(
       res,
       null,
-      error.message || 'Failed to run bot self-introspection'
+      error.message || 'Failed to run bot self-introspection',
     );
   }
 };
@@ -711,11 +606,7 @@ exports.buildBotEvalDataset = async (req, res) => {
   const { sourceType, customTypeId } = req.body || {};
 
   if (!sourceType && !customTypeId) {
-    return responseBuilder.badRequest(
-      res,
-      null,
-      'sourceType or customTypeId is required'
-    );
+    return responseBuilder.badRequest(res, null, 'sourceType or customTypeId is required');
   }
 
   try {
@@ -740,11 +631,7 @@ exports.buildBotEvalDataset = async (req, res) => {
       return responseBuilder.notFound(res, null, 'Bot not found');
     }
 
-    return responseBuilder.badRequest(
-      res,
-      null,
-      error.message || 'Failed to build eval dataset'
-    );
+    return responseBuilder.badRequest(res, null, error.message || 'Failed to build eval dataset');
   }
 };
 
@@ -758,11 +645,7 @@ exports.createBotEvalDatasetType = async (req, res) => {
       payload: req.body || {},
     });
 
-    return responseBuilder.created(
-      res,
-      result,
-      'Custom eval dataset type created successfully'
-    );
+    return responseBuilder.created(res, result, 'Custom eval dataset type created successfully');
   } catch (error) {
     logger.error('Error creating bot eval dataset type', {
       error: error.message,
@@ -777,7 +660,7 @@ exports.createBotEvalDatasetType = async (req, res) => {
     return responseBuilder.badRequest(
       res,
       null,
-      error.message || 'Failed to create eval dataset type'
+      error.message || 'Failed to create eval dataset type',
     );
   }
 };
@@ -786,16 +669,9 @@ exports.getBotEvalDatasetTypes = async (req, res) => {
   const { botId } = req.params;
 
   try {
-    const result = await arizeInsightService.listEvalDatasetTypes(
-      botId,
-      req.user?.id
-    );
+    const result = await arizeInsightService.listEvalDatasetTypes(botId, req.user?.id);
 
-    return responseBuilder.ok(
-      res,
-      result,
-      'Eval dataset types fetched successfully'
-    );
+    return responseBuilder.ok(res, result, 'Eval dataset types fetched successfully');
   } catch (error) {
     logger.error('Error fetching bot eval dataset types', {
       error: error.message,
@@ -810,7 +686,7 @@ exports.getBotEvalDatasetTypes = async (req, res) => {
     return responseBuilder.badRequest(
       res,
       null,
-      error.message || 'Failed to fetch eval dataset types'
+      error.message || 'Failed to fetch eval dataset types',
     );
   }
 };
@@ -825,11 +701,7 @@ exports.deleteBotEvalDatasetType = async (req, res) => {
       typeId,
     });
 
-    return responseBuilder.ok(
-      res,
-      result,
-      'Custom eval dataset type deleted successfully'
-    );
+    return responseBuilder.ok(res, result, 'Custom eval dataset type deleted successfully');
   } catch (error) {
     logger.error('Error deleting bot eval dataset type', {
       error: error.message,
@@ -849,7 +721,7 @@ exports.deleteBotEvalDatasetType = async (req, res) => {
     return responseBuilder.badRequest(
       res,
       null,
-      error.message || 'Failed to delete eval dataset type'
+      error.message || 'Failed to delete eval dataset type',
     );
   }
 };
@@ -858,10 +730,7 @@ exports.getBotEvalDatasets = async (req, res) => {
   const { botId } = req.params;
 
   try {
-    const result = await arizeInsightService.getEvalDatasets(
-      botId,
-      req.user?.id
-    );
+    const result = await arizeInsightService.getEvalDatasets(botId, req.user?.id);
 
     return responseBuilder.ok(res, result, 'Eval datasets fetched successfully');
   } catch (error) {
@@ -875,11 +744,7 @@ exports.getBotEvalDatasets = async (req, res) => {
       return responseBuilder.notFound(res, null, 'Bot not found');
     }
 
-    return responseBuilder.internalError(
-      res,
-      null,
-      'Failed to fetch eval datasets'
-    );
+    return responseBuilder.internalError(res, null, 'Failed to fetch eval datasets');
   }
 };
 
@@ -918,7 +783,7 @@ exports.runBotLLMJudge = async (req, res) => {
     return responseBuilder.badRequest(
       res,
       null,
-      error.message || 'Failed to run LLM-as-a-Judge eval'
+      error.message || 'Failed to run LLM-as-a-Judge eval',
     );
   }
 };
@@ -927,10 +792,7 @@ exports.getBotAutopilot = async (req, res) => {
   const { botId } = req.params;
 
   try {
-    const result = await arizeInsightService.getBotAutopilot(
-      botId,
-      req.user?.id
-    );
+    const result = await arizeInsightService.getBotAutopilot(botId, req.user?.id);
 
     return responseBuilder.ok(res, result, 'Bot autopilot fetched successfully');
   } catch (error) {
@@ -944,11 +806,7 @@ exports.getBotAutopilot = async (req, res) => {
       return responseBuilder.notFound(res, null, 'Bot not found');
     }
 
-    return responseBuilder.badRequest(
-      res,
-      null,
-      error.message || 'Failed to fetch bot autopilot'
-    );
+    return responseBuilder.badRequest(res, null, error.message || 'Failed to fetch bot autopilot');
   }
 };
 
@@ -974,21 +832,13 @@ exports.saveBotAutopilot = async (req, res) => {
       return responseBuilder.notFound(res, null, 'Bot not found');
     }
 
-    return responseBuilder.badRequest(
-      res,
-      null,
-      error.message || 'Failed to save bot autopilot'
-    );
+    return responseBuilder.badRequest(res, null, error.message || 'Failed to save bot autopilot');
   }
 };
 
 exports.generateBotAutopilotRecommendations = async (req, res) => {
   const { botId } = req.params;
-  const {
-    trigger = 'preview',
-    send = false,
-    promptOverride = null,
-  } = req.body || {};
+  const { trigger = 'preview', send = false, promptOverride = null } = req.body || {};
 
   try {
     const result = await arizeInsightService.generateBotAutopilotRecommendations({
@@ -1002,9 +852,7 @@ exports.generateBotAutopilotRecommendations = async (req, res) => {
     return responseBuilder.ok(
       res,
       result,
-      send
-        ? 'Autopilot recommendations generated and sent'
-        : 'Autopilot recommendations generated'
+      send ? 'Autopilot recommendations generated and sent' : 'Autopilot recommendations generated',
     );
   } catch (error) {
     logger.error('Error generating bot autopilot recommendations', {
@@ -1020,7 +868,7 @@ exports.generateBotAutopilotRecommendations = async (req, res) => {
     return responseBuilder.badRequest(
       res,
       null,
-      error.message || 'Failed to generate autopilot recommendations'
+      error.message || 'Failed to generate autopilot recommendations',
     );
   }
 };
@@ -1029,10 +877,7 @@ exports.getBotMonitoring = async (req, res) => {
   const { botId } = req.params;
 
   try {
-    const result = await botMonitoringService.getBotMonitoring(
-      botId,
-      req.user?.id
-    );
+    const result = await botMonitoringService.getBotMonitoring(botId, req.user?.id);
     return responseBuilder.ok(res, result, 'Bot monitoring fetched successfully');
   } catch (error) {
     logger.error('Error fetching bot monitoring', {
@@ -1043,11 +888,7 @@ exports.getBotMonitoring = async (req, res) => {
     if (error.message === 'Bot not found') {
       return responseBuilder.notFound(res, null, 'Bot not found');
     }
-    return responseBuilder.badRequest(
-      res,
-      null,
-      error.message || 'Failed to fetch bot monitoring'
-    );
+    return responseBuilder.badRequest(res, null, error.message || 'Failed to fetch bot monitoring');
   }
 };
 
@@ -1070,11 +911,7 @@ exports.saveBotMonitoring = async (req, res) => {
     if (error.message === 'Bot not found') {
       return responseBuilder.notFound(res, null, 'Bot not found');
     }
-    return responseBuilder.badRequest(
-      res,
-      null,
-      error.message || 'Failed to save bot monitoring'
-    );
+    return responseBuilder.badRequest(res, null, error.message || 'Failed to save bot monitoring');
   }
 };
 
@@ -1099,11 +936,7 @@ exports.evaluateBotMonitoring = async (req, res) => {
     if (error.message === 'Bot not found') {
       return responseBuilder.notFound(res, null, 'Bot not found');
     }
-    return responseBuilder.badRequest(
-      res,
-      null,
-      error.message || 'Failed to evaluate monitoring'
-    );
+    return responseBuilder.badRequest(res, null, error.message || 'Failed to evaluate monitoring');
   }
 };
 
@@ -1130,11 +963,7 @@ exports.acknowledgeMonitoringAlert = async (req, res) => {
     if (error.message === 'Alert not found') {
       return responseBuilder.notFound(res, null, error.message);
     }
-    return responseBuilder.badRequest(
-      res,
-      null,
-      error.message || 'Failed to acknowledge alert'
-    );
+    return responseBuilder.badRequest(res, null, error.message || 'Failed to acknowledge alert');
   }
 };
 
@@ -1161,11 +990,7 @@ exports.resolveMonitoringAlert = async (req, res) => {
     if (error.message === 'Alert not found') {
       return responseBuilder.notFound(res, null, error.message);
     }
-    return responseBuilder.badRequest(
-      res,
-      null,
-      error.message || 'Failed to resolve alert'
-    );
+    return responseBuilder.badRequest(res, null, error.message || 'Failed to resolve alert');
   }
 };
 
@@ -1173,10 +998,7 @@ exports.getBotExperiments = async (req, res) => {
   const { botId } = req.params;
 
   try {
-    const result = await arizeInsightService.getBotExperiments(
-      botId,
-      req.user?.id
-    );
+    const result = await arizeInsightService.getBotExperiments(botId, req.user?.id);
 
     return responseBuilder.ok(res, result, 'Bot experiments fetched successfully');
   } catch (error) {
@@ -1190,11 +1012,7 @@ exports.getBotExperiments = async (req, res) => {
       return responseBuilder.notFound(res, null, 'Bot not found');
     }
 
-    return responseBuilder.internalError(
-      res,
-      null,
-      'Failed to fetch bot experiments'
-    );
+    return responseBuilder.internalError(res, null, 'Failed to fetch bot experiments');
   }
 };
 
@@ -1223,7 +1041,7 @@ exports.createBotExperiment = async (req, res) => {
     return responseBuilder.badRequest(
       res,
       null,
-      error.message || 'Failed to create bot experiment'
+      error.message || 'Failed to create bot experiment',
     );
   }
 };
@@ -1251,10 +1069,6 @@ exports.runBotExperiment = async (req, res) => {
       return responseBuilder.notFound(res, null, error.message);
     }
 
-    return responseBuilder.badRequest(
-      res,
-      null,
-      error.message || 'Failed to run bot experiment'
-    );
+    return responseBuilder.badRequest(res, null, error.message || 'Failed to run bot experiment');
   }
 };

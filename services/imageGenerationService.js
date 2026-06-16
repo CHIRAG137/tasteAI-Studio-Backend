@@ -20,13 +20,12 @@ exports.uploadBufferToCloudinary = (buffer, folder = 'video-bots') => {
         }
         logger.info('Cloudinary upload successful', { public_id: result.public_id });
         resolve(result);
-      }
+      },
     );
 
     streamifier.createReadStream(buffer).pipe(stream);
   });
 };
-
 
 // generates an image using Google Gemini
 exports.generateImage = async (imageBuffer, mimeType, prompt) => {
@@ -49,7 +48,7 @@ exports.generateImage = async (imageBuffer, mimeType, prompt) => {
       {
         inlineData: {
           data: imageBase64,
-          mimeType: mimeType,
+          mimeType,
         },
       },
       {
