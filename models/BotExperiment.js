@@ -7,7 +7,7 @@ const VariantConfigSchema = new mongoose.Schema(
     trafficAllocation: { type: Number, default: 50 },
     config: { type: mongoose.Schema.Types.Mixed, default: {} },
   },
-  { _id: false }
+  { _id: false },
 );
 
 const BotExperimentSchema = new mongoose.Schema(
@@ -64,7 +64,7 @@ const BotExperimentSchema = new mongoose.Schema(
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     completedAt: { type: Date, default: null },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 BotExperimentSchema.index({ bot: 1, createdAt: -1 });

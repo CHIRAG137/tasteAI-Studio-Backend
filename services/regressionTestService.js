@@ -34,17 +34,29 @@ function buildSuiteName(botName, customName) {
 
 function buildSuiteDescription(counts) {
   const parts = [];
-  if (counts.low_confidence) parts.push(`${counts.low_confidence} low-confidence`);
-  if (counts.handoff) parts.push(`${counts.handoff} handoff`);
-  if (counts.negative_feedback) parts.push(`${counts.negative_feedback} negative feedback`);
-  if (counts.unanswered) parts.push(`${counts.unanswered} unanswered`);
-  if (!parts.length) return 'No production signals matched yet.';
+  if (counts.low_confidence) {
+    parts.push(`${counts.low_confidence} low-confidence`);
+  }
+  if (counts.handoff) {
+    parts.push(`${counts.handoff} handoff`);
+  }
+  if (counts.negative_feedback) {
+    parts.push(`${counts.negative_feedback} negative feedback`);
+  }
+  if (counts.unanswered) {
+    parts.push(`${counts.unanswered} unanswered`);
+  }
+  if (!parts.length) {
+    return 'No production signals matched yet.';
+  }
   return `Captured from production traces: ${parts.join(', ')}.`;
 }
 
 function addTestCase(testCases, seen, candidate) {
   const key = normalizeQuestion(candidate.question);
-  if (!key || key === 'n/a' || seen.has(key)) return;
+  if (!key || key === 'n/a' || seen.has(key)) {
+    return;
+  }
   seen.add(key);
   testCases.push(candidate);
 }
@@ -73,10 +85,7 @@ async function collectProductionTestCases(botId) {
       .lean(),
     HandoffSession.find({
       bot: botId,
-      $or: [
-        { userRating: { $lte: 2 } },
-        { userFeedback: { $exists: true, $ne: '' } },
-      ],
+      $or: [{ userRating: { $lte: 2 } }, { userFeedback: { $exists: true, $ne: '' } }],
       userQuestion: { $exists: true, $ne: '' },
     })
       .sort({ requestedAt: -1 })
@@ -107,7 +116,9 @@ async function collectProductionTestCases(botId) {
         score: metric.confidence,
       },
     });
-    if (testCases.length > before) counts.low_confidence += 1;
+    if (testCases.length > before) {
+      counts.low_confidence += 1;
+    }
   });
 
   unanswered.forEach((metric) => {
@@ -123,7 +134,9 @@ async function collectProductionTestCases(botId) {
         score: metric.confidence,
       },
     });
-    if (testCases.length > before) counts.unanswered += 1;
+    if (testCases.length > before) {
+      counts.unanswered += 1;
+    }
   });
 
   handoffs.forEach((handoff) => {
@@ -138,7 +151,9 @@ async function collectProductionTestCases(botId) {
         sessionId: handoff.flowSession ? String(handoff.flowSession) : undefined,
       },
     });
-    if (testCases.length > before) counts.handoff += 1;
+    if (testCases.length > before) {
+      counts.handoff += 1;
+    }
   });
 
   negativeFeedback.forEach((handoff) => {
@@ -154,7 +169,9 @@ async function collectProductionTestCases(botId) {
         score: handoff.userRating,
       },
     });
-    if (testCases.length > before) counts.negative_feedback += 1;
+    if (testCases.length > before) {
+      counts.negative_feedback += 1;
+    }
   });
 
   return {
@@ -194,8 +211,12 @@ function resolveVerdict({ relevance, groundedness, lastRun }) {
   const previousScore = (Number(lastRun.relevanceScore) + Number(lastRun.groundednessScore)) / 2;
   const currentScore = (relevance + groundedness) / 2;
 
-  if (currentScore > previousScore + 0.05) return 'improved';
-  if (currentScore < previousScore - 0.05) return 'regressed';
+  if (currentScore > previousScore + 0.05) {
+    return 'improved';
+  }
+  if (currentScore < previousScore - 0.05) {
+    return 'regressed';
+  }
   return meetsThreshold ? 'passed' : 'failed';
 }
 
@@ -208,7 +229,7 @@ exports.createRegressionTestSuite = async (botId, userId, options = {}) => {
   const { testCases, counts } = await collectProductionTestCases(botId);
   if (!testCases.length) {
     throw new Error(
-      'No production conversations matched yet. Chat with the bot or build eval datasets first, then try again.'
+      'No production conversations matched yet. Chat with the bot or build eval datasets first, then try again.',
     );
   }
 
@@ -263,7 +284,9 @@ exports.runRegressionTests = async (botId, testSuiteId, botVersionId, userId) =>
 
     const testCases = testSuite.testCases || [];
     if (!testCases.length) {
-      throw new Error('This suite has no test cases. Create a new suite from production conversations.');
+      throw new Error(
+        'This suite has no test cases. Create a new suite from production conversations.',
+      );
     }
 
     const bot = await ChatBot.findById(botId).lean();
@@ -273,7 +296,7 @@ exports.runRegressionTests = async (botId, testSuiteId, botVersionId, userId) =>
 
     const llmClient = await getLLMClient(bot, userId);
     const previousRunsByCase = new Map(
-      (testSuite.testRuns || []).map((run) => [String(run.testCaseId), run])
+      (testSuite.testRuns || []).map((run) => [String(run.testCaseId), run]),
     );
 
     const testRuns = [];
@@ -284,12 +307,7 @@ exports.runRegressionTests = async (botId, testSuiteId, botVersionId, userId) =>
 
     for (const testCase of testCases) {
       try {
-        const botResult = await botService.askBot(
-          testCase.question,
-          botId,
-          null,
-          userId
-        );
+        const botResult = await botService.askBot(testCase.question, botId, null, userId);
         const botResponse = botResult?.answer || '';
 
         const evaluationPrompt = `Question: ${testCase.question}
@@ -312,10 +330,15 @@ Respond only with JSON:
           lastRun,
         });
 
-        if (verdict === 'passed') passed += 1;
-        else if (verdict === 'failed') failed += 1;
-        else if (verdict === 'improved') improved += 1;
-        else if (verdict === 'regressed') regressed += 1;
+        if (verdict === 'passed') {
+          passed += 1;
+        } else if (verdict === 'failed') {
+          failed += 1;
+        } else if (verdict === 'improved') {
+          improved += 1;
+        } else if (verdict === 'regressed') {
+          regressed += 1;
+        }
 
         testRuns.push({
           testCaseId: testCase._id,

@@ -86,12 +86,7 @@ const HandoffSessionSchema = new mongoose.Schema(
         },
         reason: {
           type: String,
-          enum: [
-            'agent_removed_from_bot',
-            'no_response',
-            'manual_transfer',
-            'agent_offline',
-          ],
+          enum: ['agent_removed_from_bot', 'no_response', 'manual_transfer', 'agent_offline'],
           default: 'no_response',
         },
       },
@@ -154,7 +149,7 @@ const HandoffSessionSchema = new mongoose.Schema(
       },
     ],
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 // Indexes for better query performance
@@ -176,23 +171,19 @@ HandoffSessionSchema.virtual('wasEscalated').get(function () {
 });
 
 // Method to add a message
-HandoffSessionSchema.methods.addMessage = async function (
-  sender,
-  message,
-  agentId = null
-) {
+HandoffSessionSchema.methods.addMessage = async function (sender, message, agentId = null) {
   this.messages.push({
     sender,
     message,
     timestamp: new Date(),
     agentId,
   });
-  
+
   // Update lastAgentResponseAt if sender is agent
   if (sender === 'agent') {
     this.lastAgentResponseAt = new Date();
   }
-  
+
   await this.save();
 };
 
@@ -215,16 +206,10 @@ HandoffSessionSchema.statics.findActiveForAgent = function (agentId) {
 };
 
 // Static method to find all sessions for an agent (including escalated ones)
-HandoffSessionSchema.statics.findAllSessionsForAgent = function (
-  agentId,
-  includeEscalated = true
-) {
+HandoffSessionSchema.statics.findAllSessionsForAgent = function (agentId, includeEscalated = true) {
   const query = includeEscalated
     ? {
-        $or: [
-          { assignedAgent: agentId },
-          { 'escalationHistory.previousAgent': agentId },
-        ],
+        $or: [{ assignedAgent: agentId }, { 'escalationHistory.previousAgent': agentId }],
       }
     : { assignedAgent: agentId };
 

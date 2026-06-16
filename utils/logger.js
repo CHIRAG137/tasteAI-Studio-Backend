@@ -20,9 +20,9 @@ function formatLog(level, message, meta) {
 function log(level, message, meta = {}) {
   const line = formatLog(level, message, meta);
   if (level === 'error') {
-    process.stderr.write(line + '\n');
+    process.stderr.write(`${line}\n`);
   } else {
-    process.stdout.write(line + '\n');
+    process.stdout.write(`${line}\n`);
   }
 }
 

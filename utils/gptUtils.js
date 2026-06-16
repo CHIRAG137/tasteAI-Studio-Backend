@@ -54,10 +54,7 @@
 
 require('dotenv').config();
 const { GoogleGenerativeAI } = require('@google/generative-ai');
-const {
-  runPhoenixSpan,
-  setPhoenixSpanAttributes,
-} = require('../config/phoenixTracing');
+const { runPhoenixSpan, setPhoenixSpanAttributes } = require('../config/phoenixTracing');
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
@@ -116,7 +113,7 @@ Return only a list of 10–15 questions and answers in JSON format like this:
         });
 
         return output;
-      }
+      },
     );
   } catch (error) {
     console.error('Error in generateQAsViaGPT (Gemini):', error);
@@ -148,7 +145,7 @@ exports.getEmbedding = async (text) => {
           'embedding.vector_length': output.length,
         });
         return output;
-      }
+      },
     );
   } catch (error) {
     console.error('Error generating embedding (Gemini):', error);

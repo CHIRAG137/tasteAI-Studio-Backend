@@ -9,20 +9,12 @@ exports.humanAgentSetPassword = async (req, res) => {
 
     if (!token || !password) {
       logger.warn('Set password failed - missing token or password');
-      return responseBuilder.badRequest(
-        res,
-        null,
-        'Token and password are required'
-      );
+      return responseBuilder.badRequest(res, null, 'Token and password are required');
     }
 
     if (password.length < 8) {
       logger.warn('Set password failed - password too short');
-      return responseBuilder.badRequest(
-        res,
-        null,
-        'Password must be at least 8 characters long'
-      );
+      return responseBuilder.badRequest(res, null, 'Password must be at least 8 characters long');
     }
 
     const result = await humanAgentService.humanAgentSetPassword(token, password);
@@ -39,7 +31,7 @@ exports.humanAgentSetPassword = async (req, res) => {
         email: result.email,
         message: 'Password set successfully. You can now log in.',
       },
-      'Password set successfully'
+      'Password set successfully',
     );
   } catch (error) {
     logger.error('Set password error', {
@@ -66,11 +58,7 @@ exports.humanAgentLogin = async (req, res) => {
 
     if (!email || !password) {
       logger.warn('Login failed - missing email or password');
-      return responseBuilder.badRequest(
-        res,
-        null,
-        'Email and password are required'
-      );
+      return responseBuilder.badRequest(res, null, 'Email and password are required');
     }
 
     const result = await humanAgentService.humanAgentLogin(email, password);
@@ -90,7 +78,7 @@ exports.humanAgentLogin = async (req, res) => {
           isActive: result.agent.isActive,
         },
       },
-      'Login successful'
+      'Login successful',
     );
   } catch (error) {
     logger.error('Login error', {
@@ -230,7 +218,7 @@ exports.humanAgentVerifyToken = async (req, res) => {
         email: result.email,
         agentId: result.agentId,
       },
-      'Token is valid'
+      'Token is valid',
     );
   } catch (error) {
     logger.error('Token verification error', {
@@ -260,11 +248,7 @@ exports.getBotsByHumanAgentId = async (req, res) => {
       count: bots.length,
     });
 
-    return responseBuilder.ok(
-      res,
-      { bots },
-      'Bots fetched successfully'
-    );
+    return responseBuilder.ok(res, { bots }, 'Bots fetched successfully');
   } catch (error) {
     logger.error('Error fetching bots for agent', {
       error: error.message,
@@ -299,7 +283,7 @@ exports.updateHumanAgentStatus = async (req, res) => {
         availabilityStatus: agent.availabilityStatus,
         lastSeenAt: agent.lastSeenAt,
       },
-      'Status updated successfully'
+      'Status updated successfully',
     );
   } catch (error) {
     logger.error('Error updating agent status', {
@@ -338,22 +322,14 @@ exports.getHumanAgentProfileByAgentId = async (req, res) => {
 
     const profile = await humanAgentService.getHumanAgentProfileByAgentId(agentId);
 
-    return responseBuilder.ok(
-      res,
-      profile,
-      'Agent profile fetched successfully'
-    );
+    return responseBuilder.ok(res, profile, 'Agent profile fetched successfully');
   } catch (error) {
     logger.error('Failed to fetch agent profile', {
       agentId: req.agent?.id,
       error: error.message,
     });
 
-    return responseBuilder.internalError(
-      res,
-      null,
-      'Failed to fetch agent profile'
-    );
+    return responseBuilder.internalError(res, null, 'Failed to fetch agent profile');
   }
 };
 
@@ -370,25 +346,17 @@ exports.updateHumanAgentProfileByAgentId = async (req, res) => {
 
     const updatedProfile = await humanAgentService.updateHumanAgentProfileByAgentId(
       agentId,
-      profileData
+      profileData,
     );
 
-    return responseBuilder.ok(
-      res,
-      updatedProfile,
-      'Agent profile updated successfully'
-    );
+    return responseBuilder.ok(res, updatedProfile, 'Agent profile updated successfully');
   } catch (error) {
     logger.error('Failed to update agent profile', {
       agentId: req.agent?.id,
       error: error.message,
     });
 
-    return responseBuilder.internalError(
-      res,
-      null,
-      'Failed to update agent profile'
-    );
+    return responseBuilder.internalError(res, null, 'Failed to update agent profile');
   }
 };
 
@@ -421,8 +389,7 @@ exports.getAgentsByBotId = async (req, res) => {
     const avgResponseTime =
       agents.length > 0
         ? Math.round(
-            agents.reduce((sum, a) => sum + a.stats.avgResponseTimeInSeconds, 0) /
-              agents.length
+            agents.reduce((sum, a) => sum + a.stats.avgResponseTimeInSeconds, 0) / agents.length,
           )
         : 0;
 
@@ -446,7 +413,7 @@ exports.getAgentsByBotId = async (req, res) => {
         },
         agents,
       },
-      'Agents with stats fetched successfully'
+      'Agents with stats fetched successfully',
     );
   } catch (error) {
     logger.error('Error fetching agents with stats by bot', {
@@ -471,11 +438,7 @@ exports.humanAgentLogout = async (req, res) => {
       email: result.agent.email,
     });
 
-    return responseBuilder.ok(
-      res,
-      { message: 'Logout successful' },
-      'Logout successful'
-    );
+    return responseBuilder.ok(res, { message: 'Logout successful' }, 'Logout successful');
   } catch (error) {
     logger.error('Logout error', {
       error: error.message,

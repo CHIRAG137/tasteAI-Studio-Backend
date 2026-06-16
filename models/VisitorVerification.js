@@ -10,7 +10,7 @@ const visitorVerificationSchema = new mongoose.Schema(
     verifiedAt: { type: Date, default: Date.now },
     expiresAt: { type: Date, required: true, index: true },
   },
-  { timestamps: true, versionKey: false }
+  { timestamps: true, versionKey: false },
 );
 
 visitorVerificationSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });

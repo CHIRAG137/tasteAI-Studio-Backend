@@ -4,7 +4,9 @@
  */
 
 exports.sanitizeBotForResponse = (bot) => {
-  if (!bot) return null;
+  if (!bot) {
+    return null;
+  }
 
   // If it's a Mongoose document, convert to plain object
   const botObj = bot.toObject ? bot.toObject() : bot;

@@ -1,4 +1,5 @@
 const express = require('express');
+
 const router = express.Router();
 const authController = require('../controllers/authController');
 const tokenVaultController = require('../controllers/tokenVaultController');
@@ -45,11 +46,7 @@ router.get('/last-login', authController.getLastLoginInfo);
  * @desc    Token Vault: exchange Auth0 user token for third-party API access token
  * @access  Private (Bearer app JWT + matching Auth0 access token in body)
  */
-router.post(
-  '/token-vault/exchange',
-  authMiddleware,
-  tokenVaultController.exchangeConnectionToken,
-);
+router.post('/token-vault/exchange', authMiddleware, tokenVaultController.exchangeConnectionToken);
 
 /**
  * @route   GET /api/auth/me

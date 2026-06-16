@@ -1,4 +1,5 @@
 const express = require('express');
+
 const router = express.Router();
 const slackController = require('../controllers/slackController');
 const { authMiddleware } = require('../middlewares/authMiddleware');

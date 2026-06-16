@@ -1,4 +1,5 @@
 const express = require('express');
+
 const router = express.Router();
 const imageGenerationController = require('../controllers/imageGenerationController');
 const multer = require('multer');
@@ -18,7 +19,7 @@ const upload = multer({
 router.post(
   '/generate-image',
   upload.single('video_bot_image'),
-  imageGenerationController.generateImage
+  imageGenerationController.generateImage,
 );
 
 /**
@@ -29,7 +30,7 @@ router.post(
 router.post(
   '/upload-cropped-image',
   upload.single('video_bot_image'),
-  imageGenerationController.uploadCroppedImage
+  imageGenerationController.uploadCroppedImage,
 );
 
 module.exports = router;

@@ -1,4 +1,5 @@
 const express = require('express');
+
 const router = express.Router();
 const humanAgentController = require('../controllers/humanAgentController');
 const { authenticateHumanAgent } = require('../middlewares/humanAgentAuthMiddleware');
@@ -64,11 +65,7 @@ router.get('/stats', authenticateHumanAgent, humanAgentController.getHumanAgentS
  * @desc    Get logged-in human agent profile
  * @access  Private (Human Agent)
  */
-router.get(
-  '/profile',
-  authenticateHumanAgent,
-  humanAgentController.getHumanAgentProfileByAgentId
-);
+router.get('/profile', authenticateHumanAgent, humanAgentController.getHumanAgentProfileByAgentId);
 
 /**
  * @route   PUT /api/human-agent/profile
@@ -78,7 +75,7 @@ router.get(
 router.put(
   '/profile',
   authenticateHumanAgent,
-  humanAgentController.updateHumanAgentProfileByAgentId
+  humanAgentController.updateHumanAgentProfileByAgentId,
 );
 
 /**

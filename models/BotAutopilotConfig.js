@@ -29,8 +29,14 @@ const BotAutopilotConfigSchema = new mongoose.Schema(
     timeOfDay: { type: String, default: '09:00' },
     timezone: { type: String, default: 'UTC' },
     delivery: {
-      email: { enabled: { type: Boolean, default: true }, recipients: { type: [String], default: [] } },
-      slack: { enabled: { type: Boolean, default: false }, channelId: { type: String, default: '' } },
+      email: {
+        enabled: { type: Boolean, default: true },
+        recipients: { type: [String], default: [] },
+      },
+      slack: {
+        enabled: { type: Boolean, default: false },
+        channelId: { type: String, default: '' },
+      },
     },
     lastRunAt: { type: Date, default: null },
     nextRunAt: { type: Date, default: null, index: true },
@@ -41,7 +47,7 @@ const BotAutopilotConfigSchema = new mongoose.Schema(
     },
     lastError: { type: String, default: null },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 module.exports = mongoose.model('BotAutopilotConfig', BotAutopilotConfigSchema);

@@ -35,7 +35,7 @@ const BotInteractionMetricSchema = new mongoose.Schema(
       traceUrlSource: { type: String, default: null },
       mcpServer: { type: String, default: 'phoenix' },
     },
-    
+
     // Detailed trace information for timeline visualization
     trace: {
       embeddingGeneration: {
@@ -74,13 +74,10 @@ const BotInteractionMetricSchema = new mongoose.Schema(
       totalDurationMs: { type: Number, default: null },
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 BotInteractionMetricSchema.index({ bot: 1, createdAt: -1 });
 BotInteractionMetricSchema.index({ bot: 1, confidence: 1 });
 
-module.exports = mongoose.model(
-  'BotInteractionMetric',
-  BotInteractionMetricSchema
-);
+module.exports = mongoose.model('BotInteractionMetric', BotInteractionMetricSchema);

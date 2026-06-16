@@ -4,7 +4,9 @@ const { verifyAuth0AccessToken } = require('./auth0Verify');
 
 function getBearerToken(req) {
   const authHeader = req.header('Authorization') || '';
-  if (!authHeader.startsWith('Bearer ')) return null;
+  if (!authHeader.startsWith('Bearer ')) {
+    return null;
+  }
   return authHeader.slice('Bearer '.length).trim();
 }
 
@@ -73,7 +75,9 @@ exports.enforceVisitorAuth0ForFlowSession = async ({ req, flowSessionId }) => {
     req,
     botId: session.bot,
   });
-  if (!check.ok) return check;
+  if (!check.ok) {
+    return check;
+  }
 
   if (check.bot.require_visitor_auth0_identity) {
     if (session.visitorAuth0Sub && session.visitorAuth0Sub !== check.decoded.sub) {
@@ -88,4 +92,3 @@ exports.enforceVisitorAuth0ForFlowSession = async ({ req, flowSessionId }) => {
 
   return { ok: true, decoded: check.decoded, session, bot: check.bot };
 };
-

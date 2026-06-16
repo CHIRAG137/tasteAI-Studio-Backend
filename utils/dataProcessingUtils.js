@@ -2,7 +2,13 @@ const fs = require('fs');
 const crypto = require('crypto');
 const QAHistory = require('../models/QAHistory');
 const SpreadsheetConfig = require('../models/SpreadsheetConfig');
-const { extractTextFromPDF, extractTextFromTXT, extractTextFromDOC, extractDataFromSpreadsheet, extractFromFile } = require('./textExtractor');
+const {
+  extractTextFromPDF,
+  extractTextFromTXT,
+  extractTextFromDOC,
+  extractDataFromSpreadsheet,
+  extractFromFile,
+} = require('./textExtractor');
 const { generateQAsViaGPT } = require('./gptUtils');
 const { generateQAsWithLLM, generateEmbedding } = require('./llmClientUtils');
 const { embedText } = require('./embedUtils');
@@ -20,38 +26,40 @@ const computeFileHash = (filePath) => {
 
 // Helper function to build persona context from bot configuration
 function buildPersonaContext(bot) {
-  if (!bot) return null;
-  
+  if (!bot) {
+    return null;
+  }
+
   const personaParts = [];
-  
+
   if (bot.primary_purpose) {
     personaParts.push(`Primary Purpose: ${bot.primary_purpose}`);
   }
-  
+
   if (bot.conversation_tone) {
     personaParts.push(`Conversation Tone: ${bot.conversation_tone}`);
   }
-  
+
   if (bot.response_style) {
     personaParts.push(`Response Style: ${bot.response_style}`);
   }
-  
+
   if (bot.target_audience) {
     personaParts.push(`Target Audience: ${bot.target_audience}`);
   }
-  
+
   if (bot.specialisation_area) {
     personaParts.push(`Specialisation Area: ${bot.specialisation_area}`);
   }
-  
+
   if (bot.key_topics) {
     personaParts.push(`Key Topics: ${bot.key_topics}`);
   }
-  
+
   if (bot.keywords) {
     personaParts.push(`Keywords: ${bot.keywords}`);
   }
-  
+
   return personaParts.length > 0 ? personaParts.join('\n') : null;
 }
 
@@ -59,9 +67,9 @@ function buildPersonaContext(bot) {
 async function processChunk(chunk, botId, name, description, source, index, bot, sourceInfo = {}) {
   try {
     const personaContext = buildPersonaContext(bot);
-    
+
     // Use custom LLM if available, otherwise use default
-    const qas = bot?.custom_llm_provider 
+    const qas = bot?.custom_llm_provider
       ? await generateQAsWithLLM(chunk, name, description, bot, null, personaContext)
       : await generateQAsViaGPT(chunk, name, description, personaContext);
 
@@ -71,7 +79,7 @@ async function processChunk(chunk, botId, name, description, source, index, bot,
 
       if (question && answer) {
         // Use custom LLM for embedding if available
-        const embedding = bot?.custom_llm_provider 
+        const embedding = bot?.custom_llm_provider
           ? await generateEmbedding(question, bot)
           : await embedText(question);
 
@@ -85,15 +93,13 @@ async function processChunk(chunk, botId, name, description, source, index, bot,
           sourceFileHash: sourceInfo.sourceFileHash || null,
         });
 
-        return { success: true, question: question.substring(0, 50) + '...' };
+        return { success: true, question: `${question.substring(0, 50)}...` };
       }
       return { success: false };
     });
 
     const results = await Promise.allSettled(qaPromises);
-    const successful = results.filter(
-      (r) => r.status === 'fulfilled' && r.value.success
-    ).length;
+    const successful = results.filter((r) => r.status === 'fulfilled' && r.value.success).length;
 
     logger.debug(`Processed ${source} chunk`, {
       botId,
@@ -144,19 +150,10 @@ exports.processMarkdownContent = async (markdownArray, botId, name, description,
 
     // Process all chunks of this page in parallel
     const chunkPromises = chunks.map((chunk, j) =>
-      processChunk(
-        chunk,
-        botId,
-        name,
-        description,
-        `markdown page ${i + 1}`,
-        j + 1,
-        bot,
-        {
-          source: 'scrape',
-          sourceFileName: `markdown page ${i + 1}`,
-        }
-      )
+      processChunk(chunk, botId, name, description, `markdown page ${i + 1}`, j + 1, bot, {
+        source: 'scrape',
+        sourceFileName: `markdown page ${i + 1}`,
+      }),
     );
 
     const chunkResults = await Promise.allSettled(chunkPromises);
@@ -179,7 +176,7 @@ exports.processMarkdownContent = async (markdownArray, botId, name, description,
   });
 
   return totalQAs;
-}
+};
 
 // Helper function to process PDF content
 exports.processPDFContent = async (file, botId, name, description, bot) => {
@@ -205,20 +202,11 @@ exports.processPDFContent = async (file, botId, name, description, bot) => {
 
   // Process all PDF chunks in parallel
   const chunkPromises = chunks.map((chunk, i) =>
-    processChunk(
-      chunk,
-      botId,
-      name,
-      description,
-      'PDF',
-      i + 1,
-      bot,
-      {
-        source: 'file',
-        sourceFileName: file.originalname,
-        sourceFileHash: fileHash,
-      }
-    )
+    processChunk(chunk, botId, name, description, 'PDF', i + 1, bot, {
+      source: 'file',
+      sourceFileName: file.originalname,
+      sourceFileHash: fileHash,
+    }),
   );
 
   const results = await Promise.allSettled(chunkPromises);
@@ -232,7 +220,7 @@ exports.processPDFContent = async (file, botId, name, description, bot) => {
   });
 
   return totalQAs;
-}
+};
 
 /**
  * Process generic file content (PDF, TXT, DOC, XLSX, XLS, CSV)
@@ -264,14 +252,17 @@ exports.processFileContent = async (file, botId, name, description, bot) => {
         description,
         bot,
         extracted.metadata.firstSheet,
-        fileHash
+        fileHash,
       );
     } else {
       // For text files, process normally
       const text = extracted.content;
 
       if (!text || !text.trim()) {
-        logger.warn('File extraction resulted in empty text', { botId, filename: file.originalname });
+        logger.warn('File extraction resulted in empty text', {
+          botId,
+          filename: file.originalname,
+        });
         return { success: false, qaCount: 0, metadata: {} };
       }
 
@@ -279,20 +270,11 @@ exports.processFileContent = async (file, botId, name, description, bot) => {
 
       // Process all chunks in parallel
       const chunkPromises = chunks.map((chunk, i) =>
-        processChunk(
-          chunk,
-          botId,
-          name,
-          description,
-          file.originalname,
-          i + 1,
-          bot,
-          {
-            source: 'file',
-            sourceFileName: file.originalname,
-            sourceFileHash: fileHash,
-          }
-        )
+        processChunk(chunk, botId, name, description, file.originalname, i + 1, bot, {
+          source: 'file',
+          sourceFileName: file.originalname,
+          sourceFileHash: fileHash,
+        }),
       );
 
       const results = await Promise.allSettled(chunkPromises);
@@ -340,7 +322,7 @@ async function generateDatasetMetadata(sheetInfo, botId, fileName, bot) {
 
     // Get sample data for analysis
     const sampleRows = sheetInfo.data.slice(0, Math.min(5, sheetInfo.data.length));
-    
+
     const prompt = `Analyze this dataset and provide metadata about it.
 
 File: ${fileName}
@@ -363,15 +345,16 @@ Provide a JSON response with this structure:
 Return ONLY valid JSON, no markdown or extra text.`;
 
     const response = await llmClient.generateSummary(prompt);
-    
+
     // Parse the JSON response
     try {
       const jsonMatch = response.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0]);
         return {
-          datasetDescription: parsed.datasetDescription || 'Dataset containing business information',
-          fieldDescriptions: parsed.fieldDescriptions || {}
+          datasetDescription:
+            parsed.datasetDescription || 'Dataset containing business information',
+          fieldDescriptions: parsed.fieldDescriptions || {},
         };
       }
     } catch (parseErr) {
@@ -384,18 +367,18 @@ Return ONLY valid JSON, no markdown or extra text.`;
       fieldDescriptions: sheetInfo.columns.reduce((acc, col) => {
         acc[col] = `Column containing data for ${col}`;
         return acc;
-      }, {})
+      }, {}),
     };
   } catch (err) {
     logger.error('Error generating dataset metadata', {
       botId,
       error: err.message,
     });
-    
+
     // Return default metadata
     return {
       datasetDescription: `Dataset containing ${sheetInfo.rowCount} rows of data`,
-      fieldDescriptions: {}
+      fieldDescriptions: {},
     };
   }
 }
@@ -410,24 +393,24 @@ function convertDatasetToString(sheetInfo, datasetDescription) {
   datasetString += `**Sheet**: ${sheetInfo.name}\n`;
   datasetString += `**Rows**: ${sheetInfo.rowCount}\n`;
   datasetString += `**Columns**: ${sheetInfo.columns.length}\n\n`;
-  
+
   datasetString += `**Field Names**: ${sheetInfo.columns.join(', ')}\n\n`;
-  
+
   datasetString += `**Data**:\n`;
-  
+
   // Add column headers
   datasetString += `| ${sheetInfo.columns.join(' | ')} |\n`;
   datasetString += `| ${sheetInfo.columns.map(() => '---').join(' | ')} |\n`;
-  
+
   // Add all data rows
   sheetInfo.data.forEach((row) => {
-    const values = sheetInfo.columns.map(col => {
+    const values = sheetInfo.columns.map((col) => {
       const val = row[col];
       return val !== null && val !== undefined ? String(val).substring(0, 50) : '-';
     });
     datasetString += `| ${values.join(' | ')} |\n`;
   });
-  
+
   return datasetString;
 }
 
@@ -435,7 +418,15 @@ function convertDatasetToString(sheetInfo, datasetDescription) {
  * Process spreadsheet content - stores configuration and dataset in SpreadsheetConfig
  * Stores entire dataset as string along with metadata for later LLM analysis
  */
-exports.processSpreadsheetContent = async (file, botId, name, description, bot, sheetInfo, fileHash = null) => {
+exports.processSpreadsheetContent = async (
+  file,
+  botId,
+  name,
+  description,
+  bot,
+  sheetInfo,
+  fileHash = null,
+) => {
   if (!sheetInfo || !sheetInfo.data || sheetInfo.data.length === 0) {
     logger.warn('Spreadsheet is empty', { botId, filename: file.originalname });
     return { success: false, qaCount: 0, metadata: { isSpreadsheet: true, empty: true } };
@@ -452,10 +443,10 @@ exports.processSpreadsheetContent = async (file, botId, name, description, bot, 
 
     // Generate dataset metadata (description and field descriptions)
     const metadata = await generateDatasetMetadata(sheetInfo, botId, file.originalname, bot);
-    
+
     // Convert entire dataset to formatted string
     const datasetDataAsString = convertDatasetToString(sheetInfo, metadata.datasetDescription);
-    
+
     logger.info('Generated dataset metadata and string representation', {
       botId,
       datasetDescriptionLength: metadata.datasetDescription.length,
@@ -471,7 +462,7 @@ exports.processSpreadsheetContent = async (file, botId, name, description, bot, 
       sheetName: sheetInfo.name,
       availableColumns: sheetInfo.columns,
       data: sheetInfo.data,
-      datasetDataAsString: datasetDataAsString,
+      datasetDataAsString,
       datasetDescription: metadata.datasetDescription,
       fieldDescriptions: metadata.fieldDescriptions,
       rowCount: sheetInfo.rowCount,
@@ -530,7 +521,10 @@ exports.suggestColumnConfiguration = async (sheetInfo, botId) => {
 Column names: ${sheetInfo.columns.join(', ')}
 
 Sample data rows:
-${sheetInfo.data.slice(0, 3).map((row) => JSON.stringify(row)).join('\n')}
+${sheetInfo.data
+  .slice(0, 3)
+  .map((row) => JSON.stringify(row))
+  .join('\n')}
 
 Respond in JSON format with this structure:
 {
@@ -568,4 +562,3 @@ Respond in JSON format with this structure:
     };
   }
 };
-

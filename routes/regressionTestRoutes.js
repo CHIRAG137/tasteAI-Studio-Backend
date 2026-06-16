@@ -27,7 +27,7 @@ router.get('/:botId/regression-tests', regressionTestController.getRegressionTes
  */
 router.post(
   '/:botId/regression-tests/:testSuiteId/run',
-  regressionTestController.runRegressionTests
+  regressionTestController.runRegressionTests,
 );
 
 /**
@@ -35,10 +35,7 @@ router.post(
  * @desc    Get details of a specific test suite
  * @access  Private
  */
-router.get(
-  '/:botId/regression-tests/:testSuiteId',
-  regressionTestController.getTestSuiteDetails
-);
+router.get('/:botId/regression-tests/:testSuiteId', regressionTestController.getTestSuiteDetails);
 
 /**
  * @route   POST /api/bots/:botId/regression-tests/:testSuiteId/test-cases
@@ -47,7 +44,7 @@ router.get(
  */
 router.post(
   '/:botId/regression-tests/:testSuiteId/test-cases',
-  regressionTestController.addTestCase
+  regressionTestController.addTestCase,
 );
 
 module.exports = router;

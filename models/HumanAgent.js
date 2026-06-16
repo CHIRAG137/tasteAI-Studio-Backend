@@ -198,7 +198,7 @@ const HumanAgentSchema = new mongoose.Schema(
     // timestamp of when agent last logged out
     lastLogoutAt: { type: Date },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 // Indexes
@@ -228,10 +228,7 @@ HumanAgentSchema.methods.isAvailableForChat = function () {
 };
 
 // Method to update presence
-HumanAgentSchema.methods.updatePresence = async function (
-  isOnline,
-  status = null
-) {
+HumanAgentSchema.methods.updatePresence = async function (isOnline, status = null) {
   this.isOnline = isOnline;
   this.lastSeenAt = new Date();
 
@@ -248,18 +245,17 @@ HumanAgentSchema.methods.updatePresence = async function (
 HumanAgentSchema.methods.updateMetrics = async function (
   responseTime,
   resolutionTime,
-  rating = null
+  rating = null,
 ) {
   // Update average response time
   const totalChats = this.totalChatsHandled || 0;
   this.averageResponseTime = Math.round(
-    (this.averageResponseTime * totalChats + responseTime) / (totalChats + 1)
+    (this.averageResponseTime * totalChats + responseTime) / (totalChats + 1),
   );
 
   // Update average resolution time
   this.averageResolutionTime = Math.round(
-    (this.averageResolutionTime * totalChats + resolutionTime) /
-      (totalChats + 1)
+    (this.averageResolutionTime * totalChats + resolutionTime) / (totalChats + 1),
   );
 
   // Update rating if provided
@@ -290,9 +286,7 @@ HumanAgentSchema.statics.findAvailableForBot = async function (botId) {
     },
   });
 
-  return botAgents
-    .filter((ba) => ba.humanAgent !== null)
-    .map((ba) => ba.humanAgent);
+  return botAgents.filter((ba) => ba.humanAgent !== null).map((ba) => ba.humanAgent);
 };
 
 // Static method to find online agents

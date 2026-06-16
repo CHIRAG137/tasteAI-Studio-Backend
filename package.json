@@ -14,13 +14,17 @@
     "prepare": "husky"
   },
   "lint-staged": {
-    "*.js": [
+    "*.{js,cjs,mjs}": [
       "eslint --fix",
       "prettier --write"
     ],
     "*.{json,md,yml,yaml}": [
       "prettier --write"
     ]
+  },
+  "engines": {
+    "node": ">=20",
+    "npm": ">=10"
   },
   "keywords": [],
   "author": "",

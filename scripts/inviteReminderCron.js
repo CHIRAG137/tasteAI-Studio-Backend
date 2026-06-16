@@ -37,7 +37,9 @@ async function main() {
           continue;
         }
 
-        if (!agent.email) continue;
+        if (!agent.email) {
+          continue;
+        }
 
         // send reminder email
         await sendEmail({
@@ -50,7 +52,7 @@ async function main() {
             <p style="color: #065F46; margin-top: 8px;">Your invite will expire soon — please set your password to activate your account.</p>
           </div>
           <div style="background-color: #ffffff; border: 1px solid #e6f4ea; padding: 16px; border-radius: 8px;">
-            <p style="margin: 0 0 12px 0; color: #374151;">Hi${agent.displayName ? ' ' + agent.displayName : ''},</p>
+            <p style="margin: 0 0 12px 0; color: #374151;">Hi${agent.displayName ? ` ${agent.displayName}` : ''},</p>
             <p style="margin: 0 0 12px 0; color: #374151; line-height: 1.4;">You were invited to TasteAI Studio as an agent. Please set your password using the link below before the invite expires.</p>
             <div style="text-align:center; margin: 18px 0;">
               <a href="${process.env.FRONTEND_URL}/agent/set-password?token=${tokenDoc.token}" style="background-color: #059669; color: #ffffff; padding: 10px 18px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: 600;">Set your password</a>
@@ -64,7 +66,10 @@ async function main() {
         await HumanAgentInviteToken.findByIdAndUpdate(tokenDoc._id, { reminderSent: true });
         logger.info('Invite reminder sent', { email: agent.email, tokenId: tokenDoc._id });
       } catch (err) {
-        logger.error('Error sending invite reminder for token', { tokenId: tokenDoc._id, error: err.message });
+        logger.error('Error sending invite reminder for token', {
+          tokenId: tokenDoc._id,
+          error: err.message,
+        });
       }
     }
 
@@ -72,7 +77,9 @@ async function main() {
     await mongoose.disconnect();
   } catch (err) {
     logger.error('Invite reminder cron failed', { error: err.message });
-    try { await mongoose.disconnect(); } catch (e) {}
+    try {
+      await mongoose.disconnect();
+    } catch (e) {}
     process.exit(1);
   }
 }

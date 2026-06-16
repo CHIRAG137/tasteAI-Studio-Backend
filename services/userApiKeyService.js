@@ -5,19 +5,27 @@ const logger = require('../utils/logger');
 
 function normalizeProvider(provider) {
   const p = typeof provider === 'string' ? provider.toLowerCase().trim() : '';
-  if (!['openai', 'gemini', 'openrouter'].includes(p)) return null;
+  if (!['openai', 'gemini', 'openrouter'].includes(p)) {
+    return null;
+  }
   return p;
 }
 
 function normalizeApiKey(apiKey) {
-  if (typeof apiKey !== 'string') return null;
+  if (typeof apiKey !== 'string') {
+    return null;
+  }
   const trimmed = apiKey.trim();
-  if (!trimmed) return '';
+  if (!trimmed) {
+    return '';
+  }
   return trimmed;
 }
 
 function maskLast4(last4) {
-  if (!last4 || typeof last4 !== 'string') return null;
+  if (!last4 || typeof last4 !== 'string') {
+    return null;
+  }
   return `••••${last4}`;
 }
 
@@ -41,12 +49,20 @@ exports.listMyApiKeys = async (userId) => {
 
 exports.upsertMyApiKey = async (userId, provider, apiKey) => {
   const p = normalizeProvider(provider);
-  if (!p) throw new Error('Invalid provider. Must be openai or gemini.');
+  if (!p) {
+    throw new Error('Invalid provider. Must be openai or gemini.');
+  }
 
   const normalized = normalizeApiKey(apiKey);
-  if (normalized === null) throw new Error('apiKey must be a string');
-  if (normalized.length < 10) throw new Error('API key looks too short');
-  if (normalized.length > 500) throw new Error('API key looks too long');
+  if (normalized === null) {
+    throw new Error('apiKey must be a string');
+  }
+  if (normalized.length < 10) {
+    throw new Error('API key looks too short');
+  }
+  if (normalized.length > 500) {
+    throw new Error('API key looks too long');
+  }
 
   const encrypted = encryptApiKey(normalized);
   const last4 = normalized.slice(-4);
@@ -54,7 +70,7 @@ exports.upsertMyApiKey = async (userId, provider, apiKey) => {
   const doc = await UserApiKey.findOneAndUpdate(
     { user: userId, provider: p },
     { encrypted_api_key: encrypted, key_last4: last4 },
-    { upsert: true, new: true, setDefaultsOnInsert: true }
+    { upsert: true, new: true, setDefaultsOnInsert: true },
   ).lean();
 
   logger.info('User API key upserted', { userId, provider: p });
@@ -69,7 +85,9 @@ exports.upsertMyApiKey = async (userId, provider, apiKey) => {
 
 exports.deleteMyApiKey = async (userId, provider) => {
   const p = normalizeProvider(provider);
-  if (!p) throw new Error('Invalid provider. Must be openai, gemini, or openrouter.');
+  if (!p) {
+    throw new Error('Invalid provider. Must be openai, gemini, or openrouter.');
+  }
 
   await UserApiKey.deleteOne({ user: userId, provider: p });
   logger.info('User API key deleted', { userId, provider: p });
@@ -78,7 +96,9 @@ exports.deleteMyApiKey = async (userId, provider) => {
 
 exports.testMyApiKey = async (userId, provider, model = null) => {
   const p = normalizeProvider(provider);
-  if (!p) throw new Error('Invalid provider. Must be openai, gemini, or openrouter.');
+  if (!p) {
+    throw new Error('Invalid provider. Must be openai, gemini, or openrouter.');
+  }
 
   const keyDoc = await UserApiKey.findOne({ user: userId, provider: p }).lean();
   if (!keyDoc?.encrypted_api_key) {
@@ -93,11 +113,14 @@ exports.testMyApiKey = async (userId, provider, model = null) => {
 
 exports.getDecryptedApiKeyForUser = async (userId, provider) => {
   const p = normalizeProvider(provider);
-  if (!p) throw new Error('Invalid provider. Must be openai, gemini, or openrouter.');
+  if (!p) {
+    throw new Error('Invalid provider. Must be openai, gemini, or openrouter.');
+  }
 
   const keyDoc = await UserApiKey.findOne({ user: userId, provider: p }).lean();
-  if (!keyDoc?.encrypted_api_key) return null;
+  if (!keyDoc?.encrypted_api_key) {
+    return null;
+  }
 
   return decryptApiKey(keyDoc.encrypted_api_key);
 };
-

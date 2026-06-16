@@ -28,7 +28,7 @@ const MonitoringRuleSchema = new mongoose.Schema(
     enabled: { type: Boolean, default: true },
     isBuiltin: { type: Boolean, default: false },
   },
-  { _id: true }
+  { _id: true },
 );
 
 const BotMonitoringConfigSchema = new mongoose.Schema(
@@ -51,8 +51,14 @@ const BotMonitoringConfigSchema = new mongoose.Schema(
     cooldownMinutes: { type: Number, default: 60 },
     notifyOnDashboard: { type: Boolean, default: true },
     delivery: {
-      email: { enabled: { type: Boolean, default: true }, recipients: { type: [String], default: [] } },
-      slack: { enabled: { type: Boolean, default: false }, channelId: { type: String, default: '' } },
+      email: {
+        enabled: { type: Boolean, default: true },
+        recipients: { type: [String], default: [] },
+      },
+      slack: {
+        enabled: { type: Boolean, default: false },
+        channelId: { type: String, default: '' },
+      },
     },
     rules: { type: [MonitoringRuleSchema], default: [] },
     lastCheckedAt: { type: Date, default: null },
@@ -63,7 +69,7 @@ const BotMonitoringConfigSchema = new mongoose.Schema(
     },
     lastError: { type: String, default: null },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 module.exports = mongoose.model('BotMonitoringConfig', BotMonitoringConfigSchema);

@@ -41,7 +41,9 @@ exports.startInviteReminderScheduler = (schedule = '0 * * * *') => {
         try {
           const agent = await HumanAgent.findById(tokenDoc.humanAgent).lean();
           if (!agent || !agent.email) {
-            logger.warn('Agent not found or missing email for invite token', { tokenId: tokenDoc._id });
+            logger.warn('Agent not found or missing email for invite token', {
+              tokenId: tokenDoc._id,
+            });
             continue;
           }
 
@@ -56,7 +58,7 @@ exports.startInviteReminderScheduler = (schedule = '0 * * * *') => {
             <p style="color: #065F46; margin-top: 8px;">Your invite will expire soon — please set your password to activate your account.</p>
           </div>
           <div style="background-color: #ffffff; border: 1px solid #e6f4ea; padding: 16px; border-radius: 8px;">
-            <p style="margin: 0 0 12px 0; color: #374151;">Hi${agent.displayName ? ' ' + agent.displayName : ''},</p>
+            <p style="margin: 0 0 12px 0; color: #374151;">Hi${agent.displayName ? ` ${agent.displayName}` : ''},</p>
             <p style="margin: 0 0 12px 0; color: #374151; line-height: 1.4;">You were invited to TasteAI Studio as an agent. Please set your password using the link below before the invite expires.</p>
             <div style="text-align:center; margin: 18px 0;">
               <a href="${process.env.FRONTEND_URL}/agent/set-password?token=${tokenDoc.token}" style="background-color: #059669; color: #ffffff; padding: 10px 18px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: 600;">Set your password</a>
@@ -71,11 +73,17 @@ exports.startInviteReminderScheduler = (schedule = '0 * * * *') => {
           sentCount++;
           logger.info('Invite reminder sent', { email: agent.email, tokenId: tokenDoc._id });
         } catch (err) {
-          logger.error('Error sending invite reminder for token', { tokenId: tokenDoc._id, error: err.message });
+          logger.error('Error sending invite reminder for token', {
+            tokenId: tokenDoc._id,
+            error: err.message,
+          });
         }
       }
 
-      logger.info('Invite reminder cron job completed', { sentCount, totalProcessed: tokens.length });
+      logger.info('Invite reminder cron job completed', {
+        sentCount,
+        totalProcessed: tokens.length,
+      });
     } catch (err) {
       logger.error('Invite reminder cron job failed', { error: err.message });
     }

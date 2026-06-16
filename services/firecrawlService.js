@@ -77,7 +77,6 @@ exports.scrapeUrls = async ({ urls, formats = ['markdown', 'html'] }) => {
   }
 };
 
-
 // get scrape result by job ID
 exports.getScrapeResultByJobId = async (jobId) => {
   try {
@@ -88,9 +87,7 @@ exports.getScrapeResultByJobId = async (jobId) => {
 
     logger.info('Fetching scrape result', { jobId });
 
-    const response = await firecrawlClient.get(
-      `/batch/scrape/${jobId}`
-    );
+    const response = await firecrawlClient.get(`/batch/scrape/${jobId}`);
 
     const { status, data } = response.data;
     logger.info('Scrape result received', { jobId, status });

@@ -66,7 +66,7 @@ exports.extractDataFromSpreadsheet = async (filePath) => {
   try {
     const workbook = XLSX.readFile(filePath);
     const sheetNames = workbook.SheetNames;
-    
+
     if (sheetNames.length === 0) {
       logger.warn('Spreadsheet has no sheets', { filePath });
       return { text: '', sheets: [], firstSheet: null };
@@ -79,18 +79,18 @@ exports.extractDataFromSpreadsheet = async (filePath) => {
 
     // For text processing, concatenate all data
     let fullText = `Spreadsheet: ${firstSheetName}\n`;
-    
+
     if (jsonData.length === 0) {
       logger.warn('Spreadsheet is empty', { filePath, sheetName: firstSheetName });
-      return { 
-        text: '', 
+      return {
+        text: '',
         sheets: sheetNames,
         firstSheet: {
           name: firstSheetName,
           columns: [],
           data: [],
-          rowCount: 0
-        }
+          rowCount: 0,
+        },
       };
     }
 
@@ -108,10 +108,10 @@ exports.extractDataFromSpreadsheet = async (filePath) => {
       sheets: sheetNames,
       firstSheet: {
         name: firstSheetName,
-        columns: columns,
+        columns,
         data: jsonData,
-        rowCount: jsonData.length
-      }
+        rowCount: jsonData.length,
+      },
     };
   } catch (err) {
     logger.error('Error extracting data from spreadsheet:', { filePath, error: err.message });
@@ -136,7 +136,7 @@ exports.extractFromFile = async (file, fileType = null) => {
       size: file.size,
     });
 
-    let result = { type, content: '', metadata: {} };
+    const result = { type, content: '', metadata: {} };
 
     switch (type) {
       case 'pdf':
@@ -179,14 +179,25 @@ exports.extractFromFile = async (file, fileType = null) => {
  * @returns {string} Detected file type
  */
 function detectFileType(mimetype, ext) {
-  if (ext === '.pdf' || mimetype === 'application/pdf') return 'pdf';
-  if (ext === '.txt' || mimetype === 'text/plain') return 'txt';
-  if (ext === '.doc' || ext === '.docx' || mimetype.includes('word')) return 'doc';
-  if (ext === '.xlsx' || mimetype.includes('spreadsheetml')) return 'xlsx';
-  if (ext === '.xls' || mimetype === 'application/vnd.ms-excel') return 'xls';
-  if (ext === '.csv' || mimetype === 'text/csv' || mimetype === 'application/csv') return 'csv';
-  
+  if (ext === '.pdf' || mimetype === 'application/pdf') {
+    return 'pdf';
+  }
+  if (ext === '.txt' || mimetype === 'text/plain') {
+    return 'txt';
+  }
+  if (ext === '.doc' || ext === '.docx' || mimetype.includes('word')) {
+    return 'doc';
+  }
+  if (ext === '.xlsx' || mimetype.includes('spreadsheetml')) {
+    return 'xlsx';
+  }
+  if (ext === '.xls' || mimetype === 'application/vnd.ms-excel') {
+    return 'xls';
+  }
+  if (ext === '.csv' || mimetype === 'text/csv' || mimetype === 'application/csv') {
+    return 'csv';
+  }
+
   // Fallback to extension
   return ext.replace(/^\./, '').toLowerCase();
 }
-

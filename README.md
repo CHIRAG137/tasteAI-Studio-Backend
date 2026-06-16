@@ -5,10 +5,10 @@
 TasteAI Studio is not just another chatbot builder.
 It is a complete AI creation and deployment platform that helps businesses build, customize, deploy, and integrate intelligent AI agents in minutes 🚀
 
-Traditional chatbots mostly ***respond*** with scripted answers. AI agents can ***take actions*** — understand intent, retrieve information intelligently, trigger workflows, escalate to humans, and continue conversations contextually.
+Traditional chatbots mostly **_respond_** with scripted answers. AI agents can **_take actions_** — understand intent, retrieve information intelligently, trigger workflows, escalate to humans, and continue conversations contextually.
 
-***TasteAI combines both worlds ⚡
-Our bots don’t just answer questions — they can behave like intelligent agents while still being incredibly simple to create and deploy.***
+**_TasteAI combines both worlds ⚡
+Our bots don’t just answer questions — they can behave like intelligent agents while still being incredibly simple to create and deploy._**
 
 ![tasteAI Studio](https://res.cloudinary.com/dlpozcdw7/image/upload/v1778504843/ChatGPT_Image_May_11_2026_06_36_47_PM_cilebv.png)
 
@@ -33,6 +33,7 @@ The inspiration behind TasteAI Studio comes from the idea that AI should be acce
 Modern design tools transformed how people create graphics, videos, and websites. We believe conversational AI deserves the same transformation.
 
 Instead of spending weeks wiring together tools and workflows, creators should be able to:
+
 - Design AI flows visually
 - Connect knowledge instantly
 - Deploy in minutes
@@ -75,11 +76,13 @@ Most AI chatbot platforms today fall into one of three categories:
 TasteAI Studio solves all three.
 
 It combines:
+
 - The simplicity of no-code tools
 - The flexibility developers need
 - The scalability businesses demand
 
 Instead of static scripted bots, TasteAI Studio enables adaptive AI systems capable of:
+
 - Contextual reasoning
 - Intelligent retrieval
 - Dynamic conversational flows
@@ -95,6 +98,7 @@ The platform is designed around one core philosophy:
 # Key Features
 
 ## 1. Secure Authentication System
+
 - Secure authentication via:
   - Email & Password
   - Google OAuth
@@ -109,9 +113,10 @@ The platform is designed around one core philosophy:
 - Encrypted API-key storage for custom LLM integrations
 - Visitor verification flows for safer public bot access
 - Built to balance strong security with seamless onboarding
-![Auth Flow](https://res.cloudinary.com/dlpozcdw7/image/upload/v1778611625/auth_flow_xpbvvi.png)
+  ![Auth Flow](https://res.cloudinary.com/dlpozcdw7/image/upload/v1778611625/auth_flow_xpbvvi.png)
 
 ## 2. Visual AI Flow Builder
+
 - Create chatbots as easily as prompting an AI image generator
 - No need to manually build:
   - Backend infrastructure
@@ -129,9 +134,10 @@ The platform is designed around one core philosophy:
   - Deploys the chatbot
   - Generates integrations instantly
 - Deploy production-ready AI bots within minutes
-![Bot Creation](https://res.cloudinary.com/dlpozcdw7/image/upload/v1778609179/creation_taste_ai_bkxavo.png)
+  ![Bot Creation](https://res.cloudinary.com/dlpozcdw7/image/upload/v1778609179/creation_taste_ai_bkxavo.png)
 
 ## 3. Intelligent QnA Engine & Human Handoff
+
 - Uploaded files, websites, and datasets are converted into:
   - Structured Q&A pairs
   - Semantic embeddings
@@ -150,9 +156,10 @@ The platform is designed around one core philosophy:
 - Human agents receive live chat context
   - No need for users to repeat conversations
 - Seamlessly combines AI automation with real human support
-![QnA Engine](https://res.cloudinary.com/dlpozcdw7/image/upload/v1778610278/qa_engine_and_human_sshj7j.png)
+  ![QnA Engine](https://res.cloudinary.com/dlpozcdw7/image/upload/v1778610278/qa_engine_and_human_sshj7j.png)
 
 ## 4. Real-Time Evaluations & One-Click Deployment
+
 - Monitor conversations in real time through:
   - Analytics dashboards
   - Session summaries
@@ -175,7 +182,7 @@ The platform is designed around one core philosophy:
   - Evaluate
   - Tweak
   - Deploy
-![Bot Evaluation and Deployment](https://res.cloudinary.com/dlpozcdw7/image/upload/v1778610802/bot_evaluation_sddu4x.png)
+    ![Bot Evaluation and Deployment](https://res.cloudinary.com/dlpozcdw7/image/upload/v1778610802/bot_evaluation_sddu4x.png)
 
 ---
 
@@ -216,6 +223,7 @@ The platform is designed around one core philosophy:
 TasteAI Studio empowers businesses to move faster in the AI era.
 
 It helps organizations:
+
 - Reduce AI development time dramatically
 - Lower operational costs
 - Improve customer engagement
@@ -250,6 +258,7 @@ AI should have refinement, personality, and understanding — not generic automa
 # Conclusion
 
 TasteAI Studio is where:
+
 - Creativity meets intelligence
 - Automation becomes conversational
 - AI creation becomes intuitive

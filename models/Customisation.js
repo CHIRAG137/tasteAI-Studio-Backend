@@ -167,7 +167,7 @@ const customizationSchema = new mongoose.Schema(
       default: '12',
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 module.exports = mongoose.model('Customization', customizationSchema);

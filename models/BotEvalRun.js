@@ -62,7 +62,7 @@ const BotEvalRunSchema = new mongoose.Schema(
     error: { type: String, default: null },
     completedAt: { type: Date, default: null },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 BotEvalRunSchema.index({ bot: 1, createdAt: -1 });

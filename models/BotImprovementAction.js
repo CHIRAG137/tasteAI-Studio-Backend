@@ -11,12 +11,7 @@ const BotImprovementActionSchema = new mongoose.Schema(
     itemKey: { type: String, required: true, index: true },
     action: {
       type: String,
-      enum: [
-        'add_to_eval_dataset',
-        'create_training_qa',
-        'mark_expected',
-        'send_to_human_review',
-      ],
+      enum: ['add_to_eval_dataset', 'create_training_qa', 'mark_expected', 'send_to_human_review'],
       required: true,
     },
     status: {
@@ -27,12 +22,9 @@ const BotImprovementActionSchema = new mongoose.Schema(
     payload: { type: mongoose.Schema.Types.Mixed, default: {} },
     performedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 BotImprovementActionSchema.index({ bot: 1, itemKey: 1, action: 1 });
 
-module.exports = mongoose.model(
-  'BotImprovementAction',
-  BotImprovementActionSchema
-);
+module.exports = mongoose.model('BotImprovementAction', BotImprovementActionSchema);

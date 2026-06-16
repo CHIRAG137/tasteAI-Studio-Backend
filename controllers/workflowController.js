@@ -40,10 +40,7 @@ exports.createWorkflow = async (req, res) => {
 
 exports.getWorkflowById = async (req, res) => {
   try {
-    const workflow = await workflowService.getWorkflowById(
-      req.user._id,
-      req.params.workflowId,
-    );
+    const workflow = await workflowService.getWorkflowById(req.user._id, req.params.workflowId);
     if (!workflow) {
       return responseBuilder.notFound(res, null, 'Workflow not found');
     }

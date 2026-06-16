@@ -46,7 +46,7 @@ const BotMonitoringAlertSchema = new mongoose.Schema(
     resolvedAt: { type: Date, default: null },
     acknowledgedAt: { type: Date, default: null },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 BotMonitoringAlertSchema.index({ bot: 1, status: 1, triggeredAt: -1 });

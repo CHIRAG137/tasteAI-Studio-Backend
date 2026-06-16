@@ -29,7 +29,7 @@ const BotAgentSchema = new mongoose.Schema(
       default: 'agent',
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 BotAgentSchema.index({ bot: 1, agent: 1 }, { unique: true });

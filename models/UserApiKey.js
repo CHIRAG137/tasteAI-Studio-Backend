@@ -8,10 +8,9 @@ const UserApiKeySchema = new mongoose.Schema(
     encrypted_api_key: { type: mongoose.Schema.Types.Mixed, required: true },
     key_last4: { type: String, default: null },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 UserApiKeySchema.index({ user: 1, provider: 1 }, { unique: true });
 
 module.exports = mongoose.model('UserApiKey', UserApiKeySchema);
-

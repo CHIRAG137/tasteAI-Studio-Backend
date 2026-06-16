@@ -22,15 +22,23 @@ function getVisitorToken(req) {
  */
 exports.enforceVisitorEmailVerificationForBot = async (req, res, bot) => {
   try {
-    if (!bot?.require_visitor_email_verification) return true;
-    if (req.user) return true;
+    if (!bot?.require_visitor_email_verification) {
+      return true;
+    }
+    if (req.user) {
+      return true;
+    }
 
     const deviceId = getDeviceId(req);
     const token = getVisitorToken(req);
     const ipAddress = req.clientIp || extractIpAddress(req);
 
     if (!deviceId || !token) {
-      responseBuilder.unauthorized(res, { code: 'visitor_email_verification_required' }, 'Visitor verification required');
+      responseBuilder.unauthorized(
+        res,
+        { code: 'visitor_email_verification_required' },
+        'Visitor verification required',
+      );
       return false;
     }
 
@@ -42,18 +50,30 @@ exports.enforceVisitorEmailVerificationForBot = async (req, res, bot) => {
     }).lean();
 
     if (!record) {
-      responseBuilder.unauthorized(res, { code: 'visitor_email_verification_required' }, 'Visitor verification required');
+      responseBuilder.unauthorized(
+        res,
+        { code: 'visitor_email_verification_required' },
+        'Visitor verification required',
+      );
       return false;
     }
 
     if (record.tokenHash !== sha256(token)) {
-      responseBuilder.unauthorized(res, { code: 'visitor_email_verification_required' }, 'Visitor verification required');
+      responseBuilder.unauthorized(
+        res,
+        { code: 'visitor_email_verification_required' },
+        'Visitor verification required',
+      );
       return false;
     }
 
     return true;
   } catch (error) {
-    responseBuilder.unauthorized(res, { code: 'visitor_email_verification_required' }, 'Visitor verification required');
+    responseBuilder.unauthorized(
+      res,
+      { code: 'visitor_email_verification_required' },
+      'Visitor verification required',
+    );
     return false;
   }
 };

@@ -14,11 +14,7 @@ exports.summarizeSessionConversation = async (req, res) => {
         messageCount: Array.isArray(messages) ? messages.length : 0,
       });
 
-      return responseBuilder.badRequest(
-        res,
-        null,
-        'Messages array is required.'
-      );
+      return responseBuilder.badRequest(res, null, 'Messages array is required.');
     }
 
     logger.info('Starting conversation summarization', {
@@ -27,10 +23,7 @@ exports.summarizeSessionConversation = async (req, res) => {
       sessionId,
     });
 
-    const summary = await summarizerService.summarizeConversationWithGemini(
-      messages,
-      botName
-    );
+    const summary = await summarizerService.summarizeConversationWithGemini(messages, botName);
 
     // Save summary to session if sessionId and botId are provided
     if (sessionId && botId) {
@@ -41,7 +34,7 @@ exports.summarizeSessionConversation = async (req, res) => {
           {
             summary,
             summaryGeneratedAt: new Date(),
-          }
+          },
         );
         logger.info('Summary saved to FlowSession', { sessionId, botId });
       } catch (updateError) {
@@ -73,7 +66,7 @@ exports.summarizeSessionConversation = async (req, res) => {
     return responseBuilder.internalError(
       res,
       null,
-      error.message || 'Failed to summarize conversation.'
+      error.message || 'Failed to summarize conversation.',
     );
   }
 };

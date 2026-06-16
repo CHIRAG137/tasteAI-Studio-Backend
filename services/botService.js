@@ -16,10 +16,7 @@ const User = require('../models/User');
 const { handleHumanAgentRemovalEscalation } = require('../services/handleHumanAgentRemovalService');
 const HumanAgent = require('../models/HumanAgent');
 const BotAgent = require('../models/BotAgent');
-const {
-  processMarkdownContent,
-  processFileContent,
-} = require('../utils/dataProcessingUtils');
+const { processMarkdownContent, processFileContent } = require('../utils/dataProcessingUtils');
 const { encryptApiKey } = require('../utils/encryptionUtils');
 const { sanitizeBotForResponse, sanitizeBotsForResponse } = require('../utils/botSanitizer');
 const {
@@ -157,9 +154,7 @@ exports.createBot = async (req) => {
       throw new Error('Not an array');
     }
   } catch {
-    parsedLanguages = supported_languages
-      ?.split(',')
-      .map((lang) => lang.trim());
+    parsedLanguages = supported_languages?.split(',').map((lang) => lang.trim());
   }
 
   // Parse conversation flow
@@ -177,9 +172,7 @@ exports.createBot = async (req) => {
   if (scraped_content) {
     try {
       parsedScrapedContent =
-        typeof scraped_content === 'string'
-          ? JSON.parse(scraped_content)
-          : scraped_content;
+        typeof scraped_content === 'string' ? JSON.parse(scraped_content) : scraped_content;
 
       if (!Array.isArray(parsedScrapedContent)) {
         parsedScrapedContent = [parsedScrapedContent];
@@ -212,9 +205,7 @@ exports.createBot = async (req) => {
       try {
         parsedHumanEmails = JSON.parse(human_handoff_emails);
       } catch {
-        parsedHumanEmails = human_handoff_emails
-          .split(',')
-          .map((e) => e.trim());
+        parsedHumanEmails = human_handoff_emails.split(',').map((e) => e.trim());
       }
     }
   }
@@ -247,7 +238,7 @@ exports.createBot = async (req) => {
     require_visitor_email_verification: require_visitor_email_verification === 'true',
 
     custom_llm_provider: custom_llm_provider || null,
-    custom_api_key_source: custom_llm_provider ? (custom_api_key_source || 'bot') : 'bot',
+    custom_api_key_source: custom_llm_provider ? custom_api_key_source || 'bot' : 'bot',
     encrypted_api_key: encryptedApiKey,
     custom_model: custom_model || null,
   });
@@ -259,8 +250,12 @@ exports.createBot = async (req) => {
   try {
     await Customization.findOneAndUpdate(
       { botId: bot._id },
-      { ...DEFAULT_EMBED_CUSTOMIZATION, botId: bot._id, headerTitle: name || DEFAULT_EMBED_CUSTOMIZATION.headerTitle },
-      { upsert: true, new: true, setDefaultsOnInsert: true }
+      {
+        ...DEFAULT_EMBED_CUSTOMIZATION,
+        botId: bot._id,
+        headerTitle: name || DEFAULT_EMBED_CUSTOMIZATION.headerTitle,
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true },
     );
   } catch (e) {
     logger.warn('Failed to create default customization for new bot', {
@@ -279,7 +274,9 @@ exports.createBot = async (req) => {
     // Notify existing agents (who already have passwords) that they were added
     try {
       const existingAgents = await HumanAgent.find({ email: { $in: parsedHumanEmails } });
-      const inviter = await User.findById(req.user.id).lean().catch(() => null);
+      const inviter = await User.findById(req.user.id)
+        .lean()
+        .catch(() => null);
       for (const agent of existingAgents) {
         if (agent.isPasswordSet) {
           try {
@@ -293,8 +290,8 @@ exports.createBot = async (req) => {
             <p style="color: #065F46; margin-top: 8px;">You can now respond to user handoff requests for <strong>${name}</strong>.</p>
           </div>
           <div style="background-color: #ffffff; border: 1px solid #e6f4ea; padding: 16px; border-radius: 8px;">
-            <p style="margin: 0 0 12px 0; color: #374151;">Hello${agent.displayName ? ' ' + agent.displayName : ''},</p>
-            <p style="margin: 0 0 12px 0; color: #374151; line-height: 1.4;">${inviter ? (inviter.displayName || inviter.email) : 'An administrator'} has added you as a human agent for the bot <strong>${name}</strong>. You'll receive handoff requests from users and can respond via the Agent Dashboard.</p>
+            <p style="margin: 0 0 12px 0; color: #374151;">Hello${agent.displayName ? ` ${agent.displayName}` : ''},</p>
+            <p style="margin: 0 0 12px 0; color: #374151; line-height: 1.4;">${inviter ? inviter.displayName || inviter.email : 'An administrator'} has added you as a human agent for the bot <strong>${name}</strong>. You'll receive handoff requests from users and can respond via the Agent Dashboard.</p>
             <div style="text-align:center; margin: 18px 0;">
               <a href="${process.env.FRONTEND_URL}/agent/dashboard" style="background-color: #059669; color: #ffffff; padding: 10px 18px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: 600;">Open Agent Dashboard</a>
             </div>
@@ -304,12 +301,19 @@ exports.createBot = async (req) => {
               `,
             });
           } catch (e) {
-            logger.error('Failed sending agent added notification', { error: e.message, email: agent.email, botId: bot._id });
+            logger.error('Failed sending agent added notification', {
+              error: e.message,
+              email: agent.email,
+              botId: bot._id,
+            });
           }
         }
       }
     } catch (e) {
-      logger.error('Error notifying existing agents after bot create', { error: e.message, botId: bot._id });
+      logger.error('Error notifying existing agents after bot create', {
+        error: e.message,
+        botId: bot._id,
+      });
     }
   }
 
@@ -320,19 +324,13 @@ exports.createBot = async (req) => {
   // 1. Process scraped markdown content (parallel)
   if (parsedScrapedContent.length > 0) {
     processingPromises.push(
-      processMarkdownContent(
-        parsedScrapedContent,
-        bot._id,
-        name,
-        description,
-        bot
-      ).catch((err) => {
+      processMarkdownContent(parsedScrapedContent, bot._id, name, description, bot).catch((err) => {
         logger.error('Error in markdown processing', {
           botId: bot._id,
           error: err.message,
         });
         return 0;
-      })
+      }),
     );
   }
 
@@ -361,7 +359,7 @@ exports.createBot = async (req) => {
               });
             }
             return result.qaCount || 0;
-          })
+          }),
       );
     });
   }
@@ -384,7 +382,7 @@ exports.createBot = async (req) => {
                   Authorization: `Bearer ${slackIntegration.slackAccessToken}`,
                   'Content-Type': 'application/json',
                 },
-              }
+              },
             );
             logger.info('Bot joined Slack channel', {
               botId: bot._id,
@@ -412,7 +410,7 @@ exports.createBot = async (req) => {
           error: err.message,
         });
         return { slack: false };
-      })
+      }),
     );
   }
 
@@ -448,12 +446,16 @@ exports.createBot = async (req) => {
   });
 
   // Build success message
-  let messageParts = [`Bot "${name}" created successfully`];
+  const messageParts = [`Bot "${name}" created successfully`];
 
   // Bot capabilities
   const capabilities = [];
-  if (is_voice_enabled === 'true') capabilities.push('voice');
-  if (is_video_bot) capabilities.push('video');
+  if (is_voice_enabled === 'true') {
+    capabilities.push('voice');
+  }
+  if (is_video_bot) {
+    capabilities.push('video');
+  }
   if (capabilities.length > 0) {
     messageParts.push(`with ${capabilities.join(' & ')} support`);
   }
@@ -466,9 +468,7 @@ exports.createBot = async (req) => {
   // Knowledge sources
   const processedSources = [];
   if (markdownQAs > 0) {
-    processedSources.push(
-      `${parsedScrapedContent.length} scraped page(s) (${markdownQAs} Q&As)`
-    );
+    processedSources.push(`${parsedScrapedContent.length} scraped page(s) (${markdownQAs} Q&As)`);
   }
   if (fileQAs > 0) {
     processedSources.push(`${req.files.length} uploaded file(s) (${fileQAs} Q&As)`);
@@ -479,9 +479,7 @@ exports.createBot = async (req) => {
 
   // Human handoff
   if (human_handoff_enabled === 'true' && parsedHumanEmails.length > 0) {
-    messageParts.push(
-      `with human handoff enabled for ${parsedHumanEmails.length} agent(s)`
-    );
+    messageParts.push(`with human handoff enabled for ${parsedHumanEmails.length} agent(s)`);
   }
 
   // Slack
@@ -577,7 +575,15 @@ exports.createBot = async (req) => {
   };
 };
 
-async function askBotImpl(question, botId, flowSessionId = null, userId = null, chatHistory = [], matchedAnswer = null, userEmotion = null) {
+async function askBotImpl(
+  question,
+  botId,
+  flowSessionId = null,
+  userId = null,
+  chatHistory = [],
+  matchedAnswer = null,
+  userEmotion = null,
+) {
   const overallStart = Date.now();
   const traceTimings = {
     embeddingGeneration: { start: null, duration: null },
@@ -597,10 +603,10 @@ async function askBotImpl(question, botId, flowSessionId = null, userId = null, 
   }
 
   // Log which LLM is being used
-  const llmType = bot.custom_llm_provider 
+  const llmType = bot.custom_llm_provider
     ? `custom (${bot.custom_llm_provider}, source: ${bot.custom_api_key_source}, model: ${bot.custom_model || 'default'})`
     : 'default';
-  
+
   logger.info('Bot asked a question', { botId, question, flowSessionId, llmProvider: llmType });
 
   // ==================== EMBEDDING GENERATION ====================
@@ -620,10 +626,10 @@ async function askBotImpl(question, botId, flowSessionId = null, userId = null, 
       embeddingModel = bot.custom_model || 'default';
       inputEmbedding = await generateEmbedding(question, botId, userId);
     } catch (error) {
-      logger.error('Error generating embedding with custom LLM, falling back to default', { 
+      logger.error('Error generating embedding with custom LLM, falling back to default', {
         botId,
         provider: bot.custom_llm_provider,
-        error: error.message 
+        error: error.message,
       });
       embeddingProvider = 'default';
       embeddingModel = 'embedding-001';
@@ -642,11 +648,11 @@ async function askBotImpl(question, botId, flowSessionId = null, userId = null, 
 
   let bestMatch = null,
     bestScore = -1;
-  
-  for (let qa of qas) {
+
+  for (const qa of qas) {
     const storedEmbedding = new Float32Array(qa.embedding.buffer);
     const score = cosineSimilarity(inputEmbedding, storedEmbedding);
-    
+
     if (score > bestScore) {
       bestScore = score;
       bestMatch = qa;
@@ -694,15 +700,18 @@ async function askBotImpl(question, botId, flowSessionId = null, userId = null, 
         });
 
         // Build the dataset-aware prompt with complete context
-        const chatHistoryText = chatHistory && chatHistory.length > 0
-          ? chatHistory.map((msg) => `${msg.from || 'User'}: ${msg.text}`).join('\n')
-          : 'No previous chat history';
+        const chatHistoryText =
+          chatHistory && chatHistory.length > 0
+            ? chatHistory.map((msg) => `${msg.from || 'User'}: ${msg.text}`).join('\n')
+            : 'No previous chat history';
 
-        const fieldDescriptionsText = spreadsheetConfig.fieldDescriptions && Object.keys(spreadsheetConfig.fieldDescriptions).length > 0
-          ? Object.entries(spreadsheetConfig.fieldDescriptions)
-              .map(([field, desc]) => `- ${field}: ${desc}`)
-              .join('\n')
-          : 'Field descriptions not available';
+        const fieldDescriptionsText =
+          spreadsheetConfig.fieldDescriptions &&
+          Object.keys(spreadsheetConfig.fieldDescriptions).length > 0
+            ? Object.entries(spreadsheetConfig.fieldDescriptions)
+                .map(([field, desc]) => `- ${field}: ${desc}`)
+                .join('\n')
+            : 'Field descriptions not available';
 
         const datasetPrompt = `You are an AI assistant with specialized knowledge about a dataset.
 
@@ -712,9 +721,11 @@ async function askBotImpl(question, botId, flowSessionId = null, userId = null, 
 **Field Descriptions**:
 ${fieldDescriptionsText}
 
-${spreadsheetConfig.availableColumns && spreadsheetConfig.availableColumns.length > 0 
-  ? `**Available Fields**: ${spreadsheetConfig.availableColumns.join(', ')}` 
-  : ''}
+${
+  spreadsheetConfig.availableColumns && spreadsheetConfig.availableColumns.length > 0
+    ? `**Available Fields**: ${spreadsheetConfig.availableColumns.join(', ')}`
+    : ''
+}
 
 ## Complete Dataset
 ${spreadsheetConfig.datasetDataAsString}
@@ -903,7 +914,7 @@ Based on this data, answer the user's question. If the question appears to be as
       keyTopics: bot.key_topics,
       keywords: bot.keywords,
       customInstructions: bot.custom_instructions,
-    }
+    },
   };
 
   const prompt = `You are an AI assistant with the following persona:
@@ -953,7 +964,7 @@ Based on the chat history, matched answer, and user's emotion, provide the best 
     await QAHistory.create({
       bot: botId,
       question,
-      answer: answer,
+      answer,
       embedding: Buffer.from(inputEmbedding.buffer),
       source,
     });
@@ -966,9 +977,9 @@ Based on the chat history, matched answer, and user's emotion, provide the best 
   }
 
   // Return the final answer with trace data
-  return { 
-    answer, 
-    score: bestScore, 
+  return {
+    answer,
+    score: bestScore,
     source,
     sourceDescription,
     matchedMatch: bestMatch,
@@ -983,7 +994,15 @@ Based on the chat history, matched answer, and user's emotion, provide the best 
 }
 
 // ask query to a chatbot
-exports.askBot = async (question, botId, flowSessionId = null, userId = null, chatHistory = [], matchedAnswer = null, userEmotion = null) => {
+exports.askBot = async (
+  question,
+  botId,
+  flowSessionId = null,
+  userId = null,
+  chatHistory = [],
+  matchedAnswer = null,
+  userEmotion = null,
+) => {
   const startedAt = Date.now();
   return runPhoenixSpan(
     'bot.answer_question',
@@ -1000,9 +1019,7 @@ exports.askBot = async (question, botId, flowSessionId = null, userId = null, ch
     async (span) => {
       let result;
       const spanContext =
-        span && typeof span.spanContext === 'function'
-          ? span.spanContext()
-          : null;
+        span && typeof span.spanContext === 'function' ? span.spanContext() : null;
       const phoenixTraceId = spanContext?.traceId || null;
       const phoenixSpanId = spanContext?.spanId || null;
       try {
@@ -1013,7 +1030,7 @@ exports.askBot = async (question, botId, flowSessionId = null, userId = null, ch
           userId,
           chatHistory,
           matchedAnswer,
-          userEmotion
+          userEmotion,
         );
       } finally {
         const latencyMs = Date.now() - startedAt;
@@ -1118,7 +1135,7 @@ exports.askBot = async (question, botId, flowSessionId = null, userId = null, ch
       });
 
       return result;
-    }
+    },
   );
 };
 
@@ -1131,10 +1148,7 @@ exports.getAllChatBots = async (userId, { skip, limit, page }) => {
   });
 
   const [bots, total] = await Promise.all([
-    ChatBot.find({ user: userId })
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit),
+    ChatBot.find({ user: userId }).sort({ createdAt: -1 }).skip(skip).limit(limit),
     ChatBot.countDocuments({ user: userId }),
   ]);
 
@@ -1168,7 +1182,7 @@ exports.getBotByBotId = async (botId) => {
     throw new Error('Bot not found');
   }
   logger.info('Fetched bot by ID', { botId });
-  
+
   // Sanitize bot to remove sensitive fields before returning to frontend
   return sanitizeBotForResponse(bot);
 };
@@ -1289,9 +1303,7 @@ exports.updateBotByBotId = async (botId, userId, body, files) => {
       throw new Error('Not an array');
     }
   } catch {
-    parsedLanguages = supported_languages
-      ?.split(',')
-      .map((lang) => lang.trim());
+    parsedLanguages = supported_languages?.split(',').map((lang) => lang.trim());
   }
 
   // Parse conversation flow
@@ -1309,9 +1321,7 @@ exports.updateBotByBotId = async (botId, userId, body, files) => {
   if (scraped_content) {
     try {
       parsedScrapedContent =
-        typeof scraped_content === 'string'
-          ? JSON.parse(scraped_content)
-          : scraped_content;
+        typeof scraped_content === 'string' ? JSON.parse(scraped_content) : scraped_content;
 
       if (!Array.isArray(parsedScrapedContent)) {
         parsedScrapedContent = [parsedScrapedContent];
@@ -1339,9 +1349,10 @@ exports.updateBotByBotId = async (botId, userId, body, files) => {
   let preservedTrainingFiles = Array.isArray(bot.training_files) ? bot.training_files : [];
   if (body.existing_training_files !== undefined) {
     try {
-      preservedTrainingFiles = typeof body.existing_training_files === 'string'
-        ? JSON.parse(body.existing_training_files)
-        : body.existing_training_files;
+      preservedTrainingFiles =
+        typeof body.existing_training_files === 'string'
+          ? JSON.parse(body.existing_training_files)
+          : body.existing_training_files;
       if (!Array.isArray(preservedTrainingFiles)) {
         preservedTrainingFiles = [];
       }
@@ -1350,18 +1361,16 @@ exports.updateBotByBotId = async (botId, userId, body, files) => {
     }
   }
 
-  const oldEmails = Array.isArray(bot.human_handoff_emails)
-    ? bot.human_handoff_emails
-    : [];
+  const oldEmails = Array.isArray(bot.human_handoff_emails) ? bot.human_handoff_emails : [];
 
   const oldTrainingFiles = Array.isArray(bot.training_files) ? bot.training_files : [];
   const preservedFileHashes = new Set(
     preservedTrainingFiles
       .map((file) => file.hash)
-      .filter((hash) => typeof hash === 'string' && hash.length > 0)
+      .filter((hash) => typeof hash === 'string' && hash.length > 0),
   );
   const removedTrainingFiles = oldTrainingFiles.filter(
-    (file) => !preservedFileHashes.has(file.hash)
+    (file) => !preservedFileHashes.has(file.hash),
   );
 
   let parsedHumanEmails;
@@ -1372,20 +1381,14 @@ exports.updateBotByBotId = async (botId, userId, body, files) => {
       try {
         parsedHumanEmails = JSON.parse(human_handoff_emails);
       } catch {
-        parsedHumanEmails = human_handoff_emails
-          .split(',')
-          .map((e) => e.trim());
+        parsedHumanEmails = human_handoff_emails.split(',').map((e) => e.trim());
       }
     }
   }
 
   // Detect URL changes
-  const prevUrls = Array.isArray(bot.scraped_urls)
-    ? bot.scraped_urls.sort()
-    : [];
-  const newUrls = Array.isArray(parsedScrapedUrls)
-    ? parsedScrapedUrls.sort()
-    : [];
+  const prevUrls = Array.isArray(bot.scraped_urls) ? bot.scraped_urls.sort() : [];
+  const newUrls = Array.isArray(parsedScrapedUrls) ? parsedScrapedUrls.sort() : [];
   const urlsChanged = JSON.stringify(prevUrls) !== JSON.stringify(newUrls);
 
   // Update bot fields
@@ -1407,9 +1410,9 @@ exports.updateBotByBotId = async (botId, userId, body, files) => {
     custom_instructions: custom_instructions || bot.custom_instructions,
     conversationFlow: parsedConversationFlow || bot.conversationFlow,
     scraped_urls: parsedScrapedUrls || bot.scraped_urls,
-    is_video_bot: is_video_bot,
-    video_bot_image_url: video_bot_image_url,
-    video_bot_image_public_id: video_bot_image_public_id,
+    is_video_bot,
+    video_bot_image_url,
+    video_bot_image_public_id,
     human_handoff_enabled: human_handoff_enabled === 'true',
     human_handoff_emails: parsedHumanEmails || bot.human_handoff_emails,
     require_visitor_email_verification:
@@ -1417,11 +1420,14 @@ exports.updateBotByBotId = async (botId, userId, body, files) => {
         ? require_visitor_email_verification === 'true'
         : bot.require_visitor_email_verification,
 
-    custom_llm_provider: custom_llm_provider !== undefined ? custom_llm_provider : bot.custom_llm_provider,
+    custom_llm_provider:
+      custom_llm_provider !== undefined ? custom_llm_provider : bot.custom_llm_provider,
     custom_api_key_source:
       custom_llm_provider !== undefined
-        ? (custom_llm_provider ? (custom_api_key_source || bot.custom_api_key_source || 'bot') : 'bot')
-        : (bot.custom_api_key_source || 'bot'),
+        ? custom_llm_provider
+          ? custom_api_key_source || bot.custom_api_key_source || 'bot'
+          : 'bot'
+        : bot.custom_api_key_source || 'bot',
     encrypted_api_key: encryptedApiKey,
     custom_model: custom_model || bot.custom_model,
   });
@@ -1444,7 +1450,9 @@ exports.updateBotByBotId = async (botId, userId, body, files) => {
     // Notify existing agents (already have password) that they were invited/added
     try {
       const existingAgents = await HumanAgent.find({ email: { $in: addedEmails } });
-      const inviter = await User.findById(userId).lean().catch(() => null);
+      const inviter = await User.findById(userId)
+        .lean()
+        .catch(() => null);
       for (const agent of existingAgents) {
         if (agent.isPasswordSet) {
           try {
@@ -1458,8 +1466,8 @@ exports.updateBotByBotId = async (botId, userId, body, files) => {
             <p style="color: #065F46; margin-top: 8px;">You can now respond to user handoff requests for <strong>${bot.name}</strong>.</p>
           </div>
           <div style="background-color: #ffffff; border: 1px solid #e6f4ea; padding: 16px; border-radius: 8px;">
-            <p style="margin: 0 0 12px 0; color: #374151;">Hello${agent.displayName ? ' ' + agent.displayName : ''},</p>
-            <p style="margin: 0 0 12px 0; color: #374151; line-height: 1.4;">${inviter ? (inviter.displayName || inviter.email) : 'An administrator'} has added you as a human agent for the bot <strong>${bot.name}</strong>. You'll receive handoff requests from users and can respond via the Agent Dashboard.</p>
+            <p style="margin: 0 0 12px 0; color: #374151;">Hello${agent.displayName ? ` ${agent.displayName}` : ''},</p>
+            <p style="margin: 0 0 12px 0; color: #374151; line-height: 1.4;">${inviter ? inviter.displayName || inviter.email : 'An administrator'} has added you as a human agent for the bot <strong>${bot.name}</strong>. You'll receive handoff requests from users and can respond via the Agent Dashboard.</p>
             <div style="text-align:center; margin: 18px 0;">
               <a href="${process.env.FRONTEND_URL}/agent/dashboard" style="background-color: #059669; color: #ffffff; padding: 10px 18px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: 600;">Open Agent Dashboard</a>
             </div>
@@ -1469,12 +1477,19 @@ exports.updateBotByBotId = async (botId, userId, body, files) => {
               `,
             });
           } catch (e) {
-            logger.error('Failed sending agent added notification', { error: e.message, email: agent.email, botId: bot._id });
+            logger.error('Failed sending agent added notification', {
+              error: e.message,
+              email: agent.email,
+              botId: bot._id,
+            });
           }
         }
       }
     } catch (e) {
-      logger.error('Error notifying existing agents after bot update', { error: e.message, botId: bot._id });
+      logger.error('Error notifying existing agents after bot update', {
+        error: e.message,
+        botId: bot._id,
+      });
     }
   }
 
@@ -1487,21 +1502,23 @@ exports.updateBotByBotId = async (botId, userId, body, files) => {
         bot: bot._id,
         humanAgent: { $in: agentIds },
       },
-      { isEnabled: false }
+      { isEnabled: false },
     );
     logger.info('Disabled bot-agent relationships for removed agents', {
       botId,
       removedEmails,
       agentIds: agentIds.map((id) => id.toString()),
     });
-      try {
-        const remover = await User.findById(userId).lean().catch(() => null);
-        for (const email of removedEmails) {
-          try {
-            await sendEmail({
-              to: email,
-              subject: `Access revoked: ${bot.name} agent access removed`,
-              html: `
+    try {
+      const remover = await User.findById(userId)
+        .lean()
+        .catch(() => null);
+      for (const email of removedEmails) {
+        try {
+          await sendEmail({
+            to: email,
+            subject: `Access revoked: ${bot.name} agent access removed`,
+            html: `
         <div style="font-family: Arial, sans-serif; max-width: 680px; margin: 0 auto;">
           <div style="text-align:center; padding: 20px 0;">
             <h2 style="color: #9b1c1c; margin: 0;">Agent access revoked</h2>
@@ -1509,20 +1526,27 @@ exports.updateBotByBotId = async (botId, userId, body, files) => {
           </div>
           <div style="background-color: #ffffff; border: 1px solid #fdecea; padding: 16px; border-radius: 8px;">
             <p style="margin: 0 0 12px 0; color: #374151;">Hello,</p>
-            <p style="margin: 0 0 12px 0; color: #374151; line-height: 1.4;">Your agent access for the bot <strong>${bot.name}</strong> has been removed by ${remover ? (remover.displayName || remover.email) : 'an administrator'}.</p>
+            <p style="margin: 0 0 12px 0; color: #374151; line-height: 1.4;">Your agent access for the bot <strong>${bot.name}</strong> has been removed by ${remover ? remover.displayName || remover.email : 'an administrator'}.</p>
             <p style="margin: 0 0 12px 0; color: #374151;">If you believe this was a mistake or have questions, please contact the administrator who invited you.</p>
             <p style="color: #6b7280; font-size: 13px; margin: 0;">This change affects only the access to this bot and does not delete your account.</p>
           </div>
         </div>
               `,
-            });
-          } catch (e) {
-            logger.error('Failed sending agent removed notification', { error: e.message, email, botId: bot._id });
-          }
+          });
+        } catch (e) {
+          logger.error('Failed sending agent removed notification', {
+            error: e.message,
+            email,
+            botId: bot._id,
+          });
         }
-      } catch (e) {
-        logger.error('Error sending removed-agent notifications', { error: e.message, botId: bot._id });
       }
+    } catch (e) {
+      logger.error('Error sending removed-agent notifications', {
+        error: e.message,
+        botId: bot._id,
+      });
+    }
   }
 
   // Slack auto-join
@@ -1538,7 +1562,7 @@ exports.updateBotByBotId = async (botId, userId, body, files) => {
               Authorization: `Bearer ${slackIntegration.slackAccessToken}`,
               'Content-Type': 'application/json',
             },
-          }
+          },
         );
         logger.info('Bot joined Slack channel', { botId, slack_channel_id });
       } catch (err) {
@@ -1563,7 +1587,7 @@ exports.updateBotByBotId = async (botId, userId, body, files) => {
     .filter((hash) => typeof hash === 'string' && hash.length > 0);
 
   const processPromises = [];
-  let newTrainingFilesMeta = [];
+  const newTrainingFilesMeta = [];
 
   const existingFileHashSet = new Set(oldTrainingFiles.map((file) => file.hash).filter(Boolean));
 
@@ -1585,19 +1609,15 @@ exports.updateBotByBotId = async (botId, userId, body, files) => {
     logger.info('Deleted scraped QAs because scraped URLs changed', { botId });
     if (parsedScrapedContent.length > 0) {
       processPromises.push(
-        processMarkdownContent(
-          parsedScrapedContent,
-          bot._id,
-          name,
-          description,
-          bot
-        ).catch((err) => {
-          logger.error('Error in markdown reprocessing', {
-            botId,
-            error: err.message,
-          });
-          return 0;
-        })
+        processMarkdownContent(parsedScrapedContent, bot._id, name, description, bot).catch(
+          (err) => {
+            logger.error('Error in markdown reprocessing', {
+              botId,
+              error: err.message,
+            });
+            return 0;
+          },
+        ),
       );
     }
   }
@@ -1656,7 +1676,7 @@ exports.updateBotByBotId = async (botId, userId, body, files) => {
               });
             }
             return result.qaCount || 0;
-          })
+          }),
       );
     }
   }
@@ -1739,7 +1759,7 @@ exports.saveBotCustomization = async (botId, data) => {
   const customization = await Customization.findOneAndUpdate(
     { botId },
     { ...data, botId },
-    { new: true, upsert: true }
+    { new: true, upsert: true },
   );
 
   logger.info('Customization saved successfully', { botId });
@@ -1747,7 +1767,9 @@ exports.saveBotCustomization = async (botId, data) => {
 };
 
 const serializeTraceMetric = (metric) => {
-  if (!metric) return null;
+  if (!metric) {
+    return null;
+  }
 
   return {
     id: String(metric._id),
@@ -1776,7 +1798,9 @@ const attachTraceMetricsToSession = (session, metrics) => {
     }
 
     const matchingMetric = serializedMetrics.find((metric) => {
-      if (usedMetricIds.has(metric.id)) return false;
+      if (usedMetricIds.has(metric.id)) {
+        return false;
+      }
       return metric.question === entry.question;
     });
 
@@ -1816,9 +1840,7 @@ exports.getAllChatHistoriesByBotId = async (botId, page = 1, limit = 10) => {
 
   const [sessions, totalSessions] = await Promise.all([
     FlowSession.find({ bot: botId })
-      .select(
-        '_id ipAddress userAgent isFinished createdAt lastUpdatedAt history'
-      )
+      .select('_id ipAddress userAgent isFinished createdAt lastUpdatedAt history')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
@@ -1837,16 +1859,15 @@ exports.getAllChatHistoriesByBotId = async (botId, page = 1, limit = 10) => {
 
   const metricsBySessionId = metrics.reduce((acc, metric) => {
     const key = String(metric.flowSession);
-    if (!acc[key]) acc[key] = [];
+    if (!acc[key]) {
+      acc[key] = [];
+    }
     acc[key].push(metric);
     return acc;
   }, {});
 
   const sessionsWithTrace = sessions.map((session) =>
-    attachTraceMetricsToSession(
-      session,
-      metricsBySessionId[String(session._id)] || []
-    )
+    attachTraceMetricsToSession(session, metricsBySessionId[String(session._id)] || []),
   );
 
   const totalPages = Math.ceil(totalSessions / limit);
@@ -1975,7 +1996,7 @@ exports.getSessionTraceTimeline = async (botId, sessionId) => {
 // Get spreadsheet configuration for a bot
 exports.getSpreadsheetConfigForBot = async (botId, userId) => {
   const SpreadsheetConfig = require('../models/SpreadsheetConfig');
-  
+
   logger.info('Fetching spreadsheet configuration', { botId, userId });
 
   const bot = await ChatBot.findOne({ _id: botId, user: userId });
@@ -1984,7 +2005,7 @@ exports.getSpreadsheetConfigForBot = async (botId, userId) => {
   }
 
   const config = await SpreadsheetConfig.findOne({ bot: botId });
-  
+
   if (!config) {
     logger.info('No spreadsheet configuration found for bot', { botId });
     return { configured: false, config: null };
@@ -2007,7 +2028,7 @@ exports.getSpreadsheetConfigForBot = async (botId, userId) => {
 // Configure spreadsheet columns for a bot
 exports.configureSpreadsheetColumns = async (botId, userId, outputColumn, inputColumns) => {
   const SpreadsheetConfig = require('../models/SpreadsheetConfig');
-  
+
   logger.info('Configuring spreadsheet columns', {
     botId,
     userId,
@@ -2028,7 +2049,7 @@ exports.configureSpreadsheetColumns = async (botId, userId, outputColumn, inputC
       isConfigured: true,
       updatedAt: new Date(),
     },
-    { new: true, runValidators: true }
+    { new: true, runValidators: true },
   );
 
   if (!config) {
@@ -2059,7 +2080,7 @@ exports.configureSpreadsheetColumns = async (botId, userId, outputColumn, inputC
 exports.getSuggestedColumnConfigForBot = async (botId, userId) => {
   const SpreadsheetConfig = require('../models/SpreadsheetConfig');
   const { suggestColumnConfiguration } = require('../utils/dataProcessingUtils');
-  
+
   logger.info('Getting suggested column configuration', { botId, userId });
 
   const bot = await ChatBot.findOne({ _id: botId, user: userId });
@@ -2068,7 +2089,7 @@ exports.getSuggestedColumnConfigForBot = async (botId, userId) => {
   }
 
   const config = await SpreadsheetConfig.findOne({ bot: botId });
-  
+
   if (!config) {
     throw new Error('No spreadsheet configuration found for this bot');
   }

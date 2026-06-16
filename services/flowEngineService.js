@@ -21,8 +21,8 @@ exports.findEdgeByHandle = (edges, nodeId, handleValue) => {
   const outs = exports.outgoingEdges(edges, nodeId);
   const normalized = String(handleValue).toLowerCase();
 
-  let edge = outs.find(
-    (o) => o.sourceHandle && String(o.sourceHandle).toLowerCase() === normalized
+  const edge = outs.find(
+    (o) => o.sourceHandle && String(o.sourceHandle).toLowerCase() === normalized,
   );
   if (edge) {
     return edge;
@@ -84,7 +84,7 @@ exports.executeCodeNode = async (codeNode, session) => {
       variables: variablesProxy,
 
       // HTTP client
-      axios: axios,
+      axios,
 
       // Console for logging
       console: {
@@ -107,14 +107,14 @@ exports.executeCodeNode = async (codeNode, session) => {
       },
 
       // Global objects that might be needed
-      JSON: JSON,
-      Math: Math,
-      Date: Date,
-      Promise: Promise,
-      setTimeout: setTimeout,
-      setInterval: setInterval,
-      clearTimeout: clearTimeout,
-      clearInterval: clearInterval,
+      JSON,
+      Math,
+      Date,
+      Promise,
+      setTimeout,
+      setInterval,
+      clearTimeout,
+      clearInterval,
     };
 
     const context = vm.createContext(sandbox);
@@ -133,7 +133,7 @@ exports.executeCodeNode = async (codeNode, session) => {
 
     const script = new vm.Script(wrappedCode);
     await script.runInContext(context, {
-      timeout: timeout,
+      timeout,
       displayErrors: true,
     });
 
@@ -328,11 +328,7 @@ exports.runFrom = async (flow, session, nodeId, userInputIfAny = null) => {
       });
 
       // Continue to next node via success handle or default edge
-      const successEdge = exports.findEdgeByHandle(
-        edges,
-        current.id,
-        'success'
-      );
+      const successEdge = exports.findEdgeByHandle(edges, current.id, 'success');
       if (successEdge) {
         current = exports.getNode(nodeMap, successEdge.target);
       } else {
