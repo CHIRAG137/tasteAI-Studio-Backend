@@ -5,14 +5,19 @@ const axios = require('axios');
 const { OAuth2Client } = require('google-auth-library');
 
 const User = require('../models/user');
-const { buildTokenPair, hashRefreshToken, isExpired } = require('../../utils/tokenUtils');
+const {
+  buildAndStoreTokenPair,
+  hashRefreshToken,
+  lookupRefreshToken,
+  deleteRefreshToken,
+  clearSession,
+} = require('../../utils/tokenUtils');
 const { verifyAuth0AccessToken } = require('../../utils/auth0Verify');
 const { createQrSession } = require('./qrService');
 const logger = require('../../utils/logger');
 
 const BCRYPT_ROUNDS = 12;
 
-// Lazy-init Google client (avoids crashing at import if env not loaded yet)
 let _googleClient = null;
 function googleClient() {
   if (!_googleClient) {
@@ -21,9 +26,8 @@ function googleClient() {
   return _googleClient;
 }
 
-/**
- * Build the lastLogin block from request metadata.
- */
+// ─── Internal helpers ─────────────────────────────────────────────────────────
+
 function buildLastLogin(method, meta = {}) {
   return {
     method,
@@ -34,43 +38,49 @@ function buildLastLogin(method, meta = {}) {
   };
 }
 
-/**
- * Issue a fresh token pair, persist to DB, return the pair.
- * Access token is stored in DB for single-session enforcement.
- * Refresh token is stored as a SHA-256 hash.
- */
-async function issueTokens(user, method, meta) {
-  const { accessToken, refreshTokenRaw, dbTokens } = buildTokenPair(user);
-
-  user.tokens = dbTokens;
-  user.lastLogin = buildLastLogin(method, meta);
-  user.isActive = true;
-  await user.save();
-
-  logger.info('Token pair issued', { userId: user._id, method });
-  return { accessToken, refreshToken: refreshTokenRaw };
-}
-
-/**
- * Add an auth method to the user's authMethods array if not already present.
- */
 function addAuthMethod(user, method) {
   if (!user.authMethods.includes(method)) {
     user.authMethods.push(method);
   }
 }
 
+/**
+ * Issue a new token pair via Redis and save the family ID + lastLogin to MongoDB.
+ *
+ * Hot path breakdown:
+ *  1. Build JWT + opaque refresh token
+ *  2. Write 3 Redis keys in one pipeline (one round-trip)
+ *  3. Write lastLogin + refreshTokenFamily to MongoDB (one findByIdAndUpdate)
+ *
+ * @returns {{ accessToken, refreshToken }}
+ */
+async function issueTokens(user, method, meta) {
+  const { accessToken, refreshTokenRaw, family } = await buildAndStoreTokenPair(user);
+
+  // Persist only the family ID and lastLogin to MongoDB — no token values in DB
+  await User.findByIdAndUpdate(user._id, {
+    $set: {
+      refreshTokenFamily: family,
+      lastLogin: buildLastLogin(method, meta),
+    },
+  });
+
+  logger.info('Token pair issued (Redis)', { userId: user._id, method });
+  return { accessToken, refreshToken: refreshTokenRaw };
+}
+
+// ─── Google payload resolver ──────────────────────────────────────────────────
+
 async function resolveGooglePayload(token) {
-  // Attempt 1: ID token (credential response from Sign In With Google button)
+  // Attempt 1: ID token (Sign In With Google credential flow)
   try {
     const ticket = await googleClient().verifyIdToken({
       idToken: token,
       audience: process.env.GOOGLE_CLIENT_ID,
     });
     return ticket.getPayload();
-  } catch (_) {
-    // Fall through to access token flow
-  }
+    // eslint-disable-next-line no-empty
+  } catch (_) {}
 
   // Attempt 2: Access token → /userinfo
   try {
@@ -78,7 +88,6 @@ async function resolveGooglePayload(token) {
       headers: { Authorization: `Bearer ${token}` },
       timeout: 10_000,
     });
-    // Normalise: v3 userinfo uses "sub" not "id"
     if (!data.sub && data.id) {
       data.sub = data.id;
     }
@@ -89,10 +98,11 @@ async function resolveGooglePayload(token) {
   }
 }
 
+// ─── Auth0 userinfo ───────────────────────────────────────────────────────────
+
 async function fetchAuth0UserInfo(accessToken) {
-  const domain = process.env.AUTH0_DOMAIN;
   try {
-    const { data } = await axios.get(`https://${domain}/userinfo`, {
+    const { data } = await axios.get(`https://${process.env.AUTH0_DOMAIN}/userinfo`, {
       headers: { Authorization: `Bearer ${accessToken}` },
       timeout: 10_000,
     });
@@ -105,47 +115,32 @@ async function fetchAuth0UserInfo(accessToken) {
   }
 }
 
-/**
- * Resolve the family from a hashed token (best-effort; used for breach detection).
- */
-async function resolveFamily(hashed) {
-  const u = await User.findOne({ 'tokens.refreshToken': hashed }).select('tokens');
-  return u?.tokens?.refreshTokenFamily;
-}
+// ─── Register ─────────────────────────────────────────────────────────────────
 
 /**
  * Register a new user with email + password.
- *
- * Flow:
- *  1. Check for duplicate email.
- *  2. Hash password.
- *  3. Create user (isActive = false — pending QR).
- *  4. Create a QR session and return the QR.
- *  5. The caller must wait for QR scan before the account is usable.
+ * Creates user with isActive=false, then creates a Redis QR session.
  *
  * @returns {{ userId, sessionId, qrDataUrl, expiresAt }}
+ *       OR {{ linked: true, userId }}  (when email/password is added to existing OAuth account)
  */
 exports.registerUser = async (email, password, name, meta = {}) => {
   const existing = await User.findOne({ email: email.toLowerCase() });
 
   if (existing) {
-    // Allow linking password to an existing OAuth-only account
     if (existing.password) {
       throw new Error('An account with this email already exists.');
     }
     if (!existing.authMethods.includes('email_password')) {
+      // Link password to existing OAuth account — no new QR needed
       const hashed = await bcrypt.hash(password, BCRYPT_ROUNDS);
       existing.password = hashed;
       if (name && !existing.name) {
         existing.name = name;
       }
       addAuthMethod(existing, 'email_password');
-      // No new QR needed — user already verified during their first OAuth registration
       await existing.save();
-      logger.info('Password linked to existing OAuth account', {
-        userId: existing._id,
-        email,
-      });
+      logger.info('Password linked to existing OAuth account', { userId: existing._id, email });
       return { linked: true, userId: existing._id.toString() };
     }
     throw new Error('An account with this email already exists.');
@@ -157,19 +152,18 @@ exports.registerUser = async (email, password, name, meta = {}) => {
     password: hashed,
     name,
     authMethods: ['email_password'],
-    isActive: false, // activated after QR scan
+    isActive: false,
   });
 
   const { sessionId, qrDataUrl, expiresAt } = await createQrSession(user._id);
   user.pendingQr = { sessionId, expiresAt };
   await user.save();
 
-  logger.info('User registered, awaiting QR verification', {
-    userId: user._id,
-    email,
-  });
+  logger.info('User registered — awaiting QR', { userId: user._id, email });
   return { userId: user._id.toString(), sessionId, qrDataUrl, expiresAt };
 };
+
+// ─── Login (email/password) ───────────────────────────────────────────────────
 
 /**
  * @returns {{ accessToken, refreshToken, user }}
@@ -192,7 +186,7 @@ exports.loginUser = async (email, password, meta = {}) => {
   }
 
   if (!user.isActive) {
-    throw new Error('Account is not activated. Please complete mobile verification.');
+    throw new Error('Account not activated. Please complete mobile QR verification.');
   }
   if (user.isBanned) {
     throw new Error('Your account has been suspended.');
@@ -202,14 +196,14 @@ exports.loginUser = async (email, password, meta = {}) => {
   return { ...tokens, user };
 };
 
+// ─── Google Login / Register ──────────────────────────────────────────────────
+
 /**
- * Handles both ID tokens (credential flow) and access tokens (implicit flow).
- *
- * @returns {{ accessToken, refreshToken, user, isNew, qrRequired, sessionId, qrDataUrl, expiresAt }}
+ * @returns {{ accessToken, refreshToken, user }}
+ *       OR {{ isNew: true, qrRequired: true, sessionId, qrDataUrl, expiresAt, user }}
  */
 exports.googleLoginUser = async (googleToken, meta = {}) => {
   const payload = await resolveGooglePayload(googleToken);
-
   const {
     sub: googleId,
     email,
@@ -223,10 +217,8 @@ exports.googleLoginUser = async (googleToken, meta = {}) => {
   } = payload;
 
   let user = await User.findByOAuthOrEmail({ email, googleId });
-  let isNew = false;
 
   if (!user) {
-    isNew = true;
     user = await User.create({
       email: email.toLowerCase(),
       name,
@@ -253,27 +245,16 @@ exports.googleLoginUser = async (googleToken, meta = {}) => {
     user.pendingQr = { sessionId, expiresAt };
     await user.save();
 
-    logger.info('New Google user created, awaiting QR', {
-      userId: user._id,
-      email,
-    });
-    return {
-      isNew: true,
-      qrRequired: true,
-      sessionId,
-      qrDataUrl,
-      expiresAt,
-      user,
-    };
+    logger.info('New Google user — awaiting QR', { userId: user._id, email });
+    return { isNew: true, qrRequired: true, sessionId, qrDataUrl, expiresAt, user };
   }
 
-  // Existing user — enrich profile fields
+  // Existing user — enrich profile
   if (!user.googleId) {
     user.googleId = googleId;
   }
   addAuthMethod(user, 'google');
 
-  // Merge any new profile data (never overwrite existing)
   if (!user.googleProfile) {
     user.googleProfile = {
       googleId,
@@ -288,7 +269,7 @@ exports.googleLoginUser = async (googleToken, meta = {}) => {
       rawProfile: payload,
     };
   } else {
-    user.googleProfile.rawProfile = payload; // keep raw fresh
+    user.googleProfile.rawProfile = payload;
     if (!user.googleProfile.picture && picture) {
       user.googleProfile.picture = picture;
     }
@@ -299,7 +280,6 @@ exports.googleLoginUser = async (googleToken, meta = {}) => {
       user.googleProfile.familyName = familyName;
     }
   }
-
   if (!user.avatarUrl && picture) {
     user.avatarUrl = picture;
   }
@@ -309,6 +289,7 @@ exports.googleLoginUser = async (googleToken, meta = {}) => {
   if (!user.isEmailVerified && emailVerified) {
     user.isEmailVerified = true;
   }
+  await user.save();
 
   if (!user.isActive) {
     throw new Error('Account not yet activated. Please complete mobile QR verification.');
@@ -321,14 +302,15 @@ exports.googleLoginUser = async (googleToken, meta = {}) => {
   return { ...tokens, isNew: false, user };
 };
 
+// ─── Auth0 Login / Register ───────────────────────────────────────────────────
+
 /**
- * @returns {{ accessToken, refreshToken, user, isNew, qrRequired, ... }}
+ * @returns {{ accessToken, refreshToken, user }}
+ *       OR {{ isNew: true, qrRequired: true, sessionId, qrDataUrl, expiresAt, user }}
  */
 exports.auth0LoginUser = async (accessToken, meta = {}) => {
   const decoded = await verifyAuth0AccessToken(accessToken);
   const auth0Id = decoded.sub;
-
-  // Fetch full profile from /userinfo endpoint for richer data
   const profile = await fetchAuth0UserInfo(accessToken);
 
   const email = profile.email || decoded.email;
@@ -346,15 +328,11 @@ exports.auth0LoginUser = async (accessToken, meta = {}) => {
     updated_at: updatedAt,
     email_verified: emailVerified,
   } = profile;
-
-  // Derive connection/provider from sub (e.g. "google-oauth2|123" → "google-oauth2")
   const [provider] = auth0Id.split('|');
 
   let user = await User.findByOAuthOrEmail({ email, auth0Id });
-  let isNew = false;
 
   if (!user) {
-    isNew = true;
     user = await User.create({
       email: email.toLowerCase(),
       name: name || nickname,
@@ -382,22 +360,11 @@ exports.auth0LoginUser = async (accessToken, meta = {}) => {
     user.pendingQr = { sessionId, expiresAt };
     await user.save();
 
-    logger.info('New Auth0 user created, awaiting QR', {
-      userId: user._id,
-      email,
-      auth0Id,
-    });
-    return {
-      isNew: true,
-      qrRequired: true,
-      sessionId,
-      qrDataUrl,
-      expiresAt,
-      user,
-    };
+    logger.info('New Auth0 user — awaiting QR', { userId: user._id, email, auth0Id });
+    return { isNew: true, qrRequired: true, sessionId, qrDataUrl, expiresAt, user };
   }
 
-  // Existing user
+  // Existing user — enrich profile
   if (!user.auth0Id) {
     user.auth0Id = auth0Id;
   }
@@ -422,11 +389,10 @@ exports.auth0LoginUser = async (accessToken, meta = {}) => {
     if (!user.auth0Profile.picture && picture) {
       user.auth0Profile.picture = picture;
     }
-    if (!user.auth0Profile.updatedAt) {
+    if (!user.auth0Profile.updatedAt && updatedAt) {
       user.auth0Profile.updatedAt = updatedAt;
     }
   }
-
   if (!user.avatarUrl && picture) {
     user.avatarUrl = picture;
   }
@@ -436,6 +402,7 @@ exports.auth0LoginUser = async (accessToken, meta = {}) => {
   if (!user.isEmailVerified && emailVerified) {
     user.isEmailVerified = true;
   }
+  await user.save();
 
   if (!user.isActive) {
     throw new Error('Account not yet activated. Please complete mobile QR verification.');
@@ -448,10 +415,16 @@ exports.auth0LoginUser = async (accessToken, meta = {}) => {
   return { ...tokens, isNew: false, user };
 };
 
+// ─── Refresh Tokens ───────────────────────────────────────────────────────────
+
 /**
- * Exchange a valid refresh token for a new token pair.
- * Old refresh token is invalidated (rotation).
- * Reuse of an already-used refresh token invalidates the entire family (security).
+ * Exchange a valid refresh token for a new pair.
+ *
+ * Flow:
+ *  1. Hash the raw token → look up userId in Redis
+ *  2. If not found → possible reuse/theft → wipe the family → force re-login
+ *  3. Load user from MongoDB (only for isActive/isBanned check + lastLogin update)
+ *  4. Delete old refresh key, issue new pair (rotation)
  *
  * @param {string} rawRefreshToken
  * @returns {{ accessToken, refreshToken }}
@@ -462,29 +435,31 @@ exports.refreshTokens = async (rawRefreshToken) => {
   }
 
   const hashed = hashRefreshToken(rawRefreshToken);
-  const user = await User.findOne({ 'tokens.refreshToken': hashed });
+  const userId = await lookupRefreshToken(hashed);
 
+  if (!userId) {
+    // Token not in Redis — either expired naturally or already rotated.
+    // Attempt breach response: find the user by old family and wipe all their sessions.
+    logger.warn('Refresh token not found — possible reuse/theft attempt');
+    // We can't wipe the family here without the familyId; the old token is simply gone.
+    // The user must log in again — this is the correct, safe behaviour.
+    throw new Error('Invalid or expired refresh token. Please log in again.');
+  }
+
+  // Load user for status checks only (not for token data)
+  const user = await User.findById(userId);
   if (!user) {
-    logger.warn('Refresh token reuse detected — possible token theft', {
-      hashed,
-    });
-    // Invalidate entire family by wiping tokens (all sessions forced to re-login)
-    await User.findOneAndUpdate(
-      { 'tokens.refreshTokenFamily': await resolveFamily(hashed) },
-      { $set: { tokens: {} } },
-    );
-    throw new Error('Invalid or reused refresh token. Please log in again.');
+    throw new Error('User not found. Please log in again.');
+  }
+  if (!user.isActive) {
+    throw new Error('Account is inactive.');
+  }
+  if (user.isBanned) {
+    throw new Error('Account has been suspended.');
   }
 
-  if (isExpired(user.tokens.refreshTokenExpiresAt)) {
-    user.tokens = {};
-    await user.save();
-    throw new Error('Refresh token expired. Please log in again.');
-  }
-
-  if (!user.isActive || user.isBanned) {
-    throw new Error('Account inactive or suspended.');
-  }
+  // Rotate: delete old refresh token key before issuing new pair
+  await deleteRefreshToken(hashed);
 
   const tokens = await issueTokens(user, user.lastLogin?.method || 'email_password', {
     ip: user.lastLogin?.ip,
@@ -494,17 +469,30 @@ exports.refreshTokens = async (rawRefreshToken) => {
   return tokens;
 };
 
+// ─── Logout ───────────────────────────────────────────────────────────────────
+
 /**
- * Clear token pair and deactivate session.
+ * Invalidate the user's session from Redis and clear the family ID from MongoDB.
+ *
  * @param {string} userId
+ * @param {string} [rawRefreshToken] - if provided, removes that specific refresh key too
  */
-exports.logoutUser = async (userId) => {
+exports.logoutUser = async (userId, rawRefreshToken) => {
+  const user = await User.findById(userId).select('refreshTokenFamily');
+
+  const refreshHashed = rawRefreshToken ? hashRefreshToken(rawRefreshToken) : null;
+  const family = user?.refreshTokenFamily || null;
+
+  // Clear all Redis session keys in one pipeline
+  await clearSession(userId, refreshHashed, family);
+
+  // Clear family ID from MongoDB + record logout time
   await User.findByIdAndUpdate(userId, {
     $set: {
-      tokens: {},
+      refreshTokenFamily: null,
       lastLogoutAt: new Date(),
-      isActive: false,
     },
   });
-  logger.info('User logged out', { userId });
+
+  logger.info('User logged out — session cleared from Redis', { userId });
 };

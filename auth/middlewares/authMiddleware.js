@@ -1,37 +1,38 @@
 'use strict';
 
 const User = require('../models/user');
-const { verifyAccessToken, isExpired } = require('../../utils/tokenUtils');
+const { verifyAccessToken, validateAccessToken } = require('../../utils/tokenUtils');
 const responseBuilder = require('../../utils/responseBuilder');
 const logger = require('../../utils/logger');
 
 /**
- * Protect routes that require a valid, non-expired access token.
+ * authMiddleware — protect routes requiring a valid session.
  *
- * Attaches req.user (full Mongoose document) for downstream handlers.
+ * Validation order (fast-fail):
+ *  1. JWT signature + expiry (cryptographic, no I/O)
+ *  2. Token type check
+ *  3. Redis single-session check — O(1), sub-millisecond
+ *  4. MongoDB user load — only if Redis passes (for isActive/isBanned/req.user)
  *
- * Token is expected as: Authorization: Bearer <accessToken>
+ * This means banned/inactive checks still require a MongoDB read,
+ * but the hot-path token validation never touches MongoDB.
  */
 exports.authMiddleware = async (req, res, next) => {
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    logger.warn('Auth failed — missing or malformed Authorization header', {
-      ip: req.clientIp,
-    });
+    logger.warn('Auth failed — missing Authorization header', { ip: req.clientIp });
     return responseBuilder.unauthorized(res, null, 'Authentication required');
   }
 
   const token = authHeader.split(' ')[1];
 
+  // Step 1: Verify JWT signature + expiry (pure crypto, no I/O)
   let decoded;
   try {
     decoded = verifyAccessToken(token);
   } catch (err) {
-    logger.warn('Auth failed — invalid token signature', {
-      error: err.message,
-      ip: req.clientIp,
-    });
+    logger.warn('Auth failed — bad JWT', { error: err.message, ip: req.clientIp });
     return responseBuilder.unauthorized(res, null, 'Invalid or expired token');
   }
 
@@ -39,38 +40,61 @@ exports.authMiddleware = async (req, res, next) => {
     return responseBuilder.unauthorized(res, null, 'Invalid token type');
   }
 
-  const user = await User.findById(decoded.sub);
+  const userId = decoded.sub;
 
+  // Step 2: Redis single-session enforcement — O(1)
+  // Redis key access:<userId> stores the current valid access token.
+  // If the stored value doesn't match → user logged out or logged in elsewhere.
+  const sessionValid = await validateAccessToken(userId, token);
+  if (!sessionValid) {
+    logger.warn('Auth failed — Redis session mismatch or evicted', { userId });
+    return responseBuilder.unauthorized(
+      res,
+      null,
+      'Session expired or invalidated. Please log in again.',
+    );
+  }
+
+  // Step 3: Load user from MongoDB for account flags + attaching to req
+  const user = await User.findById(userId);
   if (!user) {
-    logger.warn('Auth failed — user not found', { sub: decoded.sub });
+    logger.warn('Auth failed — user not found in MongoDB', { userId });
     return responseBuilder.unauthorized(res, null, 'User not found');
-  }
-
-  // Single-session enforcement: token must match what is in DB
-  if (user.tokens?.accessToken !== token) {
-    logger.warn('Auth failed — token mismatch (possible replay)', {
-      userId: user._id,
-    });
-    return responseBuilder.unauthorized(res, null, 'Session invalidated. Please log in again.');
-  }
-
-  // Belt-and-suspenders: DB-side expiry check
-  if (isExpired(user.tokens?.accessTokenExpiresAt)) {
-    logger.warn('Auth failed — access token expired in DB', {
-      userId: user._id,
-    });
-    return responseBuilder.unauthorized(res, null, 'Token expired');
   }
 
   if (!user.isActive) {
     return responseBuilder.forbidden(res, null, 'Account not yet activated');
   }
-
   if (user.isBanned) {
     return responseBuilder.forbidden(res, null, 'Account suspended');
   }
 
   req.user = user;
   logger.info('Authenticated', { userId: user._id, email: user.email });
+  return next();
+};
+
+/**
+ * optionalAuth — attach req.user if a valid session exists, never block.
+ */
+exports.optionalAuth = async (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return next();
+  }
+
+  try {
+    const token = authHeader.split(' ')[1];
+    const decoded = verifyAccessToken(token);
+    const valid = await validateAccessToken(decoded.sub, token);
+    if (valid) {
+      const user = await User.findById(decoded.sub);
+      if (user && user.isActive && !user.isBanned) {
+        req.user = user;
+      }
+    }
+  } catch (_) {
+    // silently skip — optional auth never blocks
+  }
   return next();
 };
