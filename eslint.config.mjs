@@ -1,37 +1,181 @@
 import js from '@eslint/js';
 import globals from 'globals';
-import prettier from 'eslint-plugin-prettier';
-import node from 'eslint-plugin-node';
+
+import prettierPlugin from 'eslint-plugin-prettier';
+import prettierConfig from 'eslint-config-prettier';
+
+import nodePlugin from 'eslint-plugin-n';
+import importPlugin from 'eslint-plugin-import';
+import promisePlugin from 'eslint-plugin-promise';
+import securityPlugin from 'eslint-plugin-security';
+import unusedImports from 'eslint-plugin-unused-imports';
 
 export default [
   js.configs.recommended,
+  prettierConfig,
 
   {
     files: ['**/*.js'],
+
+    ignores: ['node_modules/**', 'coverage/**', 'dist/**', 'build/**', '.next/**', 'logs/**'],
+
     languageOptions: {
+      ecmaVersion: 'latest',
+      sourceType: 'commonjs',
+
       globals: {
         ...globals.node,
       },
-      ecmaVersion: 'latest',
-      sourceType: 'commonjs',
     },
+
     plugins: {
-      prettier,
-      node,
+      prettier: prettierPlugin,
+      n: nodePlugin,
+      import: importPlugin,
+      promise: promisePlugin,
+      security: securityPlugin,
+      'unused-imports': unusedImports,
     },
+
     rules: {
-      // Prettier as ESLint rule
+      /*
+       * Formatting
+       */
+
       'prettier/prettier': 'error',
 
-      // Code quality
-      'no-console': 'warn',
-      'no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+      /*
+       * Possible Bugs
+       */
+
       eqeqeq: ['error', 'always'],
       curly: ['error', 'all'],
+      'no-var': 'error',
+      'prefer-const': 'error',
 
-      // Node rules
-      'node/no-missing-require': 'off',
-      'node/no-unpublished-require': 'off',
+      'no-unreachable': 'error',
+      'no-duplicate-imports': 'error',
+      'no-template-curly-in-string': 'error',
+
+      'no-shadow': 'error',
+      'no-use-before-define': 'error',
+
+      /*
+       * Variables
+       */
+
+      'no-unused-vars': 'off',
+
+      'unused-imports/no-unused-imports': 'error',
+
+      'unused-imports/no-unused-vars': [
+        'warn',
+        {
+          vars: 'all',
+          varsIgnorePattern: '^_',
+          args: 'after-used',
+          argsIgnorePattern: '^_',
+        },
+      ],
+
+      /*
+       * Best Practices
+       */
+
+      'consistent-return': 'error',
+
+      'default-case': 'error',
+
+      'dot-notation': 'error',
+
+      'no-eval': 'error',
+
+      'no-implied-eval': 'error',
+
+      'no-multi-spaces': 'error',
+
+      'no-new-func': 'error',
+
+      'no-return-await': 'error',
+
+      'no-self-compare': 'error',
+
+      'no-useless-return': 'error',
+
+      'prefer-template': 'error',
+
+      'object-shorthand': 'error',
+
+      /*
+       * Imports
+       */
+
+      'import/no-duplicates': 'error',
+
+      'import/first': 'error',
+
+      'import/newline-after-import': [
+        'error',
+        {
+          count: 1,
+        },
+      ],
+
+      /*
+       * Promises
+       */
+
+      'promise/always-return': 'error',
+
+      'promise/no-return-wrap': 'error',
+
+      'promise/param-names': 'error',
+
+      'promise/no-new-statics': 'error',
+
+      'promise/no-nesting': 'warn',
+
+      /*
+       * Security
+       */
+
+      'security/detect-object-injection': 'off',
+
+      /*
+       * Node
+       */
+
+      'n/no-missing-require': 'off',
+
+      'n/no-unpublished-require': 'off',
+
+      /*
+       * Console
+       */
+
+      'no-console': [
+        'warn',
+        {
+          allow: ['warn', 'error'],
+        },
+      ],
+
+      /*
+       * Style
+       */
+
+      'max-depth': ['warn', 4],
+
+      complexity: ['warn', 15],
+
+      'max-lines-per-function': [
+        'warn',
+        {
+          max: 100,
+          skipBlankLines: true,
+          skipComments: true,
+        },
+      ],
     },
   },
 ];

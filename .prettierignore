@@ -1,4 +1,8 @@
 node_modules
-dist
 coverage
+dist
+build
+package-lock.json
+*.log
 .env
+.next
