@@ -56,8 +56,9 @@ exports.resolveGooglePayload = async function (token) {
       audience: process.env.GOOGLE_CLIENT_ID,
     });
     return ticket.getPayload();
-    // eslint-disable-next-line no-empty
-  } catch (_) {}
+  } catch (err) {
+    logger.debug('Google ID token verification failed', err);
+  }
 
   // Attempt 2: Access token → /userinfo
   try {

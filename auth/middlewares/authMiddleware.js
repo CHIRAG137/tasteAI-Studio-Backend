@@ -90,8 +90,8 @@ exports.optionalAuth = async (req, res, next) => {
         req.user = user;
       }
     }
-  } catch (_) {
-    // silently skip - optional auth never blocks
+  } catch (err) {
+    logger.error('Optional auth failed', { error: err.message });
   }
   return next();
 };

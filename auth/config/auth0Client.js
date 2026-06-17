@@ -30,8 +30,10 @@ function getJwksClient() {
 exports.getSigningKey = function (header, callback) {
   getJwksClient().getSigningKey(header.kid, (err, key) => {
     if (err) {
-      return callback(err);
+      callback(err);
+      return;
     }
+
     callback(null, key.getPublicKey());
   });
 };
@@ -44,7 +46,8 @@ exports.getSigningKey = function (header, callback) {
 exports.verifyAuth0AccessToken = function (token) {
   return new Promise((resolve, reject) => {
     if (!process.env.AUTH0_AUDIENCE) {
-      return reject(new Error('AUTH0_AUDIENCE is not configured'));
+      reject(new Error('AUTH0_AUDIENCE is not configured'));
+      return;
     }
 
     jwt.verify(
@@ -57,8 +60,10 @@ exports.verifyAuth0AccessToken = function (token) {
       },
       (err, decoded) => {
         if (err) {
-          return reject(err);
+          reject(err);
+          return;
         }
+
         resolve(decoded);
       },
     );
