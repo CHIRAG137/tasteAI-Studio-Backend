@@ -5,30 +5,15 @@ const { v4: uuidv4 } = require('uuid');
 const { getRedis } = require('../../config/redisClient');
 const User = require('../models/user');
 const logger = require('../../utils/logger');
+const qrUtils = require('../utils/qrUtils');
 
-const QR_TTL_SECONDS = 10 * 60; // 10 minutes
-
-// ─── Redis key builders ───────────────────────────────────────────────────────
-//
-//  qr:session:<sessionId>         → userId          (pending session)
-//  qr:scanned:<sessionId>         → "1"             (scan confirmed flag)
-//  qr:phone:<phoneNumber>         → userId          (duplicate-phone guard)
-//
+const QR_TTL_SECONDS = 10 * 60;
 
 const qrKeys = {
   session: (id) => `qr:session:${id}`,
   scanned: (id) => `qr:scanned:${id}`,
   phone: (phone) => `qr:phone:${phone}`,
 };
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function buildDeepLink(sessionId) {
-  const base = process.env.MOBILE_DEEP_LINK_BASE || 'myapp://auth/verify-qr';
-  return `${base}?sessionId=${sessionId}`;
-}
-
-// ─── Create ───────────────────────────────────────────────────────────────────
 
 /**
  * Create a new QR session for the given user and store it in Redis.
@@ -37,7 +22,7 @@ function buildDeepLink(sessionId) {
  * @param {string|ObjectId} userId
  * @returns {{ sessionId, qrDataUrl, expiresAt }}
  */
-async function createQrSession(userId) {
+exports.createQrSession = async (userId) => {
   const sessionId = uuidv4();
   const expiresAt = new Date(Date.now() + QR_TTL_SECONDS * 1000);
   const redis = await getRedis();
@@ -45,7 +30,7 @@ async function createQrSession(userId) {
   // Store pending session in Redis with exact 10-min TTL
   await redis.set(qrKeys.session(sessionId), userId.toString(), { EX: QR_TTL_SECONDS });
 
-  const deepLink = buildDeepLink(sessionId);
+  const deepLink = qrUtils.buildDeepLink(sessionId);
   const qrDataUrl = await QRCode.toDataURL(deepLink, {
     errorCorrectionLevel: 'H',
     margin: 2,
@@ -54,9 +39,7 @@ async function createQrSession(userId) {
 
   logger.info('QR session created (Redis)', { sessionId, userId });
   return { sessionId, qrDataUrl, expiresAt };
-}
-
-// ─── Scan (called by mobile app) ──────────────────────────────────────────────
+};
 
 /**
  * Mark a QR session as scanned, validate it, activate the user account,
@@ -67,22 +50,22 @@ async function createQrSession(userId) {
  *
  * @param {{ sessionId, deviceInfo, phoneNumber?, countryCode? }}
  */
-async function markQrScanned({ sessionId, deviceInfo, phoneNumber, countryCode }) {
+exports.markQrScanned = async ({ sessionId, deviceInfo, phoneNumber, countryCode }) => {
   const redis = await getRedis();
 
-  // 1. Check session exists (Redis handles TTL — if key is gone it's expired)
+  // 1. Check session exists (Redis handles TTL - if key is gone it's expired)
   const userId = await redis.get(qrKeys.session(sessionId));
   if (!userId) {
     throw new Error('QR session not found or expired');
   }
 
-  // 2. Idempotency — reject if already scanned
+  // 2. Idempotency - reject if already scanned
   const alreadyScanned = await redis.get(qrKeys.scanned(sessionId));
   if (alreadyScanned) {
     throw new Error('QR session already used');
   }
 
-  // 3. Phone uniqueness check — one phone per account
+  // 3. Phone uniqueness check - one phone per account
   if (phoneNumber) {
     const existingOwner = await redis.get(qrKeys.phone(phoneNumber));
     if (existingOwner && existingOwner !== userId) {
@@ -94,11 +77,9 @@ async function markQrScanned({ sessionId, deviceInfo, phoneNumber, countryCode }
       throw new Error('This phone number is already linked to another account.');
     }
 
-    // Persist phone → userId mapping permanently (no TTL — it's a permanent uniqueness guard)
-    // We use the MongoDB user document as ground truth; Redis is a fast cache for lookup.
-    // Check MongoDB too in case Redis was flushed
-    const existingInDb = await User.findOne({ 'phone.phoneNumber': phoneNumber });
-    if (existingInDb && existingInDb._id.toString() !== userId) {
+    // Persist phone → userId mapping permanently (no TTL - it's a permanent uniqueness guard)
+    const existingUserInDb = await User.findOne({ 'phone.phoneNumber': phoneNumber });
+    if (existingUserInDb && existingUserInDb._id.toString() !== userId) {
       throw new Error('This phone number is already linked to another account.');
     }
   }
@@ -126,28 +107,26 @@ async function markQrScanned({ sessionId, deviceInfo, phoneNumber, countryCode }
 
   // 6. Store phone in Redis for fast duplicate-check on future registrations
   if (phoneNumber) {
-    await redis.set(qrKeys.phone(phoneNumber), userId, { EX: 365 * 24 * 60 * 60 }); // 1-year cache
+    await redis.set(qrKeys.phone(phoneNumber), userId, { EX: 365 * 24 * 60 * 60 });
   }
 
   // 7. Clean up the session key now that it's been used
   await redis.del(qrKeys.session(sessionId));
 
-  logger.info('QR verified — account activated', { sessionId, userId, phoneNumber });
-}
-
-// ─── Poll (called by web client) ──────────────────────────────────────────────
+  logger.info('QR verified - account activated', { sessionId, userId, phoneNumber });
+};
 
 /**
  * Check whether a QR session has been scanned yet.
- * Pure Redis lookup — no MongoDB needed.
+ * Pure Redis lookup - no MongoDB needed.
  *
  * @param {string} sessionId
  * @returns {{ status: 'pending' | 'scanned' | 'expired' }}
  */
-async function pollQrStatus(sessionId) {
+exports.pollQrStatus = async (sessionId) => {
   const redis = await getRedis();
 
-  // Check scanned flag first (fastest path for completed verifications)
+  // Check scanned flag first since it's the most likely positive case and we want to return "scanned" immediately without extra lookups.
   const scanned = await redis.get(qrKeys.scanned(sessionId));
   if (scanned) {
     return { status: 'scanned' };
@@ -160,6 +139,4 @@ async function pollQrStatus(sessionId) {
   }
 
   return { status: 'pending' };
-}
-
-module.exports = { createQrSession, markQrScanned, pollQrStatus };
+};

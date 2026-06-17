@@ -5,7 +5,7 @@ const SlackIntegration = require('../models/SlackIntegration');
 const logger = require('../utils/logger');
 const client = require('../config/googleClient');
 const { createToken, getTokenExpiry } = require('../utils/tokenUtils');
-const { verifyAuth0AccessToken } = require('../utils/auth0Verify');
+const { verifyAuth0AccessToken } = require('../config/auth0Client');
 
 function setLastLogin(user, method, ip = 'Unknown', device = 'Unknown', deviceId = null) {
   user.lastLogin = {

@@ -6,15 +6,7 @@ const rateLimit = require('express-rate-limit');
 const authController = require('../controllers/authController');
 const { authMiddleware } = require('../middlewares/authMiddleware');
 const { attachIpAddress } = require('../middlewares/ipMiddleware');
-const {
-  registerRules,
-  loginRules,
-  googleLoginRules,
-  auth0LoginRules,
-  refreshRules,
-  qrVerifyRules,
-  qrPollRules,
-} = require('../validators/authValidator');
+const authValidator = require('../validators/authValidator');
 
 const router = express.Router();
 
@@ -22,7 +14,7 @@ const router = express.Router();
 // For auth endpoints, we want to be more aggressive to protect against brute-force attacks, but for QR code polling we can be more lenient since it's expected to be called frequently by the web client.
 // Create a common rate limiter for auth endpoints (except QR polling) and a separate one for QR polling. Both return a consistent error response when the limit is exceeded.
 const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 min
+  windowMs: 15 * 60 * 1000,
   max: 20,
   standardHeaders: true,
   legacyHeaders: false,
@@ -33,7 +25,7 @@ const authLimiter = rateLimit({
 });
 
 const qrLimiter = rateLimit({
-  windowMs: 60 * 1000, // 1 min
+  windowMs: 1 * 60 * 1000,
   max: 60, // generous — web client polls every second
   standardHeaders: true,
   legacyHeaders: false,
@@ -45,7 +37,13 @@ const qrLimiter = rateLimit({
  *          Returns QR code for mobile verification.
  * @access  Public
  */
-router.post('/register', attachIpAddress, authLimiter, registerRules, authController.registerUser);
+router.post(
+  '/register',
+  attachIpAddress,
+  authLimiter,
+  authValidator.registerRules,
+  authController.registerUser,
+);
 
 /**
  * @route   POST /api/auth/user/login
@@ -53,7 +51,13 @@ router.post('/register', attachIpAddress, authLimiter, registerRules, authContro
  *          Returns access + refresh tokens.
  * @access  Public
  */
-router.post('/login', attachIpAddress, authLimiter, loginRules, authController.loginUser);
+router.post(
+  '/login',
+  attachIpAddress,
+  authLimiter,
+  authValidator.loginRules,
+  authController.loginUser,
+);
 
 /**
  * @route   POST /api/auth/user/google-login
@@ -65,7 +69,7 @@ router.post(
   '/google-login',
   attachIpAddress,
   authLimiter,
-  googleLoginRules,
+  authValidator.googleLoginRules,
   authController.googleLoginUser,
 );
 
@@ -79,7 +83,7 @@ router.post(
   '/auth0-login',
   attachIpAddress,
   authLimiter,
-  auth0LoginRules,
+  authValidator.auth0LoginRules,
   authController.auth0LoginUser,
 );
 
@@ -88,7 +92,13 @@ router.post(
  * @desc    Exchange a refresh token for a new access + refresh token pair.
  * @access  Public (token in body)
  */
-router.post('/refresh', attachIpAddress, authLimiter, refreshRules, authController.refreshTokens);
+router.post(
+  '/refresh',
+  attachIpAddress,
+  authLimiter,
+  authValidator.refreshRules,
+  authController.refreshTokens,
+);
 
 /**
  * @route   POST /api/auth/user/verify-qr
@@ -96,14 +106,25 @@ router.post('/refresh', attachIpAddress, authLimiter, refreshRules, authControll
  *          Activates the account and records device info.
  * @access  Public (mobile app)
  */
-router.post('/verify-qr', attachIpAddress, qrLimiter, qrVerifyRules, authController.verifyQr);
+router.post(
+  '/verify-qr',
+  attachIpAddress,
+  qrLimiter,
+  authValidator.qrVerifyRules,
+  authController.verifyQr,
+);
 
 /**
  * @route   GET /api/auth/user/qr-status/:sessionId
  * @desc    Web client polls this until status is 'scanned' or 'expired'.
  * @access  Public
  */
-router.get('/qr-status/:sessionId', qrLimiter, qrPollRules, authController.pollQrStatus);
+router.get(
+  '/qr-status/:sessionId',
+  qrLimiter,
+  authValidator.qrPollRules,
+  authController.pollQrStatus,
+);
 
 /**
  * @route   POST /api/auth/user/logout
