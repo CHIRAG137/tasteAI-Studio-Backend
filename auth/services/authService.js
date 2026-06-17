@@ -9,7 +9,7 @@ const {
   deleteRefreshToken,
   clearSession,
 } = require('../../utils/tokenUtils');
-const { verifyAuth0AccessToken } = require('../config/auth0Client');
+const auth0Client = require('../config/auth0Client');
 const authUtils = require('../utils/authUtils');
 const qrService = require('./qrService');
 const logger = require('../../utils/logger');
@@ -31,14 +31,16 @@ exports.registerUser = async (email, password, name, _ = {}) => {
       throw new Error('An account with this email already exists.');
     }
     if (!existingUser.authMethods.includes('email_password')) {
-      // Link password to existing OAuth account — no new QR needed
+      // Link password to existing OAuth account - no new QR needed
       const hashedPassword = await bcrypt.hash(password, BCRYPT_ROUNDS);
       existingUser.password = hashedPassword;
       if (name && !existingUser.name) {
         existingUser.name = name;
       }
+
       authUtils.addAuthMethod(existingUser, 'email_password');
       await existingUser.save();
+
       logger.info('Password linked to existing OAuth account', { userId: existingUser._id, email });
       return { linked: true, userId: existingUser._id.toString() };
     }
@@ -58,7 +60,7 @@ exports.registerUser = async (email, password, name, _ = {}) => {
   user.pendingQr = { sessionId, expiresAt };
   await user.save();
 
-  logger.info('User registered — awaiting QR', { userId: user._id, email });
+  logger.info('User registered - awaiting QR', { userId: user._id, email });
   return { userId: user._id.toString(), sessionId, qrDataUrl, expiresAt };
 };
 
@@ -140,11 +142,11 @@ exports.googleLoginUser = async (googleToken, meta = {}) => {
     user.pendingQr = { sessionId, expiresAt };
     await user.save();
 
-    logger.info('New Google user — awaiting QR', { userId: user._id, email });
+    logger.info('New Google user - awaiting QR', { userId: user._id, email });
     return { isNew: true, qrRequired: true, sessionId, qrDataUrl, expiresAt, user };
   }
 
-  // Existing user — enrich profile
+  // Existing user - enrich profile
   if (!user.googleId) {
     user.googleId = googleId;
   }
@@ -202,7 +204,7 @@ exports.googleLoginUser = async (googleToken, meta = {}) => {
  *       OR {{ isNew: true, qrRequired: true, sessionId, qrDataUrl, expiresAt, user }}
  */
 exports.auth0LoginUser = async (accessToken, meta = {}) => {
-  const decoded = await verifyAuth0AccessToken(accessToken);
+  const decoded = await auth0Client.verifyAuth0AccessToken(accessToken);
   const auth0Id = decoded.sub;
   const profile = await authUtils.fetchAuth0UserInfo(accessToken);
 
@@ -253,11 +255,11 @@ exports.auth0LoginUser = async (accessToken, meta = {}) => {
     user.pendingQr = { sessionId, expiresAt };
     await user.save();
 
-    logger.info('New Auth0 user — awaiting QR', { userId: user._id, email, auth0Id });
+    logger.info('New Auth0 user - awaiting QR', { userId: user._id, email, auth0Id });
     return { isNew: true, qrRequired: true, sessionId, qrDataUrl, expiresAt, user };
   }
 
-  // Existing user — enrich profile
+  // Existing user - enrich profile
   if (!user.auth0Id) {
     user.auth0Id = auth0Id;
   }
@@ -329,9 +331,9 @@ exports.refreshTokens = async (rawRefreshToken) => {
   const userId = await lookupRefreshToken(hashedRefreshToken);
 
   if (!userId) {
-    // Token not in Redis — either expired naturally or already rotated.
-    logger.warn('Refresh token not found — possible reuse/theft attempt');
-    // The user must log in again — this is the correct, safe behaviour.
+    // Token not in Redis - either expired naturally or already rotated.
+    logger.warn('Refresh token not found - possible reuse/theft attempt');
+    // The user must log in again - this is the correct, safe behaviour.
     throw new Error('Invalid or expired refresh token. Please log in again.');
   }
 
@@ -380,5 +382,5 @@ exports.logoutUser = async (userId, rawRefreshToken) => {
     },
   });
 
-  logger.info('User logged out — session cleared from Redis', { userId });
+  logger.info('User logged out - session cleared from Redis', { userId });
 };

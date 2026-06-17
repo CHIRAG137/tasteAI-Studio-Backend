@@ -3,11 +3,11 @@
 const jwt = require('jsonwebtoken');
 const jwksClient = require('jwks-rsa');
 
-let _auth0client = null;
+let _client = null;
 
 function getJwksClient() {
-  if (_auth0client) {
-    return _auth0client;
+  if (_client) {
+    return _client;
   }
 
   const domain = process.env.AUTH0_DOMAIN;
@@ -15,7 +15,7 @@ function getJwksClient() {
     throw new Error('AUTH0_DOMAIN is not configured');
   }
 
-  _auth0client = jwksClient({
+  _client = jwksClient({
     jwksUri: `https://${domain}/.well-known/jwks.json`,
     cache: true,
     cacheMaxEntries: 5,
@@ -24,7 +24,7 @@ function getJwksClient() {
     jwksRequestsPerMinute: 10,
   });
 
-  return _auth0client;
+  return _client;
 }
 
 exports.getSigningKey = function (header, callback) {

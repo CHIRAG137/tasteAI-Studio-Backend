@@ -2,41 +2,24 @@
 
 const authService = require('../services/authService');
 const qrService = require('../services/qrService');
+const authUtils = require('../utils/authUtils');
 const responseBuilder = require('../../utils/responseBuilder');
 const logger = require('../../utils/logger');
 
 /**
- * Extract login metadata from request.
- */
-function getLoginMeta(req) {
-  return {
-    ip: req.clientIp || req.ip || 'Unknown',
-    device: req.userAgent || req.headers['user-agent'] || 'Unknown',
-    deviceId: req.body?.deviceId || null,
-  };
-}
-
-/**
- * Safely sanitise user object before returning to client.
- * toJSON transform on the model removes tokens/password, but extra belt-and-suspenders.
- */
-function sanitiseUser(user) {
-  const obj = user.toJSON ? user.toJSON() : { ...user };
-  delete obj.password;
-  delete obj.tokens;
-  delete obj.pendingQr;
-  return obj;
-}
-
-/**
  * POST /auth/user/register
- * Success (new user):    201 — { userId, sessionId, qrDataUrl, expiresAt }
- * Success (link method): 200 — { linked: true, userId }
+ * Success (new user):    201 - { userId, sessionId, qrDataUrl, expiresAt }
+ * Success (link method): 200 - { linked: true, userId }
  */
 exports.registerUser = async (req, res) => {
   try {
     const { email, password, name } = req.body;
-    const result = await authService.registerUser(email, password, name, getLoginMeta(req));
+    const result = await authService.registerUser(
+      email,
+      password,
+      name,
+      authUtils.getLoginMeta(req),
+    );
 
     if (result.linked) {
       return responseBuilder.ok(res, result, 'Password linked to existing account');
@@ -66,12 +49,12 @@ exports.loginUser = async (req, res) => {
     const { accessToken, refreshToken, user } = await authService.loginUser(
       email,
       password,
-      getLoginMeta(req),
+      authUtils.getLoginMeta(req),
     );
 
     return responseBuilder.ok(
       res,
-      { accessToken, refreshToken, user: sanitiseUser(user) },
+      { accessToken, refreshToken, user: authUtils.sanitiseUser(user) },
       'Login successful',
     );
   } catch (err) {
@@ -82,13 +65,13 @@ exports.loginUser = async (req, res) => {
 
 /**
  * POST /auth/user/google-login
- * New user:  201 — { isNew, qrRequired, sessionId, qrDataUrl, expiresAt, user }
- * Existing:  200 — { accessToken, refreshToken, user }
+ * New user:  201 - { isNew, qrRequired, sessionId, qrDataUrl, expiresAt, user }
+ * Existing:  200 - { accessToken, refreshToken, user }
  */
 exports.googleLoginUser = async (req, res) => {
   try {
     const { token } = req.body;
-    const result = await authService.googleLoginUser(token, getLoginMeta(req));
+    const result = await authService.googleLoginUser(token, authUtils.getLoginMeta(req));
 
     if (result.qrRequired) {
       const { isNew, sessionId, qrDataUrl, expiresAt, user } = result;
@@ -100,7 +83,7 @@ exports.googleLoginUser = async (req, res) => {
           sessionId,
           qrDataUrl,
           expiresAt,
-          user: sanitiseUser(user),
+          user: authUtils.sanitiseUser(user),
         },
         'Google account created. Please scan the QR code to activate your account.',
       );
@@ -109,7 +92,7 @@ exports.googleLoginUser = async (req, res) => {
     const { accessToken, refreshToken, user } = result;
     return responseBuilder.ok(
       res,
-      { accessToken, refreshToken, user: sanitiseUser(user) },
+      { accessToken, refreshToken, user: authUtils.sanitiseUser(user) },
       'Google login successful',
     );
   } catch (err) {
@@ -124,7 +107,7 @@ exports.googleLoginUser = async (req, res) => {
 exports.auth0LoginUser = async (req, res) => {
   try {
     const { accessToken } = req.body;
-    const result = await authService.auth0LoginUser(accessToken, getLoginMeta(req));
+    const result = await authService.auth0LoginUser(accessToken, authUtils.getLoginMeta(req));
 
     if (result.qrRequired) {
       const { isNew, sessionId, qrDataUrl, expiresAt, user } = result;
@@ -136,7 +119,7 @@ exports.auth0LoginUser = async (req, res) => {
           sessionId,
           qrDataUrl,
           expiresAt,
-          user: sanitiseUser(user),
+          user: authUtils.sanitiseUser(user),
         },
         'Auth0 account created. Please scan the QR code to activate your account.',
       );
@@ -145,7 +128,7 @@ exports.auth0LoginUser = async (req, res) => {
     const { accessToken: at, refreshToken, user } = result;
     return responseBuilder.ok(
       res,
-      { accessToken: at, refreshToken, user: sanitiseUser(user) },
+      { accessToken: at, refreshToken, user: authUtils.sanitiseUser(user) },
       'Auth0 login successful',
     );
   } catch (err) {
@@ -233,5 +216,5 @@ exports.pollQrStatus = async (req, res) => {
  * Returns the authenticated user's profile.
  */
 exports.getMe = async (req, res) => {
-  return responseBuilder.ok(res, sanitiseUser(req.user), 'Profile fetched');
+  return responseBuilder.ok(res, authUtils.sanitiseUser(req.user), 'Profile fetched');
 };

@@ -3,8 +3,6 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 
-// ─── Sub-schemas ─────────────────────────────────────────────────────────────
-
 const LastLoginSchema = new mongoose.Schema(
   {
     method: { type: String, enum: ['email_password', 'google', 'auth0'], default: null },
@@ -66,56 +64,31 @@ const PhoneSchema = new mongoose.Schema(
   { _id: false },
 );
 
-// ─── Main schema ─────────────────────────────────────────────────────────────
-// NOTE: tokens are NO LONGER stored here — they live in Redis.
-// The only session-related fields kept on User are:
-//   - refreshTokenFamily  → so we can wipe it on logout / breach
-//   - lastLogin           → audit metadata
-//   - isActive            → activation gate (set after QR scan)
+// Main schema
 
 const UserSchema = new mongoose.Schema(
   {
-    // ── Identity ──────────────────────────────────────────────────────────
     email: { type: String, required: true, unique: true, lowercase: true, trim: true, index: true },
     name: { type: String, trim: true },
     avatarUrl: { type: String },
-
-    // ── Email/password ─────────────────────────────────────────────────────
     password: { type: String, select: false },
-
-    // ── OAuth provider IDs (sparse indexed for fast lookup) ────────────────
     googleId: { type: String, sparse: true, index: true },
     auth0Id: { type: String, sparse: true, index: true },
-
-    // ── Rich OAuth profiles ────────────────────────────────────────────────
     googleProfile: { type: GoogleProfileSchema, default: null },
     auth0Profile: { type: Auth0ProfileSchema, default: null },
-
-    // ── Auth methods this user has used ────────────────────────────────────
     authMethods: {
       type: [String],
       enum: ['email_password', 'google', 'auth0'],
       default: [],
     },
-
-    // ── Refresh token family stored on User for breach-wipe on logout ──────
-    // The actual token lives in Redis; this is the family ID only.
     refreshTokenFamily: { type: String, default: null },
-
-    // ── Phone / mobile QR verification ────────────────────────────────────
     phone: { type: PhoneSchema, default: () => ({}) },
-
-    // ── Pending QR state (cleared after scan) ─────────────────────────────
     pendingQr: {
       sessionId: { type: String, default: null },
       expiresAt: { type: Date, default: null },
     },
-
-    // ── Audit ──────────────────────────────────────────────────────────────
     lastLogin: { type: LastLoginSchema, default: null },
     lastLogoutAt: { type: Date },
-
-    // ── Account flags ──────────────────────────────────────────────────────
     isActive: { type: Boolean, default: false },
     isEmailVerified: { type: Boolean, default: false },
     isBanned: { type: Boolean, default: false },
@@ -134,10 +107,7 @@ const UserSchema = new mongoose.Schema(
   },
 );
 
-// ─── Indexes ──────────────────────────────────────────────────────────────────
 UserSchema.index({ 'phone.phoneNumber': 1 }, { sparse: true });
-
-// ─── Statics ──────────────────────────────────────────────────────────────────
 
 UserSchema.statics.findByOAuthOrEmail = function ({ email, googleId, auth0Id }) {
   const conditions = [];
@@ -155,8 +125,6 @@ UserSchema.statics.findByOAuthOrEmail = function ({ email, googleId, auth0Id }) 
   }
   return this.findOne({ $or: conditions });
 };
-
-// ─── Methods ──────────────────────────────────────────────────────────────────
 
 UserSchema.methods.verifyPassword = async function (plaintext) {
   if (!this.password) {

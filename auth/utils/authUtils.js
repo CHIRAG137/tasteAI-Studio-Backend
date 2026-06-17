@@ -36,7 +36,7 @@ exports.addAuthMethod = function (user, method) {
 exports.issueTokens = async function (user, method, meta) {
   const { accessToken, refreshTokenRaw, family } = await buildAndStoreTokenPair(user);
 
-  // Persist only the family ID and lastLogin to MongoDB — no token values in DB
+  // Persist only the family ID and lastLogin to MongoDB - no token values in DB
   await User.findByIdAndUpdate(user._id, {
     $set: {
       refreshTokenFamily: family,
@@ -88,4 +88,27 @@ exports.fetchAuth0UserInfo = async function (accessToken) {
       'Could not fetch Auth0 user profile. Ensure email + profile scopes are granted.',
     );
   }
+};
+
+/**
+ * Extract login metadata from request.
+ */
+exports.getLoginMeta = function (req) {
+  return {
+    ip: req.clientIp || req.ip || 'Unknown',
+    device: req.userAgent || req.headers['user-agent'] || 'Unknown',
+    deviceId: req.body?.deviceId || null,
+  };
+};
+
+/**
+ * Safely sanitise user object before returning to client.
+ * toJSON transform on the model removes tokens/password
+ */
+exports.sanitiseUser = function (user) {
+  const obj = user.toJSON ? user.toJSON() : { ...user };
+  delete obj.password;
+  delete obj.tokens;
+  delete obj.pendingQr;
+  return obj;
 };

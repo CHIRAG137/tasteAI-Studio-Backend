@@ -6,7 +6,7 @@ const responseBuilder = require('../../utils/responseBuilder');
 const logger = require('../../utils/logger');
 
 /**
- * authMiddleware — protect routes requiring a valid session.
+ * authMiddleware - protect routes requiring a valid session.
  *
  * Validation order (fast-fail):
  *  1. JWT signature + expiry
@@ -18,7 +18,7 @@ exports.authMiddleware = async (req, res, next) => {
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    logger.warn('Auth failed — missing Authorization header', { ip: req.clientIp });
+    logger.warn('Auth failed - missing Authorization header', { ip: req.clientIp });
     return responseBuilder.unauthorized(res, null, 'Authentication required');
   }
 
@@ -29,7 +29,7 @@ exports.authMiddleware = async (req, res, next) => {
   try {
     decoded = verifyAccessToken(token);
   } catch (err) {
-    logger.warn('Auth failed — bad JWT', { error: err.message, ip: req.clientIp });
+    logger.warn('Auth failed - bad JWT', { error: err.message, ip: req.clientIp });
     return responseBuilder.unauthorized(res, null, 'Invalid or expired token');
   }
 
@@ -44,7 +44,7 @@ exports.authMiddleware = async (req, res, next) => {
   // If the stored value doesn't match → user logged out or logged in elsewhere.
   const sessionValid = await validateAccessToken(userId, token);
   if (!sessionValid) {
-    logger.warn('Auth failed — Redis session mismatch or evicted', { userId });
+    logger.warn('Auth failed - Redis session mismatch or evicted', { userId });
     return responseBuilder.unauthorized(
       res,
       null,
@@ -55,7 +55,7 @@ exports.authMiddleware = async (req, res, next) => {
   // Step 3: Load user from MongoDB for account flags + attaching to req
   const user = await User.findById(userId);
   if (!user) {
-    logger.warn('Auth failed — user not found in MongoDB', { userId });
+    logger.warn('Auth failed - user not found in MongoDB', { userId });
     return responseBuilder.unauthorized(res, null, 'User not found');
   }
 
@@ -72,7 +72,7 @@ exports.authMiddleware = async (req, res, next) => {
 };
 
 /**
- * optionalAuth — attach req.user if a valid session exists, never block.
+ * optionalAuth - attach req.user if a valid session exists, never block.
  */
 exports.optionalAuth = async (req, res, next) => {
   const authHeader = req.headers.authorization;
@@ -91,7 +91,7 @@ exports.optionalAuth = async (req, res, next) => {
       }
     }
   } catch (_) {
-    // silently skip — optional auth never blocks
+    // silently skip - optional auth never blocks
   }
   return next();
 };

@@ -45,7 +45,7 @@ exports.loginRules = [
 
   body('password').notEmpty().withMessage('Password is required'),
 
-  exports.validate,
+  validate,
 ];
 
 exports.googleLoginRules = [
