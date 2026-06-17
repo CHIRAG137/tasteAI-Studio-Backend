@@ -1,7 +1,7 @@
 'use strict';
 
 const authService = require('../services/authService');
-const { markQrScanned, pollQrStatus } = require('../services/qrService');
+const qrService = require('../services/qrService');
 const responseBuilder = require('../../utils/responseBuilder');
 const logger = require('../../utils/logger');
 
@@ -29,7 +29,7 @@ function sanitiseUser(user) {
 }
 
 /**
- * POST /auth/register
+ * POST /auth/user/register
  * Success (new user):    201 — { userId, sessionId, qrDataUrl, expiresAt }
  * Success (link method): 200 — { linked: true, userId }
  */
@@ -57,7 +57,7 @@ exports.registerUser = async (req, res) => {
 };
 
 /**
- * POST /auth/login
+ * POST /auth/user/login
  * Returns: { accessToken, refreshToken, user }
  */
 exports.loginUser = async (req, res) => {
@@ -81,7 +81,7 @@ exports.loginUser = async (req, res) => {
 };
 
 /**
- * POST /auth/google-login
+ * POST /auth/user/google-login
  * New user:  201 — { isNew, qrRequired, sessionId, qrDataUrl, expiresAt, user }
  * Existing:  200 — { accessToken, refreshToken, user }
  */
@@ -119,7 +119,7 @@ exports.googleLoginUser = async (req, res) => {
 };
 
 /**
- * POST /auth/auth0-login
+ * POST /auth/user/auth0-login
  */
 exports.auth0LoginUser = async (req, res) => {
   try {
@@ -155,7 +155,7 @@ exports.auth0LoginUser = async (req, res) => {
 };
 
 /**
- * POST /auth/refresh
+ * POST /auth/user/refresh
  */
 exports.refreshTokens = async (req, res) => {
   try {
@@ -169,7 +169,7 @@ exports.refreshTokens = async (req, res) => {
 };
 
 /**
- * POST /auth/logout
+ * POST /auth/user/logout
  * Requires: authMiddleware (req.user is set)
  */
 exports.logoutUser = async (req, res) => {
@@ -186,7 +186,7 @@ exports.logoutUser = async (req, res) => {
 };
 
 /**
- * POST /auth/verify-qr
+ * POST /auth/user/verify-qr
  * Called by the MOBILE APP after scanning the QR code. Activates the account and stores device info.
  * Body: { sessionId, phoneNumber?, countryCode? }
  * Device info is read from headers.
@@ -197,13 +197,13 @@ exports.verifyQr = async (req, res) => {
 
     const deviceInfo = {
       userAgent: req.userAgent || req.headers['user-agent'] || 'Unknown',
-      platform: req.headers['x-device-platform'] || null, // iOS / Android
+      platform: req.headers['x-device-platform'] || null,
       model: req.headers['x-device-model'] || null,
       os: req.headers['x-device-os'] || null,
       ip: req.clientIp,
     };
 
-    await markQrScanned({ sessionId, deviceInfo, phoneNumber, countryCode });
+    await qrService.markQrScanned({ sessionId, deviceInfo, phoneNumber, countryCode });
 
     return responseBuilder.ok(res, null, 'Mobile verified. Your account is now active.');
   } catch (err) {
@@ -213,14 +213,14 @@ exports.verifyQr = async (req, res) => {
 };
 
 /**
- * GET /auth/qr-status/:sessionId
+ * GET /auth/user/qr-status/:sessionId
  * Called by the WEB CLIENT to poll for scan status.
  * Returns { status: 'pending' | 'scanned' | 'expired' }
  */
 exports.pollQrStatus = async (req, res) => {
   try {
     const { sessionId } = req.params;
-    const result = await pollQrStatus(sessionId);
+    const result = await qrService.pollQrStatus(sessionId);
     return responseBuilder.ok(res, result, 'QR status fetched');
   } catch (err) {
     logger.error('QR status poll failed', { error: err.message });
@@ -229,7 +229,7 @@ exports.pollQrStatus = async (req, res) => {
 };
 
 /**
- * GET /auth/me
+ * GET /auth/user/me
  * Returns the authenticated user's profile.
  */
 exports.getMe = async (req, res) => {

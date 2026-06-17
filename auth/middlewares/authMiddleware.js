@@ -9,13 +9,10 @@ const logger = require('../../utils/logger');
  * authMiddleware — protect routes requiring a valid session.
  *
  * Validation order (fast-fail):
- *  1. JWT signature + expiry (cryptographic, no I/O)
+ *  1. JWT signature + expiry
  *  2. Token type check
- *  3. Redis single-session check — O(1), sub-millisecond
- *  4. MongoDB user load — only if Redis passes (for isActive/isBanned/req.user)
- *
- * This means banned/inactive checks still require a MongoDB read,
- * but the hot-path token validation never touches MongoDB.
+ *  3. Redis single-session check
+ *  4. MongoDB user load
  */
 exports.authMiddleware = async (req, res, next) => {
   const authHeader = req.headers.authorization;
@@ -27,7 +24,7 @@ exports.authMiddleware = async (req, res, next) => {
 
   const token = authHeader.split(' ')[1];
 
-  // Step 1: Verify JWT signature + expiry (pure crypto, no I/O)
+  // Step 1: Verify JWT signature + expiry
   let decoded;
   try {
     decoded = verifyAccessToken(token);
@@ -42,7 +39,7 @@ exports.authMiddleware = async (req, res, next) => {
 
   const userId = decoded.sub;
 
-  // Step 2: Redis single-session enforcement — O(1)
+  // Step 2: Redis single-session enforcement
   // Redis key access:<userId> stores the current valid access token.
   // If the stored value doesn't match → user logged out or logged in elsewhere.
   const sessionValid = await validateAccessToken(userId, token);
