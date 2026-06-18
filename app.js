@@ -2,6 +2,10 @@ const dns = require('dns');
 
 dns.setDefaultResultOrder('ipv4first');
 require('dotenv').config();
+
+// Fail fast on startup if required env vars are missing
+const { validateEnv } = require('./src/config/env');
+validateEnv();
 const { initPhoenixTracing, shutdownPhoenixTracing } = require('./config/phoenixTracing');
 
 initPhoenixTracing();
@@ -15,7 +19,7 @@ const botRoutes = require('./routes/botRoutes');
 const crawlRoutes = require('./routes/crawlRoutes');
 const slackRoutes = require('./routes/slackRoutes');
 const authRoutes = require('./routes/authRoutes');
-const authRoutesV2 = require('./auth/routes/authRoutes');
+const { getContainer } = require('./src/config/dependencyContainer');
 const flowRoutes = require('./routes/flowRoutes');
 const summarizeRoutes = require('./routes/summarizeRoutes');
 const elevenlabsRoutes = require('./routes/elevenlabsRoutes');
@@ -132,7 +136,9 @@ app.use('/api/handoff', handoffRoutes);
 app.use('/api/issue-reports', issueReportRoutes);
 app.use('/api/visitor-auth', visitorAuthRoutes);
 app.use('/api/user', userRoutes);
-app.use('/api/auth/user', authRoutesV2);
+// New Clean-Architecture auth module (mobile QR + JWT flows)
+const { authModule } = getContainer();
+app.use('/api/auth/user', authModule.router);
 app.get('/widget.js', (req, res) => {
   res.sendFile(path.join(__dirname, 'public/widget.js'));
 });
@@ -145,6 +151,10 @@ app.get('/api/keep-alive', (req, res) => {
     uptime: Math.floor(process.uptime()),
   });
 });
+
+// Global error handler — MUST be registered after all routes
+const globalErrorHandler = require('./src/modules/shared/middleware/errorHandler');
+app.use(globalErrorHandler);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
