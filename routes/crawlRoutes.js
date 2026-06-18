@@ -1,5 +1,5 @@
 const express = require('express');
-const crawlController = require('../../controllers/crawlController');
+const crawlController = require('../controllers/crawlController');
 
 const router = express.Router();
 
