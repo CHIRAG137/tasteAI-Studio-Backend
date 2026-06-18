@@ -15,7 +15,7 @@ const botRoutes = require('./routes/botRoutes');
 const crawlRoutes = require('./routes/crawlRoutes');
 const slackRoutes = require('./routes/slackRoutes');
 const authRoutes = require('./routes/authRoutes');
-const authRoutesV2 = require('./auth/routes/authRoutes');
+const authModule = require('./src/config/dependencyContainer');
 const flowRoutes = require('./routes/flowRoutes');
 const summarizeRoutes = require('./routes/summarizeRoutes');
 const elevenlabsRoutes = require('./routes/elevenlabsRoutes');
@@ -132,7 +132,7 @@ app.use('/api/handoff', handoffRoutes);
 app.use('/api/issue-reports', issueReportRoutes);
 app.use('/api/visitor-auth', visitorAuthRoutes);
 app.use('/api/user', userRoutes);
-app.use('/api/auth/user', authRoutesV2);
+app.use('/api/auth/user', authModule.router);
 app.get('/widget.js', (req, res) => {
   res.sendFile(path.join(__dirname, 'public/widget.js'));
 });
