@@ -57,13 +57,22 @@ function createAuthModule() {
   const eventBus = new InMemoryEventBus();
 
   // ── Auth Providers (Strategy pattern) ─────────────────────────────────────
+  // Providers are registered conditionally — the app starts cleanly even when
+  // optional OAuth credentials (GOOGLE_CLIENT_ID, AUTH0_DOMAIN) are absent.
   const authProviderFactory = new AuthProviderFactory();
 
+  // Email + password is always available
   authProviderFactory.register(new EmailPasswordAuthProvider(userRepository, passwordHasher));
 
-  authProviderFactory.register(new GoogleAuthProvider(googleClient(), googleClientId()));
+  // Google OAuth — only registered when GOOGLE_CLIENT_ID is configured
+  if (env.GOOGLE_CLIENT_ID) {
+    authProviderFactory.register(new GoogleAuthProvider(googleClient(), googleClientId()));
+  }
 
-  authProviderFactory.register(new Auth0AuthProvider(verifyAuth0AccessToken, env.AUTH0_DOMAIN));
+  // Auth0 — only registered when AUTH0_DOMAIN is configured
+  if (env.AUTH0_DOMAIN) {
+    authProviderFactory.register(new Auth0AuthProvider(verifyAuth0AccessToken, env.AUTH0_DOMAIN));
+  }
 
   // ── Use Cases ──────────────────────────────────────────────────────────────
   const registerUserUseCase = new RegisterUserUseCase({
