@@ -132,10 +132,14 @@ class AuthController {
   };
 
   verifyQr = async (req, res) => {
+    const sessionId = req.body?.sessionId || req.query?.sessionId;
+    const phoneNumber = req.body?.phoneNumber || req.query?.phoneNumber;
+    const countryCode = req.body?.countryCode || req.query?.countryCode;
+
     const command = new VerifyQrCommand({
-      sessionId: req.body.sessionId,
-      phoneNumber: req.body.phoneNumber,
-      countryCode: req.body.countryCode,
+      sessionId,
+      phoneNumber,
+      countryCode,
       deviceInfo: {
         userAgent: req.userAgent || req.headers['user-agent'] || 'Unknown',
         platform: req.headers['x-device-platform'] || null,
@@ -146,6 +150,34 @@ class AuthController {
     });
 
     await this.verifyQrUseCase.execute(command);
+
+    if (req.method === 'GET') {
+      res.setHeader('Content-Type', 'text/html');
+      return res.status(200).send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Account Verified</title>
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #f3f4f6; color: #1f2937; }
+            .card { text-align: center; padding: 2.5rem; background: white; border-radius: 1.5rem; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04); border: 1px solid #e5e7eb; max-width: 90%; width: 400px; }
+            .icon-wrapper { display: inline-flex; align-items: center; justify-content: center; width: 4rem; height: 4rem; background-color: #d1fae5; color: #059669; border-radius: 9999px; margin-bottom: 1.5rem; font-size: 2rem; font-weight: bold; }
+            h1 { font-size: 1.75rem; margin: 0 0 0.75rem 0; font-weight: 800; color: #111827; }
+            p { color: #4b5563; font-size: 1rem; line-height: 1.6; margin: 0; }
+          </style>
+        </head>
+        <body>
+          <div class="card">
+            <div class="icon-wrapper">✓</div>
+            <h1>Account Activated!</h1>
+            <p>Your mobile device has verified your session successfully. You can now return to the screen to sign in to your new account.</p>
+          </div>
+        </body>
+        </html>
+      `);
+    }
+
     return ApiResponse.success(res, null, 'Mobile verified. Your account is now active.');
   };
 

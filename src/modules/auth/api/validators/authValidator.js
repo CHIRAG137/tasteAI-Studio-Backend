@@ -1,6 +1,6 @@
 'use strict';
 
-const { body, param, validationResult } = require('express-validator');
+const { body, param, check, validationResult } = require('express-validator');
 const ApiResponse = require('../../../shared/response/ApiResponse');
 
 /**
@@ -63,8 +63,8 @@ exports.refreshRules = [
 ];
 
 exports.qrVerifyRules = [
-  body('sessionId').notEmpty().withMessage('sessionId is required'),
-  body('phoneNumber')
+  check('sessionId').notEmpty().withMessage('sessionId is required'),
+  check('phoneNumber')
     .optional()
     .matches(/^\+[1-9]\d{7,14}$/)
     .withMessage('phoneNumber must be in E.164 format (e.g. +12223334444)'),

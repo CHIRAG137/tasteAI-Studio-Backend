@@ -93,6 +93,14 @@ module.exports = function createAuthRoutes({ authController, authMiddleware }) {
   );
 
   router.get(
+    '/verify-qr',
+    attachIpAddress,
+    qrLimiter,
+    authValidator.qrVerifyRules,
+    asyncHandler(authController.verifyQr),
+  );
+
+  router.get(
     '/qr-status/:sessionId',
     qrLimiter,
     authValidator.qrPollRules,
