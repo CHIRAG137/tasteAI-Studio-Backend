@@ -33,8 +33,9 @@ const Auth0AuthProvider = require('./infrastructure/oauth/Auth0AuthProvider');
 const InMemoryEventBus = require('./infrastructure/eventbus/InMemoryEventBus');
 
 // ── Auth Config ───────────────────────────────────────────────────────────────
-const { googleClient, clientId: googleClientId } = require('./config/googleOAuthClient');
-const { verifyAuth0AccessToken } = require('./config/auth0Client');
+const GoogleOAuthClient = require('./config/GoogleOAuthClient');
+const Auth0Client = require('./config/Auth0Client');
+const RedisClient = require('./config/RedisClient');
 const { env } = require('../../config/env');
 
 // ── Application — Use Cases ───────────────────────────────────────────────────
@@ -75,18 +76,24 @@ const createAuthRoutes = require('./api/routes/auth.routes');
  *     └─ GetCurrentUserUseCase
  *   AuthProviderFactory
  *     └─ LoginUserUseCase, OAuthLoginUseCase
- *
  * @returns {object} Public module surface: { router, authMiddleware, services... }
  */
 function createAuthModule() {
   // ── Infrastructure layer ────────────────────────────────────────────────────
 
-  // Redis
-  const redisClient = new AuthRedisClient();
+  // Redis (Auth-scoped class instance)
+  const redisClient = new RedisClient({
+    host: env.REDIS_HOST,
+    port: env.REDIS_PORT,
+    password: env.REDIS_PASSWORD,
+    tls: env.REDIS_TLS,
+    url: env.REDIS_URL,
+  });
+  const authRedisClient = new AuthRedisClient(redisClient);
 
   // Token crypto + session persistence
   const jwtSigner = new JwtSigner();
-  const tokenStore = new AuthTokenStore(redisClient);
+  const tokenStore = new AuthTokenStore(authRedisClient);
 
   // Persistence
   const userRepository = new MongoUserRepository();
@@ -95,7 +102,7 @@ function createAuthModule() {
   const passwordHasher = new BcryptPasswordHasher();
   const tokenService = new JwtTokenService(userRepository, jwtSigner, tokenStore);
   const sessionService = new RedisSessionService(tokenStore);
-  const qrService = new RedisQrService(userRepository, redisClient);
+  const qrService = new RedisQrService(userRepository, authRedisClient);
   const eventBus = new InMemoryEventBus();
 
   // ── Auth Providers (Strategy pattern) ──────────────────────────────────────
@@ -108,12 +115,17 @@ function createAuthModule() {
 
   // Google OAuth — only when GOOGLE_CLIENT_ID is configured
   if (env.GOOGLE_CLIENT_ID) {
-    authProviderFactory.register(new GoogleAuthProvider(googleClient(), googleClientId()));
+    const googleOAuthClient = new GoogleOAuthClient({ clientId: env.GOOGLE_CLIENT_ID });
+    authProviderFactory.register(new GoogleAuthProvider(googleOAuthClient));
   }
 
   // Auth0 — only when AUTH0_DOMAIN is configured
   if (env.AUTH0_DOMAIN) {
-    authProviderFactory.register(new Auth0AuthProvider(verifyAuth0AccessToken, env.AUTH0_DOMAIN));
+    const auth0Client = new Auth0Client({
+      domain: env.AUTH0_DOMAIN,
+      audience: env.AUTH0_AUDIENCE,
+    });
+    authProviderFactory.register(new Auth0AuthProvider(auth0Client));
   }
 
   // ── Application layer (Use Cases) ──────────────────────────────────────────

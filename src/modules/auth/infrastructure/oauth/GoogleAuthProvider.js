@@ -18,13 +18,11 @@ const logger = require('../../../shared/logging');
  */
 class GoogleAuthProvider extends IAuthProvider {
   /**
-   * @param {import('google-auth-library').OAuth2Client} googleClient
-   * @param {string} clientId - GOOGLE_CLIENT_ID, injected from config
+   * @param {import('../../config/GoogleOAuthClient')} googleOAuthClient
    */
-  constructor(googleClient, clientId) {
+  constructor(googleOAuthClient) {
     super();
-    this.googleClient = googleClient;
-    this.clientId = clientId;
+    this.googleOAuthClient = googleOAuthClient;
   }
 
   getType() {
@@ -40,11 +38,7 @@ class GoogleAuthProvider extends IAuthProvider {
   async _resolvePayload(token) {
     // Strategy 1: ID token verification (most secure)
     try {
-      const ticket = await this.googleClient.verifyIdToken({
-        idToken: token,
-        audience: this.clientId,
-      });
-      return ticket.getPayload();
+      return await this.googleOAuthClient.verifyIdToken(token);
     } catch (err) {
       logger.debug('Google ID token verification failed — trying userinfo', { error: err.message });
     }

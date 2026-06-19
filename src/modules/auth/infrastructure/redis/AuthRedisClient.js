@@ -1,25 +1,34 @@
 'use strict';
 
 const IRedisClient = require('./IRedisClient');
-const { getRedis } = require('../../../../../config/redisClient');
 const logger = require('../../../shared/logging');
 
 /**
  * Concrete adapter that fulfils the IRedisClient contract for the auth module.
  *
- * Wraps the shared `config/redisClient.getRedis()` lazy singleton so that:
+ * Injects the auth-scoped class-based RedisClient so that:
  *   - The auth module depends only on its own IRedisClient abstraction
- *   - The root-level Redis connection is still shared across the process
- *   - Swapping the underlying Redis lib requires changing only this file
+ *   - Swapping the underlying Redis client requires changing only this file
  */
 class AuthRedisClient extends IRedisClient {
+  /**
+   * @param {import('../../config/RedisClient')} redisClient - Auth-scoped Redis client
+   */
+  constructor(redisClient) {
+    super();
+    if (!redisClient) {
+      throw new Error('[AuthRedisClient] redisClient instance is required');
+    }
+    this._redisClient = redisClient;
+  }
+
   /**
    * Returns the shared Redis connection, establishing it on first call.
    * @private
    * @returns {Promise<import('redis').RedisClientType>}
    */
   async _client() {
-    return getRedis();
+    return this._redisClient.getClient();
   }
 
   /** @override */

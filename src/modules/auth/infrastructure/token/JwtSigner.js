@@ -16,7 +16,7 @@ const { env } = require('../../../../config/env');
  */
 class JwtSigner {
   // ── Access token TTL constants ────────────────────────────────────────────
-  static ACCESS_TOKEN_EXPIRY_S = 15 * 60;         // 15 min in seconds (Redis TTL)
+  static ACCESS_TOKEN_EXPIRY_S = 15 * 60; // 15 min in seconds (Redis TTL)
   static REFRESH_TOKEN_EXPIRY_S = 30 * 24 * 60 * 60; // 30 days in seconds (Redis TTL)
 
   /**

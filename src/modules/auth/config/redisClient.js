@@ -1,46 +1,91 @@
 'use strict';
 
 const { createClient } = require('redis');
-const logger = require('../utils/logger');
+const logger = require('../../shared/logging');
 
-let _client = null;
-
-async function getRedis() {
-  if (_client && _client.isOpen) {
-    return _client;
+/**
+ * Object-oriented wrapper for the Redis client SDK scoped exclusively to the Auth module.
+ * Encapsulates connection lifecycle management, reconnect strategy, and error handling.
+ */
+class RedisClient {
+  /**
+   * @param {object} options
+   * @param {string} [options.host] - Redis host (optional, preferred over URL)
+   * @param {number} [options.port] - Redis port (optional)
+   * @param {string} [options.password] - Redis password (optional)
+   * @param {boolean} [options.tls] - Force TLS connection (optional)
+   * @param {string} [options.url] - Fallback Redis connection URL
+   */
+  constructor({ host, port, password, tls, url } = {}) {
+    this._host = host;
+    this._port = port;
+    this._password = password;
+    this._tls = tls;
+    this._url = url;
+    this._client = null;
   }
 
-  _client = createClient({
-    socket: {
-      host: process.env.REDIS_HOST,
-      port: parseInt(process.env.REDIS_PORT, 10),
-      tls: false, // ← plain connection for Redis Cloud free tier
-      reconnectStrategy: (retries) => {
-        if (retries > 10) {
-          logger.error('Redis: too many reconnect attempts, giving up');
-          return new Error('Redis reconnect limit reached');
+  /**
+   * Returns the connected Redis client, connecting on first call.
+   *
+   * @returns {Promise<import('redis').RedisClientType>}
+   */
+  async getClient() {
+    if (this._client && this._client.isOpen) {
+      return this._client;
+    }
+
+    const socketConfig = this._host
+      ? {
+          host: this._host,
+          port: this._port,
+          tls: this._tls,
+          reconnectStrategy: this._reconnectStrategy.bind(this),
         }
-        return Math.min(retries * 100, 3000);
-      },
-    },
-    password: process.env.REDIS_PASSWORD,
-  });
+      : undefined;
 
-  _client.on('error', (err) => console.error('Redis Error:', err.message));
-  _client.on('connect', () => logger.info('Redis connected'));
-  _client.on('reconnecting', () => logger.warn('Redis reconnecting'));
-  _client.on('ready', () => logger.info('Redis ready'));
+    this._client = createClient({
+      ...(socketConfig ? { socket: socketConfig } : { url: this._url }),
+      ...(this._password ? { password: this._password } : {}),
+    });
 
-  await _client.connect();
-  return _client;
-}
+    this._client.on('error', (err) => {
+      logger.error('[Auth Redis] Connection error:', { error: err.message });
+    });
+    this._client.on('connect', () => logger.info('[Auth Redis] Connecting...'));
+    this._client.on('ready', () => logger.info('[Auth Redis] Ready'));
+    this._client.on('reconnecting', () => logger.warn('[Auth Redis] Reconnecting...'));
+    this._client.on('end', () => logger.warn('[Auth Redis] Connection closed'));
 
-async function closeRedis() {
-  if (_client) {
-    await _client.quit();
-    _client = null;
-    logger.info('Redis connection closed');
+    await this._client.connect();
+    return this._client;
+  }
+
+  /**
+   * Gracefully closes the Redis connection.
+   */
+  async close() {
+    if (this._client) {
+      await this._client.quit();
+      this._client = null;
+      logger.info('[Auth Redis] Connection closed gracefully');
+    }
+  }
+
+  /**
+   * Reconnect back-off: exponential up to 3s, give up after 10 retries.
+   *
+   * @private
+   * @param {number} retries
+   * @returns {number|Error}
+   */
+  _reconnectStrategy(retries) {
+    if (retries > 10) {
+      logger.error('[Auth Redis] Too many reconnect attempts — giving up');
+      return new Error('Redis reconnect limit reached');
+    }
+    return Math.min(retries * 200, 3000);
   }
 }
 
-module.exports = { getRedis, closeRedis };
+module.exports = RedisClient;

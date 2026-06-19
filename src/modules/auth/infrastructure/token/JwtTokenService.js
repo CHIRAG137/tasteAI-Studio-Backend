@@ -55,7 +55,11 @@ class JwtTokenService extends ITokenService {
    */
   async issue(user, method = 'email_password', meta = {}) {
     const accessToken = this.jwtSigner.signAccessToken(user.id, user.email);
-    const { raw: refreshTokenRaw, hashed: refreshHashed, family } = this.jwtSigner.createRefreshToken();
+    const {
+      raw: refreshTokenRaw,
+      hashed: refreshHashed,
+      family,
+    } = this.jwtSigner.createRefreshToken();
 
     await this.tokenStore.storeTokenPair({
       userId: user.id,
@@ -133,7 +137,11 @@ class JwtTokenService extends ITokenService {
     await this.tokenStore.deleteRefresh(hashedToken);
 
     const accessToken = this.jwtSigner.signAccessToken(userId, user.email);
-    const { raw: refreshTokenRaw, hashed: newRefreshHashed, family } = this.jwtSigner.createRefreshToken();
+    const {
+      raw: refreshTokenRaw,
+      hashed: newRefreshHashed,
+      family,
+    } = this.jwtSigner.createRefreshToken();
 
     await this.tokenStore.storeTokenPair({
       userId,
@@ -164,9 +172,7 @@ class JwtTokenService extends ITokenService {
    */
   async revoke(userId, rawRefreshToken) {
     const user = await this.userRepository.findById(userId);
-    const hashedToken = rawRefreshToken
-      ? this.jwtSigner.hashRefreshToken(rawRefreshToken)
-      : null;
+    const hashedToken = rawRefreshToken ? this.jwtSigner.hashRefreshToken(rawRefreshToken) : null;
     const family = user?.refreshTokenFamily || null;
 
     await this.tokenStore.clearSession(userId, hashedToken, family);

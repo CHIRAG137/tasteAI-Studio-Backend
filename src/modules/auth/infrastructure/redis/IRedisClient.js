@@ -17,7 +17,9 @@ class IRedisClient {
    * @returns {Promise<string | null>}
    */
   // eslint-disable-next-line no-unused-vars
-  async get(key) { throw new Error(`${this.constructor.name}.get() not implemented`); }
+  async get(key) {
+    throw new Error(`${this.constructor.name}.get() not implemented`);
+  }
 
   /**
    * Set a key to a string value with optional TTL.
@@ -27,7 +29,9 @@ class IRedisClient {
    * @returns {Promise<void>}
    */
   // eslint-disable-next-line no-unused-vars
-  async set(key, value, options) { throw new Error(`${this.constructor.name}.set() not implemented`); }
+  async set(key, value, options) {
+    throw new Error(`${this.constructor.name}.set() not implemented`);
+  }
 
   /**
    * Delete one or more keys.
@@ -35,7 +39,9 @@ class IRedisClient {
    * @returns {Promise<void>}
    */
   // eslint-disable-next-line no-unused-vars
-  async del(...keys) { throw new Error(`${this.constructor.name}.del() not implemented`); }
+  async del(...keys) {
+    throw new Error(`${this.constructor.name}.del() not implemented`);
+  }
 
   /**
    * Execute multiple commands in a single round-trip (pipeline).
@@ -43,7 +49,9 @@ class IRedisClient {
    * @returns {Promise<void>}
    */
   // eslint-disable-next-line no-unused-vars
-  async pipeline(operations) { throw new Error(`${this.constructor.name}.pipeline() not implemented`); }
+  async pipeline(operations) {
+    throw new Error(`${this.constructor.name}.pipeline() not implemented`);
+  }
 }
 
 module.exports = IRedisClient;

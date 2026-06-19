@@ -37,21 +37,27 @@ function isExpired(date) {
  * @deprecated Use src/modules/auth/infrastructure/token/JwtSigner instead
  */
 function createAccessToken() {
-  throw new Error('[tokenUtils] createAccessToken() is deprecated. Use JwtSigner.signAccessToken()');
+  throw new Error(
+    '[tokenUtils] createAccessToken() is deprecated. Use JwtSigner.signAccessToken()',
+  );
 }
 
 /**
  * @deprecated Use src/modules/auth/infrastructure/token/JwtSigner instead
  */
 function verifyAccessToken() {
-  throw new Error('[tokenUtils] verifyAccessToken() is deprecated. Use JwtSigner.verifyAccessToken()');
+  throw new Error(
+    '[tokenUtils] verifyAccessToken() is deprecated. Use JwtSigner.verifyAccessToken()',
+  );
 }
 
 /**
  * @deprecated Use src/modules/auth/infrastructure/token/AuthTokenStore instead
  */
 function buildAndStoreTokenPair() {
-  throw new Error('[tokenUtils] buildAndStoreTokenPair() is deprecated. Use JwtTokenService.issue()');
+  throw new Error(
+    '[tokenUtils] buildAndStoreTokenPair() is deprecated. Use JwtTokenService.issue()',
+  );
 }
 
 module.exports = {

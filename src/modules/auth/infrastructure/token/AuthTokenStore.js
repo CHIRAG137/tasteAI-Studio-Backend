@@ -41,15 +41,27 @@ class AuthTokenStore {
     await this.redis.pipeline([
       {
         cmd: 'set',
-        args: [AuthRedisKeyScheme.access(userId), accessToken, { EX: JwtSigner.ACCESS_TOKEN_EXPIRY_S }],
+        args: [
+          AuthRedisKeyScheme.access(userId),
+          accessToken,
+          { EX: JwtSigner.ACCESS_TOKEN_EXPIRY_S },
+        ],
       },
       {
         cmd: 'set',
-        args: [AuthRedisKeyScheme.refresh(refreshHashed), userId.toString(), { EX: JwtSigner.REFRESH_TOKEN_EXPIRY_S }],
+        args: [
+          AuthRedisKeyScheme.refresh(refreshHashed),
+          userId.toString(),
+          { EX: JwtSigner.REFRESH_TOKEN_EXPIRY_S },
+        ],
       },
       {
         cmd: 'set',
-        args: [AuthRedisKeyScheme.family(family), userId.toString(), { EX: JwtSigner.REFRESH_TOKEN_EXPIRY_S }],
+        args: [
+          AuthRedisKeyScheme.family(family),
+          userId.toString(),
+          { EX: JwtSigner.REFRESH_TOKEN_EXPIRY_S },
+        ],
       },
     ]);
   }
