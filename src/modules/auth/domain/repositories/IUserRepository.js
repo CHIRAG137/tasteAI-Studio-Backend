@@ -1,7 +1,8 @@
 'use strict';
 
 /**
- * Updated IUserRepository interface — adds findByPhone.
+ * Interface representing User repository.
+ * @interface
  */
 class IUserRepository {
   async findById(id) {

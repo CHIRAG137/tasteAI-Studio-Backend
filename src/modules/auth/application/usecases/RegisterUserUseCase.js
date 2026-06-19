@@ -5,7 +5,7 @@ const User = require('../../domain/entities/User');
 const AuthProviderTypes = require('../../domain/providers/AuthProviderTypes');
 const UserRegisteredEvent = require('../../domain/events/UserRegisteredEvent');
 const AccountExistsException = require('../../domain/exceptions/AccountExistsException');
-const AuthResponseMapper = require('../mapper/AuthResponseMapper');
+const AuthResponseMapper = require('../mappers/AuthResponseMapper');
 const logger = require('../../../shared/logging');
 
 /**
@@ -49,21 +49,22 @@ class RegisterUserUseCase extends BaseUseCase {
    * Either links the password to an OAuth-only account, or throws if already registered.
    */
   async _handleExistingUser(existingUser, email, command) {
-    const { doc } = await this.userRepository.findByEmailWithPassword(email);
+    const userWithPwd = await this.userRepository.findByEmailWithPassword(email);
 
     // Already has a password → account fully exists → reject
-    if (doc?.password) {
+    if (userWithPwd?.password) {
       throw new AccountExistsException();
     }
 
     // OAuth-only account → link password
     if (!existingUser.hasAuthMethod(AuthProviderTypes.EMAIL_PASSWORD)) {
+      existingUser.addAuthMethod(AuthProviderTypes.EMAIL_PASSWORD);
       const hashedPassword = await this.passwordHasher.hash(command.password);
 
       await this.userRepository.update(existingUser.id, {
         password: hashedPassword,
+        authMethods: existingUser.authMethods,
         ...(command.name && !existingUser.name ? { name: command.name } : {}),
-        $addToSet: { authMethods: AuthProviderTypes.EMAIL_PASSWORD },
       });
 
       this.eventBus.publish(new UserRegisteredEvent(existingUser.id));

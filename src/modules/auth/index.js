@@ -2,22 +2,22 @@
 
 const AuthProviderFactory = require('./domain/factories/AuthProviderFactory');
 const AuthProviderTypes = require('./domain/providers/AuthProviderTypes');
-
-const MongoUserRepository = require('./infrastructure/persistence/MongoUserRepository');
-const RedisSessionService = require('./infrastructure/cache/RedisSessionService');
+const AuthRedisClient = require('./infrastructure/redis/AuthRedisClient');
+const JwtSigner = require('./infrastructure/token/JwtSigner');
+const AuthTokenStore = require('./infrastructure/token/AuthTokenStore');
 const JwtTokenService = require('./infrastructure/token/JwtTokenService');
+const RedisSessionService = require('./infrastructure/cache/RedisSessionService');
 const RedisQrService = require('./infrastructure/qr/RedisQrService');
-const InMemoryEventBus = require('./infrastructure/eventbus/InMemoryEventBus');
+const MongoUserRepository = require('./infrastructure/persistence/MongoUserRepository');
 const BcryptPasswordHasher = require('./infrastructure/security/BcryptPasswordHasher');
-
 const EmailPasswordAuthProvider = require('./infrastructure/oauth/EmailPasswordAuthProvider');
 const GoogleAuthProvider = require('./infrastructure/oauth/GoogleAuthProvider');
 const Auth0AuthProvider = require('./infrastructure/oauth/Auth0AuthProvider');
-
-const { googleClient, clientId: googleClientId } = require('./config/googleOAuthClient');
-const { verifyAuth0AccessToken } = require('./config/auth0Client');
+const InMemoryEventBus = require('./infrastructure/eventbus/InMemoryEventBus');
+const GoogleOAuthClient = require('./config/GoogleOAuthClient');
+const Auth0Client = require('./config/Auth0Client');
+const RedisClient = require('./config/RedisClient');
 const { env } = require('../../config/env');
-
 const RegisterUserUseCase = require('./application/usecases/RegisterUserUseCase');
 const LoginUserUseCase = require('./application/usecases/LoginUserUseCase');
 const OAuthLoginUseCase = require('./application/usecases/OAuthLoginUseCase');
@@ -25,61 +25,57 @@ const RefreshTokenUseCase = require('./application/usecases/RefreshTokenUseCase'
 const LogoutUserUseCase = require('./application/usecases/LogoutUserUseCase');
 const VerifyQrUseCase = require('./application/usecases/VerifyQrUseCase');
 const PollQrStatusUseCase = require('./application/usecases/PollQrStatusUseCase');
-const GetCurrentUserUseCase = require('./application/queries/GetCurrentUserUseCase');
-
+const GetCurrentUserQuery = require('./application/queries/GetCurrentUserQuery');
 const AuthController = require('./api/controllers/AuthController');
-const AuthMiddleware = require('./middleware/AuthMiddleware');
-const createAuthRoutes = require('./api/routes/auth.routes');
+const AuthMiddleware = require('./api/middleware/AuthMiddleware');
+const createAuthRoutes = require('./api/routes/AuthRoutes');
 
 /**
- * Factory that wires up and returns the fully composed auth module.
+ * Composition root for the authentication module.
+ * Wires all domain, application, and infrastructure dependencies using constructor injection.
  *
- * All dependency injection happens here — no module imports its own concrete
- * implementations directly. This keeps each layer testable in isolation.
- *
- * Returns the public surface of the module:
- *   - router       → mount on the Express app
- *   - authMiddleware → use on other modules' protected routes
- *   - services     → expose for cross-module use (e.g. token validation)
- *
- * @returns {object}
+ * @returns {object} Public module interface containing the Express router, middleware, and core services.
  */
 function createAuthModule() {
-  // ── Infrastructure ─────────────────────────────────────────────────────────
+  const redisClient = new RedisClient({
+    host: env.REDIS_HOST,
+    port: env.REDIS_PORT,
+    password: env.REDIS_PASSWORD,
+    tls: env.REDIS_TLS,
+    url: env.REDIS_URL,
+  });
+  const authRedisClient = new AuthRedisClient(redisClient);
+
+  const jwtSigner = new JwtSigner();
+  const tokenStore = new AuthTokenStore(authRedisClient);
   const userRepository = new MongoUserRepository();
   const passwordHasher = new BcryptPasswordHasher();
-  const sessionService = new RedisSessionService();
-
-  // JwtTokenService and RedisQrService now receive userRepository
-  // so they never import UserModel directly.
-  const tokenService = new JwtTokenService(userRepository);
-  const qrService = new RedisQrService(userRepository);
+  const tokenService = new JwtTokenService(userRepository, jwtSigner, tokenStore);
+  const sessionService = new RedisSessionService(tokenStore);
+  const qrService = new RedisQrService(userRepository, authRedisClient);
   const eventBus = new InMemoryEventBus();
 
-  // ── Auth Providers (Strategy pattern) ─────────────────────────────────────
-  // Providers are registered conditionally — the app starts cleanly even when
-  // optional OAuth credentials (GOOGLE_CLIENT_ID, AUTH0_DOMAIN) are absent.
   const authProviderFactory = new AuthProviderFactory();
-
-  // Email + password is always available
   authProviderFactory.register(new EmailPasswordAuthProvider(userRepository, passwordHasher));
 
-  // Google OAuth — only registered when GOOGLE_CLIENT_ID is configured
   if (env.GOOGLE_CLIENT_ID) {
-    authProviderFactory.register(new GoogleAuthProvider(googleClient(), googleClientId()));
+    const googleOAuthClient = new GoogleOAuthClient({ clientId: env.GOOGLE_CLIENT_ID });
+    authProviderFactory.register(new GoogleAuthProvider(googleOAuthClient));
   }
 
-  // Auth0 — only registered when AUTH0_DOMAIN is configured
   if (env.AUTH0_DOMAIN) {
-    authProviderFactory.register(new Auth0AuthProvider(verifyAuth0AccessToken, env.AUTH0_DOMAIN));
+    const auth0Client = new Auth0Client({
+      domain: env.AUTH0_DOMAIN,
+      audience: env.AUTH0_AUDIENCE,
+    });
+    authProviderFactory.register(new Auth0AuthProvider(auth0Client));
   }
 
-  // ── Use Cases ──────────────────────────────────────────────────────────────
   const registerUserUseCase = new RegisterUserUseCase({
     userRepository,
     qrService,
     eventBus,
-    passwordHasher, // application layer uses the IPasswordHasher port
+    passwordHasher,
   });
 
   const loginUserUseCase = new LoginUserUseCase({
@@ -100,9 +96,8 @@ function createAuthModule() {
   const logoutUserUseCase = new LogoutUserUseCase({ tokenService, eventBus });
   const verifyQrUseCase = new VerifyQrUseCase({ qrService });
   const pollQrStatusUseCase = new PollQrStatusUseCase({ qrService });
-  const getCurrentUserUseCase = new GetCurrentUserUseCase({ userRepository });
+  const getCurrentUserUseCase = new GetCurrentUserQuery({ userRepository });
 
-  // ── API Layer ──────────────────────────────────────────────────────────────
   const authController = new AuthController({
     loginUserUseCase,
     registerUserUseCase,
@@ -122,15 +117,15 @@ function createAuthModule() {
 
   const router = createAuthRoutes({ authController, authMiddleware });
 
-  // ── Public Module Surface ──────────────────────────────────────────────────
   return {
     router,
     authMiddleware,
-    // Expose services for use by other modules
     userRepository,
     tokenService,
     sessionService,
     qrService,
+    tokenStore,
+    jwtSigner,
     eventBus,
     authProviderFactory,
   };

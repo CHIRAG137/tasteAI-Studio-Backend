@@ -5,6 +5,7 @@ require('dotenv').config();
 
 // Fail fast on startup if required env vars are missing
 const { validateEnv } = require('./src/config/env');
+
 validateEnv();
 const { initPhoenixTracing, shutdownPhoenixTracing } = require('./config/phoenixTracing');
 
@@ -154,6 +155,7 @@ app.get('/api/keep-alive', (req, res) => {
 
 // Global error handler — MUST be registered after all routes
 const globalErrorHandler = require('./src/modules/shared/middleware/errorHandler');
+
 app.use(globalErrorHandler);
 
 const PORT = process.env.PORT || 5000;

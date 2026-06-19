@@ -1,7 +1,7 @@
 'use strict';
 
 const BaseUseCase = require('../../../shared/usecases/BaseUseCase');
-const AuthResponseMapper = require('../mapper/AuthResponseMapper');
+const AuthResponseMapper = require('../mappers/AuthResponseMapper');
 const UserNotFoundException = require('../../domain/exceptions/UserNotFoundException');
 
 /**

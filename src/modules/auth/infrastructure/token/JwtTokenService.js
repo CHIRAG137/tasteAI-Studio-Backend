@@ -1,13 +1,5 @@
 'use strict';
 
-const {
-  buildAndStoreTokenPair,
-  verifyAccessToken,
-  hashRefreshToken,
-  lookupRefreshToken,
-  deleteRefreshToken,
-  clearSession,
-} = require('../../../../../utils/tokenUtils');
 const ITokenService = require('../../domain/services/ITokenService');
 const AuthException = require('../../domain/exceptions/AuthException');
 const UserNotFoundException = require('../../domain/exceptions/UserNotFoundException');
@@ -30,35 +22,55 @@ function buildLastLoginMeta(method, meta = {}) {
 }
 
 /**
- * JWT-based token service backed by Redis for session tracking.
+ * JWT-based token service.
  *
- * Depends on IUserRepository (injected) rather than importing UserModel directly,
- * enforcing the infrastructure boundary and making this class testable in isolation.
+ * Orchestrates token issuance, rotation, verification, and revocation.
+ * Delegates cryptographic work to JwtSigner and session persistence to AuthTokenStore.
+ *
+ * Depends on abstractions (injected), not on concrete implementations:
+ *   - IUserRepository   → findById, update
+ *   - JwtSigner         → sign, verify, createRefreshToken, hashRefreshToken
+ *   - AuthTokenStore    → storeTokenPair, lookupRefresh, deleteRefresh, clearSession
  */
 class JwtTokenService extends ITokenService {
   /**
    * @param {import('../../domain/repositories/IUserRepository')} userRepository
+   * @param {import('./JwtSigner')} jwtSigner
+   * @param {import('./AuthTokenStore')} tokenStore
    */
-  constructor(userRepository) {
+  constructor(userRepository, jwtSigner, tokenStore) {
     super();
     this.userRepository = userRepository;
+    this.jwtSigner = jwtSigner;
+    this.tokenStore = tokenStore;
   }
 
   /**
    * Issues a fresh access + refresh token pair and persists session metadata.
+   *
    * @param {import('../../domain/entities/User')} user
-   * @param {string} method
+   * @param {string} method - Auth method for audit logging
    * @param {{ ip?: string, device?: string, deviceId?: string }} meta
+   * @returns {Promise<{ accessToken: string, refreshToken: string }>}
    */
   async issue(user, method = 'email_password', meta = {}) {
-    // buildAndStoreTokenPair needs an object with _id property
-    const { accessToken, refreshTokenRaw, family } = await buildAndStoreTokenPair({ _id: user.id });
+    const accessToken = this.jwtSigner.signAccessToken(user.id, user.email);
+    const {
+      raw: refreshTokenRaw,
+      hashed: refreshHashed,
+      family,
+    } = this.jwtSigner.createRefreshToken();
+
+    await this.tokenStore.storeTokenPair({
+      userId: user.id,
+      accessToken,
+      refreshHashed,
+      family,
+    });
 
     await this.userRepository.update(user.id, {
-      $set: {
-        refreshTokenFamily: family,
-        lastLogin: buildLastLoginMeta(method, meta),
-      },
+      refreshTokenFamily: family,
+      lastLogin: buildLastLoginMeta(method, meta),
     });
 
     logger.info('Token pair issued', { userId: user.id, method });
@@ -67,21 +79,35 @@ class JwtTokenService extends ITokenService {
   }
 
   /**
-   * Verifies an access token signature and asserts it is of type 'access'.
+   * Verifies a JWT access token signature and type claim.
+   *
+   * @param {string} token
+   * @returns {object} Decoded JWT payload
    * @throws {AuthException} if invalid or wrong type
    */
   verifyAccessToken(token) {
-    const decoded = verifyAccessToken(token);
+    let decoded;
+    try {
+      decoded = this.jwtSigner.verifyAccessToken(token);
+    } catch {
+      throw new AuthException('Invalid or expired access token', 'INVALID_TOKEN');
+    }
+
     if (decoded.type !== 'access') {
       throw new AuthException('Invalid token type', 'INVALID_TOKEN');
     }
+
     return decoded;
   }
 
   /**
-   * Rotates a refresh token: validates, deletes old, issues new pair.
-   * Detecting reuse of a revoked token triggers an immediate session wipe (token-family rotation).
+   * Rotates a refresh token (token-rotation security pattern).
    *
+   * Validates the presented token, deletes it, and issues a fresh pair.
+   * If the token is already gone (reuse detected), wipes the entire session.
+   *
+   * @param {string} rawRefreshToken
+   * @returns {Promise<{ accessToken: string, refreshToken: string }>}
    * @throws {AuthException} on missing, invalid, or reused refresh token
    */
   async refresh(rawRefreshToken) {
@@ -89,8 +115,8 @@ class JwtTokenService extends ITokenService {
       throw new AuthException('Refresh token is required', 'INVALID_REFRESH_TOKEN');
     }
 
-    const hashedToken = hashRefreshToken(rawRefreshToken);
-    const userId = await lookupRefreshToken(hashedToken);
+    const hashedToken = this.jwtSigner.hashRefreshToken(rawRefreshToken);
+    const userId = await this.tokenStore.lookupRefresh(hashedToken);
 
     if (!userId) {
       logger.warn('Refresh token not found — possible reuse or theft attempt');
@@ -101,44 +127,61 @@ class JwtTokenService extends ITokenService {
     }
 
     const user = await this.userRepository.findById(userId);
-    if (!user) throw new UserNotFoundException();
-    if (!user.isActive) throw new UserInactiveException();
-    if (user.isBanned) throw new UserBannedException();
+    if (!user) {
+      throw new UserNotFoundException();
+    }
+    if (!user.isActive) {
+      throw new UserInactiveException();
+    }
+    if (user.isBanned) {
+      throw new UserBannedException();
+    }
 
-    // Rotate — delete old token before issuing new pair
-    await deleteRefreshToken(hashedToken);
+    // Rotate — invalidate old token before issuing new pair
+    await this.tokenStore.deleteRefresh(hashedToken);
 
-    const { accessToken, refreshTokenRaw, family } = await buildAndStoreTokenPair({ _id: userId });
+    const accessToken = this.jwtSigner.signAccessToken(userId, user.email);
+    const {
+      raw: refreshTokenRaw,
+      hashed: newRefreshHashed,
+      family,
+    } = this.jwtSigner.createRefreshToken();
+
+    await this.tokenStore.storeTokenPair({
+      userId,
+      accessToken,
+      refreshHashed: newRefreshHashed,
+      family,
+    });
 
     await this.userRepository.update(userId, {
-      $set: {
-        refreshTokenFamily: family,
-        lastLogin: buildLastLoginMeta(user.lastLogin?.method || 'email_password', {
-          ip: user.lastLogin?.ip,
-          device: user.lastLogin?.device,
-          deviceId: user.lastLogin?.deviceId,
-        }),
-      },
+      refreshTokenFamily: family,
+      lastLogin: buildLastLoginMeta(user.lastLogin?.method || 'email_password', {
+        ip: user.lastLogin?.ip,
+        device: user.lastLogin?.device,
+        deviceId: user.lastLogin?.deviceId,
+      }),
     });
 
     return { accessToken, refreshToken: refreshTokenRaw };
   }
 
   /**
-   * Revokes all tokens for a user (logout or forced session termination).
+   * Revokes all session tokens for a user (logout / forced termination).
+   *
+   * @param {string} userId
+   * @param {string | null} rawRefreshToken
    */
   async revoke(userId, rawRefreshToken) {
     const user = await this.userRepository.findById(userId);
-    const hashedToken = rawRefreshToken ? hashRefreshToken(rawRefreshToken) : null;
+    const hashedToken = rawRefreshToken ? this.jwtSigner.hashRefreshToken(rawRefreshToken) : null;
     const family = user?.refreshTokenFamily || null;
 
-    await clearSession(userId, hashedToken, family);
+    await this.tokenStore.clearSession(userId, hashedToken, family);
 
     await this.userRepository.update(userId, {
-      $set: {
-        refreshTokenFamily: null,
-        lastLogoutAt: new Date(),
-      },
+      refreshTokenFamily: null,
+      lastLogoutAt: new Date(),
     });
 
     logger.info('User session revoked', { userId });

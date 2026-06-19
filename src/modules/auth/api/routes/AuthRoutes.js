@@ -3,8 +3,8 @@
 const express = require('express');
 const rateLimit = require('express-rate-limit');
 const { env } = require('../../../../config/env');
-const authValidator = require('../validators/authValidator');
-const { attachIpAddress } = require('../middleware/ipMiddleware');
+const authValidator = require('../validators/AuthValidator');
+const { attachIpAddress } = require('../middleware/IpMiddleware');
 const asyncHandler = require('../../../shared/middleware/asyncHandler');
 
 /**
@@ -23,7 +23,7 @@ const asyncHandler = require('../../../shared/middleware/asyncHandler');
 module.exports = function createAuthRoutes({ authController, authMiddleware }) {
   const router = express.Router();
 
-  // ── Rate limiters ──────────────────────────────────────────────────────────
+  // Rate limiters
   const authLimiter = rateLimit({
     windowMs: env.AUTH_RATE_LIMIT_WINDOW_MS,
     max: env.AUTH_RATE_LIMIT_MAX,
@@ -43,7 +43,7 @@ module.exports = function createAuthRoutes({ authController, authMiddleware }) {
     legacyHeaders: false,
   });
 
-  // ── Public routes ──────────────────────────────────────────────────────────
+  // Public routes
   router.post(
     '/register',
     attachIpAddress,
@@ -107,7 +107,7 @@ module.exports = function createAuthRoutes({ authController, authMiddleware }) {
     asyncHandler(authController.pollQrStatus),
   );
 
-  // ── Protected routes ───────────────────────────────────────────────────────
+  // Protected routes
   router.post('/logout', authMiddleware.requireAuth, asyncHandler(authController.logout));
 
   router.get('/me', authMiddleware.requireAuth, asyncHandler(authController.me));

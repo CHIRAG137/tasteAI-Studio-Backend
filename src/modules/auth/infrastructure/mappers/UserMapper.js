@@ -8,13 +8,14 @@ class UserMapper {
       return null;
     }
 
-    const plain = doc.toJSON ? doc.toJSON() : doc;
+    const plain = doc.toObject ? doc.toObject() : doc;
 
     return new User({
       id: plain._id?.toString() || plain.id,
       email: plain.email,
       name: plain.name,
       avatarUrl: plain.avatarUrl,
+      password: plain.password,
       isActive: plain.isActive,
       isBanned: plain.isBanned,
       isEmailVerified: plain.isEmailVerified,

@@ -4,14 +4,11 @@ const User = require('../../../domain/entities/User');
 const AuthProviderTypes = require('../../../domain/providers/AuthProviderTypes');
 const UserLoggedInEvent = require('../../../domain/events/UserLoggedInEvent');
 const UserInactiveException = require('../../../domain/exceptions/UserInactiveException');
-const AuthResponseMapper = require('../../mapper/AuthResponseMapper');
+const AuthResponseMapper = require('../../mappers/AuthResponseMapper');
 const logger = require('../../../../shared/logging');
 
 /**
- * Handles all Auth0 OAuth login flows.
- *
- * Extracted from OAuthLoginUseCase to apply the Single Responsibility Principle.
- * Responsible only for the Auth0-specific user creation and enrichment logic.
+ * Handles Auth0 OAuth authentication flows.
  */
 class Auth0OAuthHandler {
   /**
@@ -151,7 +148,8 @@ class Auth0OAuthHandler {
       updates.auth0Id = data.auth0Id;
     }
     if (!user.hasAuthMethod(AuthProviderTypes.AUTH0)) {
-      updates.$addToSet = { authMethods: AuthProviderTypes.AUTH0 };
+      user.addAuthMethod(AuthProviderTypes.AUTH0);
+      updates.authMethods = user.authMethods;
     }
 
     const base = user.auth0Profile ?? {};

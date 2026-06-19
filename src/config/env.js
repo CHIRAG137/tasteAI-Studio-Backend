@@ -25,6 +25,8 @@ const env = Object.freeze({
   JWT_REFRESH_SECRET: process.env.JWT_REFRESH_SECRET,
   JWT_ACCESS_EXPIRES_IN: process.env.JWT_ACCESS_EXPIRES_IN || '15m',
   JWT_REFRESH_EXPIRES_IN: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
+  JWT_ISSUER: process.env.JWT_ISSUER || 'auth-service',
+  JWT_AUDIENCE: process.env.JWT_AUDIENCE || 'app-client',
 
   // ── Google OAuth ───────────────────────────────────────────────────────────
   GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
@@ -35,6 +37,10 @@ const env = Object.freeze({
 
   // ── Data stores ───────────────────────────────────────────────────────────
   REDIS_URL: process.env.REDIS_URL || 'redis://localhost:6379',
+  REDIS_HOST: process.env.REDIS_HOST || null,
+  REDIS_PORT: parseInt(process.env.REDIS_PORT || '6379', 10),
+  REDIS_PASSWORD: process.env.REDIS_PASSWORD || null,
+  REDIS_TLS: process.env.REDIS_TLS === 'true',
   MONGODB_URI: process.env.MONGODB_URI || process.env.MONGO_URI,
 
   // ── QR / Deep link ────────────────────────────────────────────────────────

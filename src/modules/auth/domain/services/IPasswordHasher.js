@@ -2,9 +2,7 @@
 
 /**
  * Domain service interface for password hashing.
- *
- * Keeps bcrypt (infrastructure) out of the application layer.
- * Concrete implementation: BcryptPasswordHasher (infrastructure/security)
+ * @interface
  */
 class IPasswordHasher {
   /**

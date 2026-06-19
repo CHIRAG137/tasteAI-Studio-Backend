@@ -1,23 +1,34 @@
 'use strict';
 
-const { validateAccessToken } = require('../../../../../utils/tokenUtils');
 const ISessionService = require('../../domain/services/ISessionService');
 
 /**
  * Redis-backed session validator.
  *
- * Validates that the presented access token matches the one stored in Redis
- * for the given user, preventing use of tokens that have been revoked server-side.
+ * Validates that a presented access token matches the one stored in Redis for the user,
+ * ensuring tokens revoked at logout cannot be replayed.
+ *
+ * Injects AuthTokenStore rather than calling Redis/tokenUtils directly.
+ * This keeps the class thin: one method, one responsibility.
  */
 class RedisSessionService extends ISessionService {
   /**
+   * @param {import('../token/AuthTokenStore')} tokenStore
+   */
+  constructor(tokenStore) {
+    super();
+    this.tokenStore = tokenStore;
+  }
+
+  /**
+   * Checks whether the access token is still valid in the Redis session store.
+   *
    * @param {string} userId
-   * @param {string} token - Raw JWT access token
-   * @returns {Promise<boolean>}
+   * @param {string} token - Raw JWT access token presented by the client
+   * @returns {Promise<boolean>} true if the Redis-stored token matches
    */
   async validateAccessToken(userId, token) {
-    const result = await validateAccessToken(userId, token);
-    return Boolean(result);
+    return this.tokenStore.validateToken(userId, token);
   }
 }
 

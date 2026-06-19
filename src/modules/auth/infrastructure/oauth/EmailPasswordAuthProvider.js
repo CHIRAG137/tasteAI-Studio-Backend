@@ -6,10 +6,7 @@ const InvalidCredentialsException = require('../../domain/exceptions/InvalidCred
 const AuthException = require('../../domain/exceptions/AuthException');
 
 /**
- * Email + password authentication provider.
- *
- * Depends on IUserRepository and IPasswordHasher (both injected),
- * keeping this class free of direct Mongoose or bcrypt imports.
+ * Email and password authentication provider.
  */
 class EmailPasswordAuthProvider extends IAuthProvider {
   /**
@@ -27,21 +24,21 @@ class EmailPasswordAuthProvider extends IAuthProvider {
   }
 
   async authenticate(command) {
-    const { domain: user, doc } = await this.userRepository.findByEmailWithPassword(command.email);
+    const user = await this.userRepository.findByEmailWithPassword(command.email);
 
-    if (!user || !doc) {
+    if (!user) {
       throw new InvalidCredentialsException();
     }
 
     // Account exists but was created via OAuth — no password set
-    if (!doc.password) {
+    if (!user.password) {
       throw new AuthException(
         'This email is registered via Google or Auth0. Please use your original sign-in method.',
         'OAUTH_ONLY_ACCOUNT',
       );
     }
 
-    const isValid = await this.passwordHasher.compare(command.password, doc.password);
+    const isValid = await this.passwordHasher.compare(command.password, user.password);
     if (!isValid) {
       throw new InvalidCredentialsException();
     }

@@ -8,19 +8,14 @@ const logger = require('../../../shared/logging');
 
 /**
  * Auth0 OAuth authentication provider.
- *
- * Accepts `verifyToken` and `auth0Domain` via constructor injection
- * rather than reading process.env inside methods.
  */
 class Auth0AuthProvider extends IAuthProvider {
   /**
-   * @param {Function} verifyToken - Bound verifyAuth0AccessToken from config/auth0Client
-   * @param {string} auth0Domain - AUTH0_DOMAIN, injected from config
+   * @param {import('../../config/Auth0Client')} auth0Client
    */
-  constructor(verifyToken, auth0Domain) {
+  constructor(auth0Client) {
     super();
-    this._verifyToken = verifyToken;
-    this._auth0Domain = auth0Domain;
+    this._auth0Client = auth0Client;
   }
 
   getType() {
@@ -28,7 +23,7 @@ class Auth0AuthProvider extends IAuthProvider {
   }
 
   async authenticate(command) {
-    const decoded = await this._verifyToken(command.accessToken);
+    const decoded = await this._auth0Client.verifyAccessToken(command.accessToken);
     const profile = await this._fetchUserInfo(command.accessToken);
 
     const email = profile.email || decoded.email;
@@ -45,7 +40,8 @@ class Auth0AuthProvider extends IAuthProvider {
   /** @private */
   async _fetchUserInfo(accessToken) {
     try {
-      const { data } = await axios.get(`https://${this._auth0Domain}/userinfo`, {
+      const domain = this._auth0Client.getDomain();
+      const { data } = await axios.get(`https://${domain}/userinfo`, {
         headers: { Authorization: `Bearer ${accessToken}` },
         timeout: 10_000,
       });

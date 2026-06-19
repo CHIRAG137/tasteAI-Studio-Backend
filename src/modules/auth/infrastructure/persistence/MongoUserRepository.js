@@ -1,14 +1,11 @@
 'use strict';
 
 const IUserRepository = require('../../domain/repositories/IUserRepository');
-const UserModel = require('../../models/user');
+const UserModel = require('../../models/UserModel');
 const UserMapper = require('../mappers/UserMapper');
 
 /**
- * MongoDB/Mongoose implementation of IUserRepository.
- *
- * All Mongoose-specific logic (queries, document manipulation) lives here.
- * Callers receive domain User entities — never Mongoose documents.
+ * MongoDB/Mongoose implementation of IUserRepository interface.
  */
 class MongoUserRepository extends IUserRepository {
   async findById(id) {
@@ -22,13 +19,12 @@ class MongoUserRepository extends IUserRepository {
   }
 
   /**
-   * Returns both a domain entity AND the raw Mongoose doc.
-   * The raw doc is used by EmailPasswordAuthProvider to access the select:false password field.
-   * @returns {{ domain: User | null, doc: MongooseDocument | null }}
+   * Returns a domain user entity with the password field populated.
+   * @returns {Promise<User | null>}
    */
   async findByEmailWithPassword(email) {
     const doc = await UserModel.findOne({ email: email.toLowerCase() }).select('+password');
-    return { domain: UserMapper.toDomain(doc), doc };
+    return UserMapper.toDomain(doc);
   }
 
   async findByOAuthOrEmail({ email, googleId, auth0Id }) {
