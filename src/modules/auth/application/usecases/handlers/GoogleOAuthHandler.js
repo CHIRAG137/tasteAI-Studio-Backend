@@ -147,7 +147,8 @@ class GoogleOAuthHandler {
       updates.googleId = data.googleId;
     }
     if (!user.hasAuthMethod(AuthProviderTypes.GOOGLE)) {
-      updates.$addToSet = { authMethods: AuthProviderTypes.GOOGLE };
+      user.addAuthMethod(AuthProviderTypes.GOOGLE);
+      updates.authMethods = user.authMethods;
     }
 
     const base = user.googleProfile ?? {};

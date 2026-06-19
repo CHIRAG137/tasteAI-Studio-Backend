@@ -151,7 +151,8 @@ class Auth0OAuthHandler {
       updates.auth0Id = data.auth0Id;
     }
     if (!user.hasAuthMethod(AuthProviderTypes.AUTH0)) {
-      updates.$addToSet = { authMethods: AuthProviderTypes.AUTH0 };
+      user.addAuthMethod(AuthProviderTypes.AUTH0);
+      updates.authMethods = user.authMethods;
     }
 
     const base = user.auth0Profile ?? {};

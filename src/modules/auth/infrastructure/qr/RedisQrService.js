@@ -3,7 +3,7 @@
 const QRCode = require('qrcode');
 const { v4: uuidv4 } = require('uuid');
 const IQrService = require('../../domain/services/IQrService');
-const IRedisClient = require('../redis/IRedisClient');
+// IRedisClient is imported in JSDoc only, no runtime requirement needed
 const QrSessionException = require('../../domain/exceptions/QrSessionException');
 const qrKeyScheme = require('./qrKeyScheme');
 const { buildDeepLink } = require('./qrUtils');
@@ -76,17 +76,15 @@ class RedisQrService extends IQrService {
 
     // 5. Activate user and record phone info via repository
     const updateFields = {
-      $set: {
-        isActive: true,
-        pendingQr: { sessionId: null, expiresAt: null },
-        'phone.isVerified': true,
-        'phone.verifiedAt': new Date(),
-        'phone.deviceInfo': deviceInfo ?? null,
-        ...(phoneNumber && {
-          'phone.phoneNumber': phoneNumber,
-          'phone.countryCode': countryCode ?? null,
-        }),
-      },
+      isActive: true,
+      pendingQr: { sessionId: null, expiresAt: null },
+      'phone.isVerified': true,
+      'phone.verifiedAt': new Date(),
+      'phone.deviceInfo': deviceInfo ?? null,
+      ...(phoneNumber && {
+        'phone.phoneNumber': phoneNumber,
+        'phone.countryCode': countryCode ?? null,
+      }),
     };
 
     const updatedUser = await this.userRepository.update(userId, updateFields);
@@ -108,10 +106,14 @@ class RedisQrService extends IQrService {
 
   async pollStatus(sessionId) {
     const scanned = await this.redis.get(qrKeyScheme.scanned(sessionId));
-    if (scanned) return { status: 'scanned' };
+    if (scanned) {
+      return { status: 'scanned' };
+    }
 
     const pending = await this.redis.get(qrKeyScheme.session(sessionId));
-    if (!pending) return { status: 'expired' };
+    if (!pending) {
+      return { status: 'expired' };
+    }
 
     return { status: 'pending' };
   }

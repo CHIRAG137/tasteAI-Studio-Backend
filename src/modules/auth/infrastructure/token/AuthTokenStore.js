@@ -1,6 +1,6 @@
 'use strict';
 
-const IRedisClient = require('../redis/IRedisClient');
+// IRedisClient is imported in JSDoc only, no runtime requirement needed
 const AuthRedisKeyScheme = require('../redis/AuthRedisKeyScheme');
 const JwtSigner = require('./JwtSigner');
 

@@ -69,10 +69,8 @@ class JwtTokenService extends ITokenService {
     });
 
     await this.userRepository.update(user.id, {
-      $set: {
-        refreshTokenFamily: family,
-        lastLogin: buildLastLoginMeta(method, meta),
-      },
+      refreshTokenFamily: family,
+      lastLogin: buildLastLoginMeta(method, meta),
     });
 
     logger.info('Token pair issued', { userId: user.id, method });
@@ -129,9 +127,15 @@ class JwtTokenService extends ITokenService {
     }
 
     const user = await this.userRepository.findById(userId);
-    if (!user) throw new UserNotFoundException();
-    if (!user.isActive) throw new UserInactiveException();
-    if (user.isBanned) throw new UserBannedException();
+    if (!user) {
+      throw new UserNotFoundException();
+    }
+    if (!user.isActive) {
+      throw new UserInactiveException();
+    }
+    if (user.isBanned) {
+      throw new UserBannedException();
+    }
 
     // Rotate — invalidate old token before issuing new pair
     await this.tokenStore.deleteRefresh(hashedToken);
@@ -151,14 +155,12 @@ class JwtTokenService extends ITokenService {
     });
 
     await this.userRepository.update(userId, {
-      $set: {
-        refreshTokenFamily: family,
-        lastLogin: buildLastLoginMeta(user.lastLogin?.method || 'email_password', {
-          ip: user.lastLogin?.ip,
-          device: user.lastLogin?.device,
-          deviceId: user.lastLogin?.deviceId,
-        }),
-      },
+      refreshTokenFamily: family,
+      lastLogin: buildLastLoginMeta(user.lastLogin?.method || 'email_password', {
+        ip: user.lastLogin?.ip,
+        device: user.lastLogin?.device,
+        deviceId: user.lastLogin?.deviceId,
+      }),
     });
 
     return { accessToken, refreshToken: refreshTokenRaw };
@@ -178,10 +180,8 @@ class JwtTokenService extends ITokenService {
     await this.tokenStore.clearSession(userId, hashedToken, family);
 
     await this.userRepository.update(userId, {
-      $set: {
-        refreshTokenFamily: null,
-        lastLogoutAt: new Date(),
-      },
+      refreshTokenFamily: null,
+      lastLogoutAt: new Date(),
     });
 
     logger.info('User session revoked', { userId });
