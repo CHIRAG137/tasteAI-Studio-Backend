@@ -3,8 +3,7 @@
 const { OAuth2Client } = require('google-auth-library');
 
 /**
- * Object-oriented configuration wrapper for the Google OAuth SDK client.
- * Provides lazy-loading client caching, strict config validation, and clean encapsulation of verification logic.
+ * Configuration wrapper for the Google OAuth SDK client.
  */
 class GoogleOAuthClient {
   /**

@@ -1,7 +1,7 @@
 'use strict';
 
 const BaseUseCase = require('../../../shared/usecases/BaseUseCase');
-const AuthResponseMapper = require('../mapper/AuthResponseMapper');
+const AuthResponseMapper = require('../mappers/AuthResponseMapper');
 
 /**
  * Issues a new access/refresh token pair using a valid refresh token (token rotation).

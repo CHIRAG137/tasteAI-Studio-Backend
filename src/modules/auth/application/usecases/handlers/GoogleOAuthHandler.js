@@ -4,14 +4,11 @@ const User = require('../../../domain/entities/User');
 const AuthProviderTypes = require('../../../domain/providers/AuthProviderTypes');
 const UserLoggedInEvent = require('../../../domain/events/UserLoggedInEvent');
 const UserInactiveException = require('../../../domain/exceptions/UserInactiveException');
-const AuthResponseMapper = require('../../mapper/AuthResponseMapper');
+const AuthResponseMapper = require('../../mappers/AuthResponseMapper');
 const logger = require('../../../../shared/logging');
 
 /**
- * Handles all Google OAuth login flows.
- *
- * Extracted from OAuthLoginUseCase to apply the Single Responsibility Principle.
- * Responsible only for the Google-specific user creation and enrichment logic.
+ * Handles Google OAuth authentication flows.
  */
 class GoogleOAuthHandler {
   /**

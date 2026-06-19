@@ -1,14 +1,8 @@
 'use strict';
 
 /**
- * Port/Interface for Redis client operations used within the auth module.
- *
- * Abstracts the concrete Redis client so that:
- *   1. The auth module does not depend on the `redis` npm package directly
- *   2. Any class consuming this can be tested with an in-memory mock
- *   3. The underlying Redis client can be swapped without touching auth logic
- *
- * Implementing classes: AuthRedisClient
+ * Interface representing a Redis client used within the auth module.
+ * @interface
  */
 class IRedisClient {
   /**

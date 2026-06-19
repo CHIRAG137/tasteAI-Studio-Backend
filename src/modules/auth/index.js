@@ -1,44 +1,23 @@
 'use strict';
 
-// ── Domain ─────────────────────────────────────────────────────────────────────
 const AuthProviderFactory = require('./domain/factories/AuthProviderFactory');
 const AuthProviderTypes = require('./domain/providers/AuthProviderTypes');
-
-// ── Infrastructure — Redis ─────────────────────────────────────────────────────
 const AuthRedisClient = require('./infrastructure/redis/AuthRedisClient');
-
-// ── Infrastructure — Token ─────────────────────────────────────────────────────
 const JwtSigner = require('./infrastructure/token/JwtSigner');
 const AuthTokenStore = require('./infrastructure/token/AuthTokenStore');
 const JwtTokenService = require('./infrastructure/token/JwtTokenService');
-
-// ── Infrastructure — Session ───────────────────────────────────────────────────
 const RedisSessionService = require('./infrastructure/cache/RedisSessionService');
-
-// ── Infrastructure — QR ───────────────────────────────────────────────────────
 const RedisQrService = require('./infrastructure/qr/RedisQrService');
-
-// ── Infrastructure — Persistence ──────────────────────────────────────────────
 const MongoUserRepository = require('./infrastructure/persistence/MongoUserRepository');
-
-// ── Infrastructure — Security ─────────────────────────────────────────────────
 const BcryptPasswordHasher = require('./infrastructure/security/BcryptPasswordHasher');
-
-// ── Infrastructure — OAuth ────────────────────────────────────────────────────
 const EmailPasswordAuthProvider = require('./infrastructure/oauth/EmailPasswordAuthProvider');
 const GoogleAuthProvider = require('./infrastructure/oauth/GoogleAuthProvider');
 const Auth0AuthProvider = require('./infrastructure/oauth/Auth0AuthProvider');
-
-// ── Infrastructure — Event Bus ────────────────────────────────────────────────
 const InMemoryEventBus = require('./infrastructure/eventbus/InMemoryEventBus');
-
-// ── Auth Config ───────────────────────────────────────────────────────────────
 const GoogleOAuthClient = require('./config/GoogleOAuthClient');
 const Auth0Client = require('./config/Auth0Client');
 const RedisClient = require('./config/RedisClient');
 const { env } = require('../../config/env');
-
-// ── Application — Use Cases ───────────────────────────────────────────────────
 const RegisterUserUseCase = require('./application/usecases/RegisterUserUseCase');
 const LoginUserUseCase = require('./application/usecases/LoginUserUseCase');
 const OAuthLoginUseCase = require('./application/usecases/OAuthLoginUseCase');
@@ -46,42 +25,18 @@ const RefreshTokenUseCase = require('./application/usecases/RefreshTokenUseCase'
 const LogoutUserUseCase = require('./application/usecases/LogoutUserUseCase');
 const VerifyQrUseCase = require('./application/usecases/VerifyQrUseCase');
 const PollQrStatusUseCase = require('./application/usecases/PollQrStatusUseCase');
-const GetCurrentUserUseCase = require('./application/queries/GetCurrentUserUseCase');
-
-// ── API ───────────────────────────────────────────────────────────────────────
+const GetCurrentUserQuery = require('./application/queries/GetCurrentUserQuery');
 const AuthController = require('./api/controllers/AuthController');
-const AuthMiddleware = require('./middleware/AuthMiddleware');
-const createAuthRoutes = require('./api/routes/auth.routes');
+const AuthMiddleware = require('./api/middleware/AuthMiddleware');
+const createAuthRoutes = require('./api/routes/AuthRoutes');
 
 /**
- * Composition root for the auth module.
+ * Composition root for the authentication module.
+ * Wires all domain, application, and infrastructure dependencies using constructor injection.
  *
- * Wires all dependencies using constructor injection.
- * No module instantiates its own dependencies — everything flows through here.
- *
- * Dependency graph (bottom → top):
- *
- *   env config
- *     └─ AuthRedisClient (wraps shared getRedis())
- *         ├─ AuthTokenStore (Redis session ops)
- *         └─ RedisQrService (QR session ops)
- *   JwtSigner (pure JWT crypto)
- *     └─ JwtTokenService (orchestrates signer + store)
- *   AuthTokenStore
- *     └─ RedisSessionService (validates sessions)
- *   MongoUserRepository
- *     ├─ JwtTokenService
- *     ├─ RedisQrService
- *     ├─ RegisterUserUseCase
- *     └─ GetCurrentUserUseCase
- *   AuthProviderFactory
- *     └─ LoginUserUseCase, OAuthLoginUseCase
- * @returns {object} Public module surface: { router, authMiddleware, services... }
+ * @returns {object} Public module interface containing the Express router, middleware, and core services.
  */
 function createAuthModule() {
-  // ── Infrastructure layer ────────────────────────────────────────────────────
-
-  // Redis (Auth-scoped class instance)
   const redisClient = new RedisClient({
     host: env.REDIS_HOST,
     port: env.REDIS_PORT,
@@ -91,35 +46,23 @@ function createAuthModule() {
   });
   const authRedisClient = new AuthRedisClient(redisClient);
 
-  // Token crypto + session persistence
   const jwtSigner = new JwtSigner();
   const tokenStore = new AuthTokenStore(authRedisClient);
-
-  // Persistence
   const userRepository = new MongoUserRepository();
-
-  // Services
   const passwordHasher = new BcryptPasswordHasher();
   const tokenService = new JwtTokenService(userRepository, jwtSigner, tokenStore);
   const sessionService = new RedisSessionService(tokenStore);
   const qrService = new RedisQrService(userRepository, authRedisClient);
   const eventBus = new InMemoryEventBus();
 
-  // ── Auth Providers (Strategy pattern) ──────────────────────────────────────
-  // Providers are registered conditionally — the app starts cleanly even when
-  // optional OAuth credentials are absent in .env
   const authProviderFactory = new AuthProviderFactory();
-
-  // Email + password — always available
   authProviderFactory.register(new EmailPasswordAuthProvider(userRepository, passwordHasher));
 
-  // Google OAuth — only when GOOGLE_CLIENT_ID is configured
   if (env.GOOGLE_CLIENT_ID) {
     const googleOAuthClient = new GoogleOAuthClient({ clientId: env.GOOGLE_CLIENT_ID });
     authProviderFactory.register(new GoogleAuthProvider(googleOAuthClient));
   }
 
-  // Auth0 — only when AUTH0_DOMAIN is configured
   if (env.AUTH0_DOMAIN) {
     const auth0Client = new Auth0Client({
       domain: env.AUTH0_DOMAIN,
@@ -128,7 +71,6 @@ function createAuthModule() {
     authProviderFactory.register(new Auth0AuthProvider(auth0Client));
   }
 
-  // ── Application layer (Use Cases) ──────────────────────────────────────────
   const registerUserUseCase = new RegisterUserUseCase({
     userRepository,
     qrService,
@@ -154,9 +96,8 @@ function createAuthModule() {
   const logoutUserUseCase = new LogoutUserUseCase({ tokenService, eventBus });
   const verifyQrUseCase = new VerifyQrUseCase({ qrService });
   const pollQrStatusUseCase = new PollQrStatusUseCase({ qrService });
-  const getCurrentUserUseCase = new GetCurrentUserUseCase({ userRepository });
+  const getCurrentUserUseCase = new GetCurrentUserQuery({ userRepository });
 
-  // ── API layer ───────────────────────────────────────────────────────────────
   const authController = new AuthController({
     loginUserUseCase,
     registerUserUseCase,
@@ -176,11 +117,9 @@ function createAuthModule() {
 
   const router = createAuthRoutes({ authController, authMiddleware });
 
-  // ── Public module surface ───────────────────────────────────────────────────
   return {
     router,
     authMiddleware,
-    // Expose services for cross-module use (e.g. other modules needing token validation)
     userRepository,
     tokenService,
     sessionService,

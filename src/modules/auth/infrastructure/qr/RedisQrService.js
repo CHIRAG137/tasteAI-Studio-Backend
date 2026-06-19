@@ -5,8 +5,8 @@ const { v4: uuidv4 } = require('uuid');
 const IQrService = require('../../domain/services/IQrService');
 // IRedisClient is imported in JSDoc only, no runtime requirement needed
 const QrSessionException = require('../../domain/exceptions/QrSessionException');
-const qrKeyScheme = require('./qrKeyScheme');
-const { buildDeepLink } = require('./qrUtils');
+const qrKeyScheme = require('./QrKeyScheme');
+const { buildDeepLink } = require('./QrUtils');
 const { env } = require('../../../../config/env');
 const logger = require('../../../shared/logging');
 

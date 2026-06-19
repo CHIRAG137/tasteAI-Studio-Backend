@@ -6,10 +6,7 @@ const InvalidCredentialsException = require('../../domain/exceptions/InvalidCred
 const AuthException = require('../../domain/exceptions/AuthException');
 
 /**
- * Email + password authentication provider.
- *
- * Depends on IUserRepository and IPasswordHasher (both injected),
- * keeping this class free of direct Mongoose or bcrypt imports.
+ * Email and password authentication provider.
  */
 class EmailPasswordAuthProvider extends IAuthProvider {
   /**

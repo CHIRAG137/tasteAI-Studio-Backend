@@ -8,13 +8,6 @@ const logger = require('../../../shared/logging');
 
 /**
  * Google OAuth authentication provider.
- *
- * Accepts `googleClient` and `clientId` via constructor injection
- * rather than reading process.env inside methods.
- *
- * Verification strategy:
- *   1. Try verifyIdToken (ID token flow)
- *   2. Fallback to /userinfo endpoint (access token flow)
  */
 class GoogleAuthProvider extends IAuthProvider {
   /**

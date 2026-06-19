@@ -4,8 +4,7 @@ const { createClient } = require('redis');
 const logger = require('../../shared/logging');
 
 /**
- * Object-oriented wrapper for the Redis client SDK scoped exclusively to the Auth module.
- * Encapsulates connection lifecycle management, reconnect strategy, and error handling.
+ * Scoped Redis client wrapper for the authentication module.
  */
 class RedisClient {
   /**

@@ -3,7 +3,7 @@
 const BaseUseCase = require('../../../shared/usecases/BaseUseCase');
 const AuthProviderTypes = require('../../domain/providers/AuthProviderTypes');
 const UserLoggedInEvent = require('../../domain/events/UserLoggedInEvent');
-const AuthResponseMapper = require('../mapper/AuthResponseMapper');
+const AuthResponseMapper = require('../mappers/AuthResponseMapper');
 
 /**
  * Handles email + password login.

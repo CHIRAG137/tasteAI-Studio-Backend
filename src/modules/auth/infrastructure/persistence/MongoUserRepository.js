@@ -1,14 +1,11 @@
 'use strict';
 
 const IUserRepository = require('../../domain/repositories/IUserRepository');
-const UserModel = require('../../models/user');
+const UserModel = require('../../models/UserModel');
 const UserMapper = require('../mappers/UserMapper');
 
 /**
- * MongoDB/Mongoose implementation of IUserRepository.
- *
- * All Mongoose-specific logic (queries, document manipulation) lives here.
- * Callers receive domain User entities — never Mongoose documents.
+ * MongoDB/Mongoose implementation of IUserRepository interface.
  */
 class MongoUserRepository extends IUserRepository {
   async findById(id) {

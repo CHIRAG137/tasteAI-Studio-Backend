@@ -1,7 +1,7 @@
 'use strict';
 
-const ApiResponse = require('../../shared/response/ApiResponse');
-const logger = require('../../shared/logging');
+const ApiResponse = require('../../../shared/response/ApiResponse');
+const logger = require('../../../shared/logging');
 
 /**
  * Authentication middleware.

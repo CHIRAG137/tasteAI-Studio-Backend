@@ -4,8 +4,7 @@ const jwt = require('jsonwebtoken');
 const jwksClient = require('jwks-rsa');
 
 /**
- * Object-oriented configuration wrapper for the Auth0 SDK client and verification logic.
- * Encapsulates JWKS client caching, token verification, and configuration validation.
+ * Configuration wrapper for the Auth0 SDK client.
  */
 class Auth0Client {
   /**

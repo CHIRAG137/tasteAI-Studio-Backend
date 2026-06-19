@@ -5,14 +5,8 @@ const IEventBus = require('../../domain/services/IEventBus');
 const logger = require('../../../shared/logging');
 
 /**
- * In-process event bus backed by Node.js EventEmitter.
- *
- * Suitable for single-process deployments. For multi-instance / distributed
- * deployments, swap this with a Redis Pub/Sub or message queue adapter
- * (e.g., RedisPubSubEventBus) without changing any consumer code.
- *
- * Events are dispatched via setImmediate() so publishing never blocks
- * the current request/response cycle.
+ * In-process event bus implementation using Node.js EventEmitter.
+ * Implements IEventBus interface.
  */
 class InMemoryEventBus extends IEventBus {
   constructor() {

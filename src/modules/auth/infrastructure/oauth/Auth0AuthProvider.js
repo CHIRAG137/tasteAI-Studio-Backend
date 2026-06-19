@@ -8,9 +8,6 @@ const logger = require('../../../shared/logging');
 
 /**
  * Auth0 OAuth authentication provider.
- *
- * Accepts `verifyToken` and `auth0Domain` via constructor injection
- * rather than reading process.env inside methods.
  */
 class Auth0AuthProvider extends IAuthProvider {
   /**

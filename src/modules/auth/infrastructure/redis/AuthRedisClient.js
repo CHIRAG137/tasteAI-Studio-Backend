@@ -4,11 +4,8 @@ const IRedisClient = require('./IRedisClient');
 const logger = require('../../../shared/logging');
 
 /**
- * Concrete adapter that fulfils the IRedisClient contract for the auth module.
- *
- * Injects the auth-scoped class-based RedisClient so that:
- *   - The auth module depends only on its own IRedisClient abstraction
- *   - Swapping the underlying Redis client requires changing only this file
+ * Concrete Redis client implementation for the auth module.
+ * Implements IRedisClient interface.
  */
 class AuthRedisClient extends IRedisClient {
   /**

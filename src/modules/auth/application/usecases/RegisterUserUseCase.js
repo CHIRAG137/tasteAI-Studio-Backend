@@ -5,7 +5,7 @@ const User = require('../../domain/entities/User');
 const AuthProviderTypes = require('../../domain/providers/AuthProviderTypes');
 const UserRegisteredEvent = require('../../domain/events/UserRegisteredEvent');
 const AccountExistsException = require('../../domain/exceptions/AccountExistsException');
-const AuthResponseMapper = require('../mapper/AuthResponseMapper');
+const AuthResponseMapper = require('../mappers/AuthResponseMapper');
 const logger = require('../../../shared/logging');
 
 /**

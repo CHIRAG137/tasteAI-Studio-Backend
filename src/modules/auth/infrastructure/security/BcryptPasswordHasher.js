@@ -6,10 +6,7 @@ const IPasswordHasher = require('../../domain/services/IPasswordHasher');
 const SALT_ROUNDS = 12;
 
 /**
- * bcrypt-based implementation of IPasswordHasher.
- *
- * Kept in the infrastructure layer so the application layer has no dependency on bcrypt.
- * Can be swapped for Argon2 or PBKDF2 without touching any use case code.
+ * bcrypt-based implementation of IPasswordHasher interface.
  */
 class BcryptPasswordHasher extends IPasswordHasher {
   /**

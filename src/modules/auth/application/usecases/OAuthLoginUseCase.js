@@ -6,14 +6,7 @@ const GoogleOAuthHandler = require('./handlers/GoogleOAuthHandler');
 const Auth0OAuthHandler = require('./handlers/Auth0OAuthHandler');
 
 /**
- * Thin orchestrator for OAuth login flows.
- *
- * Delegates all provider-specific logic to dedicated handler classes,
- * keeping this use case small and open for extension (Open/Closed Principle).
- *
- * To add a new OAuth provider:
- *   1. Create a new handler in ./handlers/
- *   2. Register it in the _handlers Map below
+ * Orchestrates OAuth login flows by delegating to provider-specific handlers.
  */
 class OAuthLoginUseCase extends BaseUseCase {
   /**
