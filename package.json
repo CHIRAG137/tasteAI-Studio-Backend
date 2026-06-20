@@ -5,7 +5,10 @@
   "main": "app.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "AUTH_MODE=embedded nodemon app.js",
     "start": "node app.js",
+    "dev:auth": "AUTH_MODE=embedded nodemon src/modules/auth/standalone.js",
+    "start:auth": "node src/modules/auth/standalone.js",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier . --write",
@@ -48,6 +51,7 @@
     "express-rate-limit": "^8.5.1",
     "express-validator": "^7.3.2",
     "googleapis": "^154.0.0",
+    "http-proxy-middleware": "^4.1.1",
     "jsonwebtoken": "^9.0.2",
     "jwks-rsa": "^3.2.2",
     "livekit-server-sdk": "^2.15.0",

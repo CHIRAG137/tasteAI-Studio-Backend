@@ -20,6 +20,17 @@ const env = Object.freeze({
   NODE_ENV: process.env.NODE_ENV || 'development',
   LOG_LEVEL: process.env.LOG_LEVEL || 'info',
 
+  // ── Auth integration mode ───────────────────────────────────────────────────
+  // 'embedded' → auth module mounted in-process (local dev / monolith)
+  // 'remote'   → traffic proxied to an independently deployed auth service
+  AUTH_MODE: (process.env.AUTH_MODE || 'embedded').toLowerCase(),
+  AUTH_SERVICE_URL: process.env.AUTH_SERVICE_URL || null,
+  AUTH_PORT: parseInt(process.env.AUTH_PORT || '5001', 10),
+  AUTH_CORS_ORIGINS: (process.env.AUTH_CORS_ORIGINS || '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean),
+
   // ── JWT ────────────────────────────────────────────────────────────────────
   JWT_ACCESS_SECRET: process.env.JWT_ACCESS_SECRET,
   JWT_REFRESH_SECRET: process.env.JWT_REFRESH_SECRET,
@@ -59,23 +70,52 @@ const env = Object.freeze({
 });
 
 /**
- * List of environment variables that MUST be present at startup.
- * Add any new required vars here.
+ * List of environment variables that MUST always be present at startup,
+ * regardless of mode.
  */
 const REQUIRED_VARS = ['JWT_ACCESS_SECRET', 'JWT_REFRESH_SECRET'];
 
 /**
- * Validates that all required environment variables are set.
+ * Conditional validators: each runs against the resolved `env` object
+ * and pushes an error message if its condition fails. Keeps validateEnv()
+ * itself simple and lets us add new conditional rules without touching
+ * its control flow (Open/Closed).
+ */
+const CONDITIONAL_VALIDATORS = [
+  () => {
+    if (!['embedded', 'remote'].includes(env.AUTH_MODE)) {
+      return `AUTH_MODE must be "embedded" or "remote", got "${env.AUTH_MODE}"`;
+    }
+    return null;
+  },
+  () => {
+    if (env.AUTH_MODE === 'remote' && !env.AUTH_SERVICE_URL) {
+      return 'AUTH_SERVICE_URL is required when AUTH_MODE=remote';
+    }
+    return null;
+  },
+];
+
+/**
+ * Validates that all required environment variables are set and that
+ * conditional invariants (e.g. AUTH_MODE-dependent requirements) hold.
  * Throws a descriptive error at startup so the app fails fast
  * instead of silently misbehaving in production.
  *
- * @throws {Error} if any required variables are missing
+ * @throws {Error} if any required variables are missing or invalid
  */
 function validateEnv() {
   const missing = REQUIRED_VARS.filter((key) => !env[key]);
-  if (missing.length > 0) {
+  const conditionalErrors = CONDITIONAL_VALIDATORS.map((check) => check()).filter(Boolean);
+
+  const allErrors = [
+    ...missing.map((key) => `Missing required environment variable: ${key}`),
+    ...conditionalErrors,
+  ];
+
+  if (allErrors.length > 0) {
     throw new Error(
-      `[ENV] Missing required environment variables: ${missing.join(', ')}\n` +
+      `[ENV] Validation failed:\n  - ${allErrors.join('\n  - ')}\n` +
         'Please check your .env file or deployment configuration.',
     );
   }
