@@ -14,7 +14,7 @@
     "format": "prettier . --write",
     "format:check": "prettier . --check",
     "check": "npm run format:check && npm run lint",
-    "prepare": "husky"
+    "prepare": "husky || true"
   },
   "lint-staged": {
     "*.{js,cjs,mjs}": [
