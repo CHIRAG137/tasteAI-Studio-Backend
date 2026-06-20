@@ -20,7 +20,6 @@ const botRoutes = require('./routes/botRoutes');
 const crawlRoutes = require('./routes/crawlRoutes');
 const slackRoutes = require('./routes/slackRoutes');
 const authRoutes = require('./routes/authRoutes');
-const { getContainer } = require('./src/config/dependencyContainer');
 const flowRoutes = require('./routes/flowRoutes');
 const summarizeRoutes = require('./routes/summarizeRoutes');
 const elevenlabsRoutes = require('./routes/elevenlabsRoutes');
