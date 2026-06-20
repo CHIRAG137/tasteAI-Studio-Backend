@@ -1,14 +1,14 @@
 'use strict';
 
 const { createProxyMiddleware } = require('http-proxy-middleware');
-const AuthIntegrationStrategy = require('./AuthIntegrationStrategy');
+const ServiceIntegrationStrategy = require('./ServiceIntegrationStrategy');
 
 /**
  * Forwards all auth traffic to an independently deployed auth service
  * (e.g. https://tastebot-auth.onrender.com). Used in production when
  * auth is scaled/deployed separately on Render.
  */
-class ProxyAuthStrategy extends AuthIntegrationStrategy {
+class ProxyServiceStrategy extends ServiceIntegrationStrategy {
   constructor(targetUrl) {
     super();
     if (!targetUrl) {
@@ -32,4 +32,4 @@ class ProxyAuthStrategy extends AuthIntegrationStrategy {
   }
 }
 
-module.exports = ProxyAuthStrategy;
+module.exports = ProxyServiceStrategy;

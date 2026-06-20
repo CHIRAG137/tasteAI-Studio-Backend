@@ -10,7 +10,7 @@ class IRedisClient {
    * @param {string} key
    * @returns {Promise<string | null>}
    */
-  // eslint-disable-next-line no-unused-vars
+
   async get(key) {
     throw new Error(`${this.constructor.name}.get() not implemented`);
   }
@@ -22,7 +22,7 @@ class IRedisClient {
    * @param {{ EX?: number }} [options]
    * @returns {Promise<void>}
    */
-  // eslint-disable-next-line no-unused-vars
+
   async set(key, value, options) {
     throw new Error(`${this.constructor.name}.set() not implemented`);
   }
@@ -32,7 +32,7 @@ class IRedisClient {
    * @param {...string} keys
    * @returns {Promise<void>}
    */
-  // eslint-disable-next-line no-unused-vars
+
   async del(...keys) {
     throw new Error(`${this.constructor.name}.del() not implemented`);
   }
@@ -42,7 +42,7 @@ class IRedisClient {
    * @param {Array<{ cmd: 'set'|'del', args: any[] }>} operations
    * @returns {Promise<void>}
    */
-  // eslint-disable-next-line no-unused-vars
+
   async pipeline(operations) {
     throw new Error(`${this.constructor.name}.pipeline() not implemented`);
   }

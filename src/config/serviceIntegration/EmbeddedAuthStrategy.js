@@ -1,13 +1,13 @@
 'use strict';
 
-const AuthIntegrationStrategy = require('./AuthIntegrationStrategy');
+const ServiceIntegrationStrategy = require('./ServiceIntegrationStrategy');
 const { createAuthModule } = require('../../modules/auth');
 
 /**
  * Runs auth in-process. Used for local development / single-process deploys.
  * Single responsibility: wire the auth module's own router into the host app.
  */
-class EmbeddedAuthStrategy extends AuthIntegrationStrategy {
+class EmbeddedAuthStrategy extends ServiceIntegrationStrategy {
   mount(app, mountPath) {
     const authModule = createAuthModule();
     app.use(mountPath, authModule.router);

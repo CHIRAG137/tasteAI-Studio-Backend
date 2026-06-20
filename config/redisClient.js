@@ -5,7 +5,6 @@ const { createClient } = require('redis');
 // Lazy import of env to avoid circular deps at startup
 // (redisClient.js is required before dotenv finishes in some test runners)
 function getEnv() {
-  // eslint-disable-next-line global-require
   return require('../src/config/env').env;
 }
 
@@ -24,7 +23,9 @@ let _client = null;
  * @returns {Promise<import('redis').RedisClientType>}
  */
 async function getRedis() {
-  if (_client && _client.isOpen) return _client;
+  if (_client && _client.isOpen) {
+    return _client;
+  }
 
   const env = getEnv();
 

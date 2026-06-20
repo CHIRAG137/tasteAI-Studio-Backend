@@ -25,7 +25,9 @@
  * @returns {boolean}
  */
 function isExpired(date) {
-  if (!date) return true;
+  if (!date) {
+    return true;
+  }
   return new Date() > new Date(date);
 }
 

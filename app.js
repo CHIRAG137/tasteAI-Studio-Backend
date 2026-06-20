@@ -138,11 +138,15 @@ app.use('/api/issue-reports', issueReportRoutes);
 app.use('/api/visitor-auth', visitorAuthRoutes);
 app.use('/api/user', userRoutes);
 // New Clean-Architecture auth module (mobile QR + JWT flows)
+const { SERVICE_REGISTRY } = require('./src/config/serviceIntegration/serviceRegistry');
 const {
-  createAuthIntegrationStrategy,
-} = require('./src/config/authIntegration/AuthIntegrationFactory');
-const authStrategy = createAuthIntegrationStrategy();
-const authModule = authStrategy.mount(app, '/api/auth/user');
+  createServiceIntegrationStrategy,
+} = require('./src/config/serviceIntegration/ServiceIntegrationFactory');
+
+Object.entries(SERVICE_REGISTRY).forEach(([key, config]) => {
+  const strategy = createServiceIntegrationStrategy(key);
+  strategy.mount(app, config.mountPath);
+});
 app.get('/widget.js', (req, res) => {
   res.sendFile(path.join(__dirname, 'public/widget.js'));
 });
