@@ -2,7 +2,7 @@
 
 const EmbeddedServiceStrategy = require('./EmbeddedServiceStrategy');
 const ProxyServiceStrategy = require('./ProxyServiceStrategy');
-const { SERVICE_REGISTRY } = require('./serviceRegistry');
+const { SERVICE_REGISTRY } = require('./ServiceRegistry');
 const { env } = require('../env');
 
 /**

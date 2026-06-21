@@ -137,7 +137,7 @@ app.use('/api/issue-reports', issueReportRoutes);
 app.use('/api/visitor-auth', visitorAuthRoutes);
 app.use('/api/user', userRoutes);
 // New Clean-Architecture auth module (mobile QR + JWT flows)
-const { SERVICE_REGISTRY } = require('./src/config/serviceIntegration/serviceRegistry');
+const { SERVICE_REGISTRY } = require('./src/config/serviceIntegration/ServiceRegistry');
 const {
   createServiceIntegrationStrategy,
 } = require('./src/config/serviceIntegration/ServiceIntegrationFactory');
