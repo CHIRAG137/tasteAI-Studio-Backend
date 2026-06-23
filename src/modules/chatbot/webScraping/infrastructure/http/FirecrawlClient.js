@@ -1,7 +1,7 @@
 'use strict';
 
 const axios = require('axios');
-const { env } = require('../../../config/env');
+const { env } = require('../../../../../config/env');
 
 const FIRECRAWL_BASE_URL = 'https://api.firecrawl.dev/v1';
 
