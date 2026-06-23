@@ -10,8 +10,6 @@ const CloudinaryAvatarStorageService = require('./infrastructure/storage/Cloudin
 
 const MongoAvatarRepository = require('./infrastructure/persistence/MongoAvatarRepository');
 
-const AvatarModel = require('./infrastructure/persistence/models/AvatarModel');
-
 const GenerateAvatarUseCase = require('./application/usecases/GenerateAvatarUseCase');
 
 const UploadAvatarUseCase = require('./application/usecases/UploadAvatarUseCase');
@@ -33,9 +31,7 @@ function createAvatarGenerationSubModule({ authGuard } = {}) {
 
   const avatarStorageService = new CloudinaryAvatarStorageService(cloudinaryClient);
 
-  const avatarRepository = new MongoAvatarRepository({
-    avatarModel: AvatarModel,
-  });
+  const avatarRepository = new MongoAvatarRepository({});
 
   // Application
 
