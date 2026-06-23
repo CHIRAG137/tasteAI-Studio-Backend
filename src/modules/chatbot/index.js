@@ -2,6 +2,7 @@
 
 const express = require('express');
 const { createWebScrapingSubModule } = require('./webScraping/index');
+const { createAvatarGenerationSubModule } = require('./videoAvatarGeneration/index');
 
 // Future sub-features plug in here — one import, one mount, nothing else changes:
 // const { createAvatarGenerationSubModule } = require('./avatar-generation');
@@ -34,6 +35,8 @@ function createChatbotModule({ authGuard } = {}) {
   // ── Website Scraping ───────────────────────────────────────────────────────
   const { router: webScrapingRouter } = createWebScrapingSubModule({ authGuard });
   router.use('/scrape', webScrapingRouter);
+  const { router: avatarRouter } = createAvatarGenerationSubModule({ authGuard });
+  router.use('/avatar', avatarRouter);
 
   // ── Future sub-features ────────────────────────────────────────────────────
   // const { router: avatarRouter }    = createAvatarGenerationSubModule({ authGuard });
