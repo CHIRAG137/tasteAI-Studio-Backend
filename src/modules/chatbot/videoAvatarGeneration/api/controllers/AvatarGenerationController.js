@@ -28,13 +28,23 @@ class AvatarGenerationController {
 
   async uploadAvatar(req, res, next) {
     try {
-      const avatar = await this.uploadAvatarUseCase.execute({
+      if (!req.file) {
+        return res.status(400).json({
+          success: false,
+          message: 'video_bot_image is required',
+        });
+      }
+
+      const result = await this.uploadAvatarUseCase.execute({
         imageBuffer: req.file.buffer,
+
+        mimeType: req.file.mimetype,
       });
 
-      return res.json({
+      return res.status(200).json({
         success: true,
-        data: avatar,
+        message: 'Avatar uploaded successfully',
+        data: result,
       });
     } catch (error) {
       next(error);

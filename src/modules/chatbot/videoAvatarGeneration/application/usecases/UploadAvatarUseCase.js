@@ -1,14 +1,10 @@
 'use strict';
 
-const Avatar = require('../../domain/entities/Avatar');
-
 const AvatarImage = require('../../domain/valueObjects/AvatarImage');
 
 class UploadAvatarUseCase {
-  constructor({ avatarStorageService, avatarRepository }) {
+  constructor({ avatarStorageService }) {
     this.avatarStorageService = avatarStorageService;
-
-    this.avatarRepository = avatarRepository;
   }
 
   async execute({ imageBuffer, mimeType }) {
@@ -22,15 +18,11 @@ class UploadAvatarUseCase {
       'video-bot-avatars',
     );
 
-    const avatar = Avatar.create({
-      imageUrl: uploaded.secure_url,
+    return {
+      videoBotImageUrl: uploaded.secure_url,
 
-      publicId: uploaded.public_id,
-    });
-
-    await this.avatarRepository.save(avatar);
-
-    return avatar;
+      videoBotImagePublicId: uploaded.public_id,
+    };
   }
 }
 
