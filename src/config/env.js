@@ -67,6 +67,8 @@ const env = Object.freeze({
   AUTH_RATE_LIMIT_MAX: parseInt(process.env.AUTH_RATE_LIMIT_MAX || '20', 10),
   QR_RATE_LIMIT_WINDOW_MS: parseInt(process.env.QR_RATE_LIMIT_WINDOW_MS || String(60 * 1000), 10),
   QR_RATE_LIMIT_MAX: parseInt(process.env.QR_RATE_LIMIT_MAX || '60', 10),
+
+  FIRECRAWL_API_KEY: process.env.FIRECRAWL_API_KEY || null,
 });
 
 /**
