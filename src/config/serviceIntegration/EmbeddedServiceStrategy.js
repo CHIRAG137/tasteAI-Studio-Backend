@@ -1,19 +1,29 @@
 'use strict';
 
 const ServiceIntegrationStrategy = require('./ServiceIntegrationStrategy');
-const { createAuthModule } = require('../../modules/auth');
 
 /**
- * Runs auth in-process. Used for local development / single-process deploys.
- * Single responsibility: wire the auth module's own router into the host app.
+ * EmbeddedServiceStrategy — mounts ANY module's router in-process.
+ *
+ * Receives the module factory function (createModule) from the registry
+ * at construction time and calls it at mount time. Has zero knowledge of
+ * which specific module it is mounting — auth, chatbot, or anything else.
  */
-class EmbeddedAuthStrategy extends ServiceIntegrationStrategy {
+class EmbeddedServiceStrategy extends ServiceIntegrationStrategy {
+  /**
+   * @param {Function} createModule — factory function from the registry entry
+   */
+  constructor(createModule) {
+    super();
+    this._createModule = createModule;
+  }
+
   mount(app, mountPath) {
-    const authModule = createAuthModule();
-    app.use(mountPath, authModule.router);
-    console.log(`[auth] EMBEDDED mode — mounted locally at ${mountPath}`);
-    return authModule; // exposed in case other routes need authMiddleware
+    const module = this._createModule();
+    app.use(mountPath, module.router);
+    console.log(`[registry] EMBEDDED — mounted at ${mountPath}`);
+    return module;
   }
 }
 
-module.exports = EmbeddedAuthStrategy;
+module.exports = EmbeddedServiceStrategy;

@@ -6,9 +6,12 @@ const { SERVICE_REGISTRY } = require('./ServiceRegistry');
 const { env } = require('../env');
 
 /**
- * Builds the integration strategy for a given registered service key.
- * Works identically for auth, notifications, or any future service —
- * no per-feature branching required.
+ * createServiceIntegrationStrategy — resolves the correct strategy for a
+ * given service key.
+ *
+ * Fully generic — no service-specific knowledge lives here. The registry
+ * entry provides everything: the createModule factory, the env var names
+ * for mode and target URL.
  */
 function createServiceIntegrationStrategy(serviceKey) {
   const config = SERVICE_REGISTRY[serviceKey];
@@ -19,8 +22,11 @@ function createServiceIntegrationStrategy(serviceKey) {
   const mode = (env[config.envModeKey] || 'embedded').toLowerCase();
 
   if (mode === 'embedded') {
+    // Pass the registry's createModule factory — EmbeddedServiceStrategy
+    // calls it at mount time. This is what was missing before.
     return new EmbeddedServiceStrategy(config.createModule);
   }
+
   if (mode === 'remote') {
     const targetUrl = env[config.envUrlKey];
     if (!targetUrl) {
@@ -28,6 +34,7 @@ function createServiceIntegrationStrategy(serviceKey) {
     }
     return new ProxyServiceStrategy(targetUrl);
   }
+
   throw new Error(`Unknown mode "${mode}" for service "${serviceKey}"`);
 }
 

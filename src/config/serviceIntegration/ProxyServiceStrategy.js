@@ -4,31 +4,35 @@ const { createProxyMiddleware } = require('http-proxy-middleware');
 const ServiceIntegrationStrategy = require('./ServiceIntegrationStrategy');
 
 /**
- * Forwards all auth traffic to an independently deployed auth service
- * (e.g. https://tastebot-auth.onrender.com). Used in production when
- * auth is scaled/deployed separately on Render.
+ * ProxyServiceStrategy — forwards ALL traffic under a mount path to an
+ * independently deployed service over HTTP.
+ *
+ * Generic — works for any service. Has zero knowledge of which specific
+ * module it is proxying.
  */
 class ProxyServiceStrategy extends ServiceIntegrationStrategy {
+  /**
+   * @param {string} targetUrl — the deployed service URL from env
+   */
   constructor(targetUrl) {
     super();
     if (!targetUrl) {
-      throw new Error('AUTH_SERVICE_URL is required when AUTH_MODE=remote');
+      throw new Error('ProxyServiceStrategy: targetUrl is required');
     }
-    this.targetUrl = targetUrl;
+    this._targetUrl = targetUrl;
   }
 
   mount(app, mountPath) {
     app.use(
       mountPath,
       createProxyMiddleware({
-        target: this.targetUrl,
+        target: this._targetUrl,
         changeOrigin: true,
-        pathRewrite: { [`^${mountPath}`]: mountPath }, // keep path as-is on target
         logLevel: 'warn',
       }),
     );
-    console.log(`[auth] REMOTE mode — proxying ${mountPath} -> ${this.targetUrl}`);
-    return null; // no local authMiddleware instance available in this process
+    console.log(`[registry] REMOTE — proxying ${mountPath} -> ${this._targetUrl}`);
+    return null;
   }
 }
 
