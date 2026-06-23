@@ -8,8 +8,6 @@ const GeminiAvatarGenerationService = require('./infrastructure/ai/GeminiAvatarG
 
 const CloudinaryAvatarStorageService = require('./infrastructure/storage/CloudinaryAvatarStorageService');
 
-const MongoAvatarRepository = require('./infrastructure/persistence/MongoAvatarRepository');
-
 const GenerateAvatarUseCase = require('./application/usecases/GenerateAvatarUseCase');
 
 const UploadAvatarUseCase = require('./application/usecases/UploadAvatarUseCase');
@@ -31,8 +29,6 @@ function createAvatarGenerationSubModule({ authGuard } = {}) {
 
   const avatarStorageService = new CloudinaryAvatarStorageService(cloudinaryClient);
 
-  const avatarRepository = new MongoAvatarRepository({});
-
   // Application
 
   const generateAvatarUseCase = new GenerateAvatarUseCase({
@@ -41,7 +37,6 @@ function createAvatarGenerationSubModule({ authGuard } = {}) {
 
   const uploadAvatarUseCase = new UploadAvatarUseCase({
     avatarStorageService,
-    avatarRepository,
   });
 
   // API
