@@ -12,11 +12,11 @@ const SERVICE_REGISTRY = {
     envModeKey: 'AUTH_MODE',
     envUrlKey: 'AUTH_SERVICE_URL',
   },
-  notifications: {
-    mountPath: '/api/notifications',
-    createModule: () => require('../../modules/notifications').createNotificationsModule(),
-    envModeKey: 'NOTIFICATIONS_MODE',
-    envUrlKey: 'NOTIFICATIONS_SERVICE_URL',
+  chatbot: {
+    mountPath: '/api/chatbot',
+    createModule: () => require('../../modules/chatbot').createChatbotModule(),
+    envModeKey: 'CHATBOT_MODE',
+    envUrlKey: 'CHATBOT_SERVICE_URL',
   },
   // add the next microservice here — nothing else changes
 };
