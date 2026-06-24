@@ -3,14 +3,14 @@
 const IQAKnowledgeProvisioningService = require('../../domain/services/IQAKnowledgeProvisioningService');
 
 class QAKnowledgeProvisioningAdapter extends IQAKnowledgeProvisioningService {
-  constructor({ qaTrainingService }) {
+  constructor({ trainKnowledgeBaseUseCase }) {
     super();
 
-    this.qaTrainingService = qaTrainingService;
+    this.trainKnowledgeBaseUseCase = trainKnowledgeBaseUseCase;
   }
 
   async train({ botId, files, urls }) {
-    return this.qaTrainingService.trainBot({
+    return this.trainKnowledgeBaseUseCase.execute({
       botId,
       files,
       urls,

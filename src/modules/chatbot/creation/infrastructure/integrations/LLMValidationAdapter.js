@@ -3,24 +3,14 @@
 const ILLMValidationService = require('../../domain/services/ILLMValidationService');
 
 class LLMValidationAdapter extends ILLMValidationService {
-  constructor({ llmConnectionTester }) {
+  constructor({ validateLLMConnectionUseCase }) {
     super();
 
-    this.llmConnectionTester = llmConnectionTester;
+    this.validateLLMConnectionUseCase = validateLLMConnectionUseCase;
   }
 
-  async validate({ provider, model, encryptedApiKey }) {
-    const result = await this.llmConnectionTester({
-      provider,
-      model,
-      encryptedApiKey,
-    });
-
-    if (!result.success) {
-      throw new Error(result.message || 'Unable to validate LLM connection');
-    }
-
-    return true;
+  async validate(payload) {
+    return this.validateLLMConnectionUseCase.execute(payload);
   }
 }
 

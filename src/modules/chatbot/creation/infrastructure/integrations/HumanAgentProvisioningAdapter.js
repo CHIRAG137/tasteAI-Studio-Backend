@@ -3,14 +3,14 @@
 const IHumanAgentProvisioningService = require('../../domain/services/IHumanAgentProvisioningService');
 
 class HumanAgentProvisioningAdapter extends IHumanAgentProvisioningService {
-  constructor({ humanAgentProvisioningService }) {
+  constructor({ provisionBotAgentsUseCase }) {
     super();
 
-    this.humanAgentProvisioningService = humanAgentProvisioningService;
+    this.provisionBotAgentsUseCase = provisionBotAgentsUseCase;
   }
 
   async provision({ botId, invitedBy, emails }) {
-    return this.humanAgentProvisioningService.syncBotAndHumanAgents({
+    return this.provisionBotAgentsUseCase.execute({
       botId,
       invitedBy,
       emails,

@@ -3,14 +3,14 @@
 const ICustomizationProvisioningService = require('../../domain/services/ICustomizationProvisioningService');
 
 class CustomizationProvisioningAdapter extends ICustomizationProvisioningService {
-  constructor({ customizationService }) {
+  constructor({ createDefaultCustomizationUseCase }) {
     super();
 
-    this.customizationService = customizationService;
+    this.createDefaultCustomizationUseCase = createDefaultCustomizationUseCase;
   }
 
   async createDefaults({ botId }) {
-    return this.customizationService.createDefaultCustomization({
+    return this.createDefaultCustomizationUseCase.execute({
       botId,
     });
   }

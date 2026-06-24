@@ -3,24 +3,14 @@
 const ISlackValidationService = require('../../domain/services/ISlackValidationService');
 
 class SlackValidationAdapter extends ISlackValidationService {
-  constructor({ slackIntegrationRepository }) {
+  constructor({ validateSlackWorkspaceUseCase }) {
     super();
 
-    this.slackIntegrationRepository = slackIntegrationRepository;
+    this.validateSlackWorkspaceUseCase = validateSlackWorkspaceUseCase;
   }
 
-  async validate({ userId, slackChannelId }) {
-    const integration = await this.slackIntegrationRepository.findByUserId(userId);
-
-    if (!integration) {
-      throw new Error('Slack workspace not connected');
-    }
-
-    if (!slackChannelId) {
-      throw new Error('Slack channel is required');
-    }
-
-    return true;
+  async validate(payload) {
+    return this.validateSlackWorkspaceUseCase.execute(payload);
   }
 }
 
