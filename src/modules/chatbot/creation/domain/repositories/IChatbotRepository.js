@@ -1,16 +1,16 @@
 'use strict';
 
 class IChatbotRepository {
-  async create(chatbot) {
-    throw new Error('IChatbotRepository.create not implemented');
+  async create() {
+    throw new Error('create() must be implemented');
   }
 
-  async findById(id) {
-    throw new Error('IChatbotRepository.findById not implemented');
+  async findById() {
+    throw new Error('findById() must be implemented');
   }
 
-  async update(id, data) {
-    throw new Error('IChatbotRepository.update not implemented');
+  async update() {
+    throw new Error('update() must be implemented');
   }
 }
 

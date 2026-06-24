@@ -8,7 +8,7 @@
 
 const MongoChatbotRepository = require('./infrastructure/persistence/MongoChatbotRepository');
 
-const ChatBotModel = require('./infrastructure/models/ChatBotModel');
+const ChatBotModel = require('../../models/ChatbotModel');
 
 /*
 |--------------------------------------------------------------------------
