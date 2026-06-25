@@ -16,7 +16,7 @@ class ChatbotCreationController {
   createChatbot = async (req, res) => {
     try {
       const command = new CreateChatbotCommand({
-        userId: req.user._id,
+        userId: req.user.id,
 
         name: req.body.name,
 

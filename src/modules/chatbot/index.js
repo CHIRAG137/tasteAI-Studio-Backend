@@ -3,7 +3,26 @@
 const express = require('express');
 const { createWebScrapingSubModule } = require('./webScraping/index');
 const { createAvatarGenerationSubModule } = require('./videoAvatarGeneration/index');
+const { createChatbotCreationModule } = require('./creation/index');
+const { createHumanAgentProvisioningModule } = require('../humanAgent/provisioning');
 
+const { createSlackValidationModule } = require('../slackIntegration/validation');
+
+const { createCustomizationProvisioningModule } = require('../customization/provisioning');
+
+const { createQAKnowledgeTrainingModule } = require('../qaKnowledge/training');
+
+const { createLLMValidationModule } = require('../llm/validation');
+
+const humanAgentModule = createHumanAgentProvisioningModule();
+
+const slackValidationModule = createSlackValidationModule();
+
+const customizationModule = createCustomizationProvisioningModule();
+
+const qaKnowledgeModule = createQAKnowledgeTrainingModule();
+
+const llmValidationModule = createLLMValidationModule();
 // Future sub-features plug in here — one import, one mount, nothing else changes:
 // const { createAvatarGenerationSubModule } = require('./avatar-generation');
 // const { createQaGenerationSubModule }     = require('./qa-generation');
@@ -29,20 +48,32 @@ const { createAvatarGenerationSubModule } = require('./videoAvatarGeneration/ind
  * @param {Function} [opts.authGuard] — auth middleware injected by the monolith
  * @returns {{ router: import('express').Router }}
  */
-function createChatbotModule({ authGuard } = {}) {
+function createChatbotModule({ authMiddleware } = {}) {
   const router = express.Router();
 
   // ── Website Scraping ───────────────────────────────────────────────────────
-  const { router: webScrapingRouter } = createWebScrapingSubModule({ authGuard });
+  const { router: webScrapingRouter } = createWebScrapingSubModule({ authMiddleware });
   router.use('/scrape', webScrapingRouter);
-  const { router: avatarRouter } = createAvatarGenerationSubModule({ authGuard });
+  const { router: avatarRouter } = createAvatarGenerationSubModule({ authMiddleware });
   router.use('/avatar', avatarRouter);
+  const { router: creationRouter } = createChatbotCreationModule({
+    provisionBotAgentsUseCase: humanAgentModule.provisionBotAgentsUseCase,
+
+    validateSlackWorkspaceUseCase: slackValidationModule.validateSlackWorkspaceUseCase,
+
+    createDefaultCustomizationUseCase: customizationModule.createDefaultCustomizationUseCase,
+
+    trainKnowledgeBaseUseCase: qaKnowledgeModule.trainKnowledgeBaseUseCase,
+
+    validateLLMConnectionUseCase: llmValidationModule.validateLLMConnectionUseCase,
+  });
+  router.use('/creation', creationRouter);
 
   // ── Future sub-features ────────────────────────────────────────────────────
-  // const { router: avatarRouter }    = createAvatarGenerationSubModule({ authGuard });
-  // const { router: qaRouter }        = createQaGenerationSubModule({ authGuard });
-  // const { router: voiceRouter }     = createVoiceGenerationSubModule({ authGuard });
-  // const { router: knowledgeRouter } = createKnowledgeBaseSubModule({ authGuard });
+  // const { router: avatarRouter }    = createAvatarGenerationSubModule({ authMiddleware });
+  // const { router: qaRouter }        = createQaGenerationSubModule({ authMiddleware });
+  // const { router: voiceRouter }     = createVoiceGenerationSubModule({ authMiddleware });
+  // const { router: knowledgeRouter } = createKnowledgeBaseSubModule({ authMiddleware });
   //
   // router.use('/avatar',        avatarRouter);
   // router.use('/qa',            qaRouter);

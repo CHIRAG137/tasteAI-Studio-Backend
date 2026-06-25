@@ -8,7 +8,7 @@
 
 const MongoChatbotRepository = require('./infrastructure/persistence/MongoChatbotRepository');
 
-const ChatBotModel = require('../../models/ChatbotModel');
+const ChatBotModel = require('../models/ChatbotModel');
 
 /*
 |--------------------------------------------------------------------------
@@ -46,25 +46,34 @@ const ChatbotCreationController = require('./api/controllers/ChatbotCreationCont
 
 const { createChatbotCreationRoutes } = require('./api/routes/ChatbotCreationRoutes');
 
+const { createAuthModule } = require('../../auth/index');
+
+const authModule = createAuthModule();
+
 /*
 |--------------------------------------------------------------------------
 | Shared
 |--------------------------------------------------------------------------
 */
 
-const logger = require('../../shared/logger');
+const logger = require('../../shared/logging');
 
-const responseBuilder = require('../../shared/responseBuilder');
+const responseBuilder = require('../../shared/response/ApiResponse');
 
 function createChatbotCreationModule({
-  authGuard,
-
   provisionBotAgentsUseCase,
   validateSlackWorkspaceUseCase,
   createDefaultCustomizationUseCase,
   trainKnowledgeBaseUseCase,
   validateLLMConnectionUseCase,
 }) {
+  console.log({
+    provisionBotAgentsUseCase,
+    validateSlackWorkspaceUseCase,
+    createDefaultCustomizationUseCase,
+    trainKnowledgeBaseUseCase,
+    validateLLMConnectionUseCase,
+  });
   /*
   |--------------------------------------------------------------------------
   | Repository
@@ -142,7 +151,7 @@ function createChatbotCreationModule({
   const router = createChatbotCreationRoutes({
     chatbotCreationController,
 
-    authGuard,
+    authMiddleware: authModule.authMiddleware,
   });
 
   return {

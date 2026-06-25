@@ -170,4 +170,4 @@ const customizationSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
-module.exports = mongoose.model('Customization', customizationSchema);
+module.exports = mongoose.model('CustomizationV2', customizationSchema);

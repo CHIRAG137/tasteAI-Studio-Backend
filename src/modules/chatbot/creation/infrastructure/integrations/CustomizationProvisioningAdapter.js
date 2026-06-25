@@ -6,6 +6,10 @@ class CustomizationProvisioningAdapter extends ICustomizationProvisioningService
   constructor({ createDefaultCustomizationUseCase }) {
     super();
 
+    if (!createDefaultCustomizationUseCase) {
+      throw new Error('createDefaultCustomizationUseCase is required');
+    }
+
     this.createDefaultCustomizationUseCase = createDefaultCustomizationUseCase;
   }
 
