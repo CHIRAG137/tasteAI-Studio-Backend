@@ -1,7 +1,6 @@
 'use strict';
 
 const ApiResponse = require('../../../shared/response/ApiResponse');
-const AuthProviderTypes = require('../../infrastructure/providers/AuthProviderTypes');
 
 class AuthController {
   constructor({ authFacade }) {
@@ -17,12 +16,16 @@ class AuthController {
   }
 
   register = async (req, res) => {
-    const result = await this.authFacade.register({
-      email: req.body.email,
-      password: req.body.password,
-      name: req.body.name,
-      ...AuthController._requestMeta(req),
-    });
+    const providerType = req.authProvider;
+    const result = await this.authFacade.register(
+      {
+        email: req.body.email,
+        password: req.body.password,
+        name: req.body.name,
+        ...AuthController._requestMeta(req),
+      },
+      providerType,
+    );
 
     if (result.linked) {
       return ApiResponse.success(res, result, 'Password linked to existing account');
@@ -31,7 +34,7 @@ class AuthController {
     return ApiResponse.created(
       res,
       result,
-      'Registration successful. Please scan the QR code with your mobile device to activate your account.',
+      'Registration successful. Please activate your account to proceed.',
     );
   };
 
@@ -45,38 +48,25 @@ class AuthController {
     return ApiResponse.success(res, result, 'Login successful');
   };
 
-  googleLogin = async (req, res) => {
-    const result = await this.authFacade.oauthLogin(
-      { token: req.body.token, ...AuthController._requestMeta(req) },
-      AuthProviderTypes.GOOGLE,
+  oauthLogin = async (req, res) => {
+    const providerType = req.authProvider || req.body.provider;
+    const result = await this.authFacade.login(
+      {
+        token: req.body.token || req.body.accessToken,
+        ...AuthController._requestMeta(req),
+      },
+      providerType,
     );
 
     if (result.qrRequired) {
       return ApiResponse.created(
         res,
         result,
-        'Google account created. Please scan the QR code to activate your account.',
+        `${providerType} account created. Please scan the QR code to activate your account.`,
       );
     }
 
-    return ApiResponse.success(res, result, 'Google login successful');
-  };
-
-  auth0Login = async (req, res) => {
-    const result = await this.authFacade.oauthLogin(
-      { accessToken: req.body.accessToken, ...AuthController._requestMeta(req) },
-      AuthProviderTypes.AUTH0,
-    );
-
-    if (result.qrRequired) {
-      return ApiResponse.created(
-        res,
-        result,
-        'Auth0 account created. Please scan the QR code to activate your account.',
-      );
-    }
-
-    return ApiResponse.success(res, result, 'Auth0 login successful');
+    return ApiResponse.success(res, result, `${providerType} login successful`);
   };
 
   refresh = async (req, res) => {
@@ -84,12 +74,13 @@ class AuthController {
     return ApiResponse.success(res, result, 'Token refreshed');
   };
 
-  verifyQr = async (req, res) => {
+  verify = async (req, res) => {
+    const verificationType = req.verificationType;
     const sessionId = req.body?.sessionId || req.query?.sessionId;
     const phoneNumber = req.body?.phoneNumber || req.query?.phoneNumber;
     const countryCode = req.body?.countryCode || req.query?.countryCode;
 
-    await this.authFacade.verifyQr({
+    await this.authFacade.verify(verificationType, {
       sessionId,
       phoneNumber,
       countryCode,
@@ -129,12 +120,16 @@ class AuthController {
       `);
     }
 
-    return ApiResponse.success(res, null, 'Mobile verified. Your account is now active.');
+    return ApiResponse.success(res, null, 'Verification successful. Your account is now active.');
   };
 
-  pollQrStatus = async (req, res) => {
-    const result = await this.authFacade.pollQrStatus(req.params.sessionId);
-    return ApiResponse.success(res, result, 'QR status fetched');
+  pollVerificationStatus = async (req, res) => {
+    const verificationType = req.verificationType;
+    const result = await this.authFacade.pollVerificationStatus(
+      verificationType,
+      req.params.sessionId,
+    );
+    return ApiResponse.success(res, result, 'Verification status fetched');
   };
 
   logout = async (req, res) => {

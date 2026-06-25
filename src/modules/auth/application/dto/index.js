@@ -5,5 +5,5 @@ module.exports = {
   RegisterCommand: require('./RegisterCommand'),
   RefreshTokenCommand: require('./RefreshTokenCommand'),
   LogoutCommand: require('./LogoutCommand'),
-  VerifyQrCommand: require('./VerifyQrCommand'),
+  VerifyCommand: require('./VerifyCommand'),
 };

@@ -1,52 +1,43 @@
 'use strict';
 
-/**
- * AuthFacade — unified, high-level interface over the entire auth subdomain.
- *
- * Implements the Facade pattern: controllers (and other consumers) interact
- * with a single object instead of wiring individual use cases.
- *
- * Each method delegates to the appropriate use case or query, translating
- * raw controller inputs into typed command objects. This keeps controllers
- * thin — they never import use cases or DTOs directly.
- */
 class AuthFacade {
   constructor({
-    registerUserUseCase,
-    loginUserUseCase,
-    oauthLoginUseCase,
+    registerUseCase,
+    loginUseCase,
     refreshTokenUseCase,
     logoutUserUseCase,
-    verifyQrUseCase,
-    pollQrStatusUseCase,
+    verifyUseCase,
+    pollVerificationUseCase,
     getCurrentUserUseCase,
   }) {
-    this._registerUserUseCase = registerUserUseCase;
-    this._loginUserUseCase = loginUserUseCase;
-    this._oauthLoginUseCase = oauthLoginUseCase;
+    this._registerUseCase = registerUseCase;
+    this._loginUseCase = loginUseCase;
     this._refreshTokenUseCase = refreshTokenUseCase;
     this._logoutUserUseCase = logoutUserUseCase;
-    this._verifyQrUseCase = verifyQrUseCase;
-    this._pollQrStatusUseCase = pollQrStatusUseCase;
+    this._verifyUseCase = verifyUseCase;
+    this._pollVerificationUseCase = pollVerificationUseCase;
     this._getCurrentUserUseCase = getCurrentUserUseCase;
   }
 
-  async register({ email, password, name, ip, userAgent }) {
+  async register({ email, password, name, ip, userAgent }, providerType) {
     const { RegisterCommand } = require('../dto');
     const command = new RegisterCommand({ email, password, name, ip, userAgent });
-    return this._registerUserUseCase.execute(command);
+    return this._registerUseCase.execute(command, providerType);
   }
 
-  async login({ email, password, ip, userAgent, deviceId }) {
+  async login({ email, password, token, accessToken, ip, userAgent, deviceId }, providerType) {
     const { LoginCommand } = require('../dto');
-    const command = new LoginCommand({ email, password, ip, userAgent, deviceId });
-    return this._loginUserUseCase.execute(command);
-  }
-
-  async oauthLogin({ token, accessToken, ip, userAgent, deviceId }, providerType) {
-    const { LoginCommand } = require('../dto');
-    const command = new LoginCommand({ token, accessToken, ip, userAgent, deviceId });
-    return this._oauthLoginUseCase.execute(command, providerType);
+    const command = new LoginCommand({
+      provider: providerType,
+      email,
+      password,
+      token,
+      accessToken,
+      ip,
+      userAgent,
+      deviceId,
+    });
+    return this._loginUseCase.execute(command, providerType);
   }
 
   async refresh(refreshToken) {
@@ -61,14 +52,14 @@ class AuthFacade {
     return this._logoutUserUseCase.execute(command);
   }
 
-  async verifyQr({ sessionId, phoneNumber, countryCode, deviceInfo }) {
-    const { VerifyQrCommand } = require('../dto');
-    const command = new VerifyQrCommand({ sessionId, phoneNumber, countryCode, deviceInfo });
-    return this._verifyQrUseCase.execute(command);
+  async verify(verificationType, { sessionId, phoneNumber, countryCode, deviceInfo }) {
+    const { VerifyCommand } = require('../dto');
+    const command = new VerifyCommand({ sessionId, phoneNumber, countryCode, deviceInfo });
+    return this._verifyUseCase.execute(verificationType, command);
   }
 
-  async pollQrStatus(sessionId) {
-    return this._pollQrStatusUseCase.execute(sessionId);
+  async pollVerificationStatus(verificationType, sessionId) {
+    return this._pollVerificationUseCase.execute(verificationType, sessionId);
   }
 
   async getProfile(userId) {
