@@ -1,23 +1,12 @@
 'use strict';
 
-const User = require('../../../domain/entities/User');
-const AuthProviderTypes = require('../../../domain/providers/AuthProviderTypes');
-const UserLoggedInEvent = require('../../../domain/events/UserLoggedInEvent');
-const UserInactiveException = require('../../../domain/exceptions/UserInactiveException');
+const User = require('../../../domain/User');
+const AuthProviderTypes = require('../../../infrastructure/providers/AuthProviderTypes');
+const { ForbiddenException } = require('../../../../shared/exceptions');
 const AuthResponseMapper = require('../../mappers/AuthResponseMapper');
 const logger = require('../../../../shared/logging');
 
-/**
- * Handles Google OAuth authentication flows.
- */
 class GoogleOAuthHandler {
-  /**
-   * @param {object} deps
-   * @param {import('../../../domain/repositories/IUserRepository')} deps.userRepository
-   * @param {import('../../../domain/services/ITokenService')} deps.tokenService
-   * @param {import('../../../domain/services/IQrService')} deps.qrService
-   * @param {import('../../../domain/services/IEventBus')} deps.eventBus
-   */
   constructor({ userRepository, tokenService, qrService, eventBus }) {
     this.userRepository = userRepository;
     this.tokenService = tokenService;
@@ -73,7 +62,6 @@ class GoogleOAuthHandler {
     );
   }
 
-  /** @private */
   async _handleNewUser(data) {
     const user = await this.userRepository.create(
       new User({
@@ -106,17 +94,14 @@ class GoogleOAuthHandler {
     return AuthResponseMapper.qrRequired(user, qr.sessionId, qr.qrDataUrl, qr.expiresAt);
   }
 
-  /** @private */
   async _handleExistingUser(user, data, command) {
     const enriched = await this._enrichProfile(user, data);
 
     if (!enriched.isActive) {
-      throw new UserInactiveException(
+      throw new ForbiddenException(
         'Account not yet activated. Please complete mobile QR verification.',
       );
     }
-
-    enriched.isEligibleToLogin();
 
     const tokens = await this.tokenService.issue(enriched, AuthProviderTypes.GOOGLE, {
       ip: command.ip,
@@ -124,19 +109,15 @@ class GoogleOAuthHandler {
       deviceId: command.deviceId,
     });
 
-    this.eventBus.publish(new UserLoggedInEvent(enriched.id, AuthProviderTypes.GOOGLE));
-
     return { ...AuthResponseMapper.tokens(enriched, tokens), isNew: false };
   }
 
-  /** @private — creates QR session and saves sessionId on the user record */
   async _createQrSession(userId) {
     const { sessionId, qrDataUrl, expiresAt } = await this.qrService.createSession(userId);
     await this.userRepository.update(userId, { pendingQr: { sessionId, expiresAt } });
     return { sessionId, qrDataUrl, expiresAt };
   }
 
-  /** @private — merges latest Google profile data into the existing user record */
   async _enrichProfile(user, data) {
     const updates = {};
 

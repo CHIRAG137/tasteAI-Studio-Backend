@@ -1,39 +1,21 @@
 'use strict';
 
-const BaseUseCase = require('../../../shared/usecases/BaseUseCase');
-const AuthProviderTypes = require('../../domain/providers/AuthProviderTypes');
+const AuthProviderTypes = require('../../infrastructure/providers/AuthProviderTypes');
 const GoogleOAuthHandler = require('./handlers/GoogleOAuthHandler');
 const Auth0OAuthHandler = require('./handlers/Auth0OAuthHandler');
 
-/**
- * Orchestrates OAuth login flows by delegating to provider-specific handlers.
- */
-class OAuthLoginUseCase extends BaseUseCase {
-  /**
-   * @param {object} deps
-   * @param {import('../../domain/factories/AuthProviderFactory')} deps.authProviderFactory
-   * @param {import('../../domain/repositories/IUserRepository')} deps.userRepository
-   * @param {import('../../domain/services/ITokenService')} deps.tokenService
-   * @param {import('../../domain/services/IQrService')} deps.qrService
-   * @param {import('../../domain/services/IEventBus')} deps.eventBus
-   */
+class OAuthLoginUseCase {
   constructor({ authProviderFactory, userRepository, tokenService, qrService, eventBus }) {
-    super();
     this.authProviderFactory = authProviderFactory;
 
     const handlerDeps = { userRepository, tokenService, qrService, eventBus };
 
-    // Map providerType → handler (Strategy pattern)
     this._handlers = new Map([
       [AuthProviderTypes.GOOGLE, new GoogleOAuthHandler(handlerDeps)],
       [AuthProviderTypes.AUTH0, new Auth0OAuthHandler(handlerDeps)],
     ]);
   }
 
-  /**
-   * @param {import('../../application/dto/LoginCommand')} command
-   * @param {string} providerType - One of AuthProviderTypes
-   */
   async execute(command, providerType) {
     const provider = this.authProviderFactory.getProvider(providerType);
     const authResult = await provider.authenticate(command);

@@ -1,17 +1,7 @@
 'use strict';
 
-const BaseUseCase = require('../../../shared/usecases/BaseUseCase');
-
-/**
- * Marks a QR session as scanned, activating the user's account.
- */
-class VerifyQrUseCase extends BaseUseCase {
-  /**
-   * @param {object} deps
-   * @param {import('../../domain/services/IQrService')} deps.qrService
-   */
+class VerifyQrUseCase {
   constructor({ qrService }) {
-    super();
     this.qrService = qrService;
   }
 
