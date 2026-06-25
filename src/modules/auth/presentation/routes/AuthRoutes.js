@@ -6,6 +6,21 @@ const { env } = require('../../../../config/env');
 const authValidator = require('../validators/AuthValidator');
 const { attachIpAddress } = require('../middleware/IpMiddleware');
 const asyncHandler = require('../../../shared/middleware/asyncHandler');
+const AuthProviderType = require('../../infrastructure/strategies/auth/AuthProviderType');
+
+function setAuthProvider(providerType) {
+  return (req, res, next) => {
+    req.authProvider = providerType;
+    next();
+  };
+}
+
+function setVerificationType(verificationType) {
+  return (req, res, next) => {
+    req.verificationType = verificationType;
+    next();
+  };
+}
 
 module.exports = function createAuthRoutes({ authController, authMiddleware }) {
   const router = express.Router();
@@ -31,6 +46,7 @@ module.exports = function createAuthRoutes({ authController, authMiddleware }) {
 
   router.post(
     '/register',
+    setAuthProvider(AuthProviderType.EMAIL_PASSWORD),
     attachIpAddress,
     authLimiter,
     authValidator.registerRules,
@@ -49,16 +65,18 @@ module.exports = function createAuthRoutes({ authController, authMiddleware }) {
     '/google-login',
     attachIpAddress,
     authLimiter,
+    setAuthProvider(AuthProviderType.GOOGLE),
     authValidator.googleLoginRules,
-    asyncHandler(authController.googleLogin),
+    asyncHandler(authController.oauthLogin),
   );
 
   router.post(
     '/auth0-login',
     attachIpAddress,
     authLimiter,
+    setAuthProvider(AuthProviderType.AUTH0),
     authValidator.auth0LoginRules,
-    asyncHandler(authController.auth0Login),
+    asyncHandler(authController.oauthLogin),
   );
 
   router.post(
@@ -71,25 +89,28 @@ module.exports = function createAuthRoutes({ authController, authMiddleware }) {
 
   router.post(
     '/verify-qr',
+    setVerificationType('qr'),
     attachIpAddress,
     qrLimiter,
     authValidator.qrVerifyRules,
-    asyncHandler(authController.verifyQr),
+    asyncHandler(authController.verify),
   );
 
   router.get(
     '/verify-qr',
+    setVerificationType('qr'),
     attachIpAddress,
     qrLimiter,
     authValidator.qrVerifyRules,
-    asyncHandler(authController.verifyQr),
+    asyncHandler(authController.verify),
   );
 
   router.get(
     '/qr-status/:sessionId',
+    setVerificationType('qr'),
     qrLimiter,
     authValidator.qrPollRules,
-    asyncHandler(authController.pollQrStatus),
+    asyncHandler(authController.pollVerificationStatus),
   );
 
   router.post('/logout', authMiddleware.requireAuth, asyncHandler(authController.logout));

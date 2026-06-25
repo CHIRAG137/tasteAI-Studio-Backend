@@ -1,30 +1,35 @@
 'use strict';
 
-const AuthProviderFactory = require('./infrastructure/providers/AuthProviderFactory');
-const AuthProviderTypes = require('./infrastructure/providers/AuthProviderTypes');
 const AuthRedisClient = require('./infrastructure/redis/AuthRedisClient');
-const JwtSigner = require('./infrastructure/strategies/JwtSigner');
-const AuthTokenStore = require('./infrastructure/strategies/AuthTokenStore');
-const JwtTokenService = require('./infrastructure/strategies/JwtTokenService');
-const RedisSessionService = require('./infrastructure/strategies/RedisSessionService');
-const RedisQrService = require('./infrastructure/strategies/RedisQrService');
+const BcryptPasswordHasher = require('./infrastructure/services/BcryptPasswordHasher');
+const JwtSigner = require('./infrastructure/services/JwtSigner');
+const AuthTokenStore = require('./infrastructure/redis/AuthTokenStore');
+const JwtTokenService = require('./infrastructure/services/JwtTokenService');
+const RedisSessionService = require('./infrastructure/redis/RedisSessionService');
+const RedisQrService = require('./infrastructure/qr/RedisQrService');
+const PhoneService = require('./infrastructure/qr/PhoneService');
 const MongoUserRepository = require('./infrastructure/repositories/MongoUserRepository');
-const BcryptPasswordHasher = require('./infrastructure/strategies/BcryptPasswordHasher');
-const EmailPasswordAuthProvider = require('./infrastructure/providers/EmailPasswordAuthProvider');
-const GoogleAuthProvider = require('./infrastructure/providers/GoogleAuthProvider');
-const Auth0AuthProvider = require('./infrastructure/providers/Auth0AuthProvider');
-const InMemoryEventBus = require('./infrastructure/strategies/InMemoryEventBus');
-const GoogleOAuthClient = require('./infrastructure/strategies/GoogleOAuthClient');
-const Auth0Client = require('./infrastructure/strategies/Auth0Client');
-const RedisClient = require('./infrastructure/strategies/RedisClient');
+const InMemoryEventBus = require('./infrastructure/services/InMemoryEventBus');
+const GoogleOAuthClient = require('./infrastructure/providers/clients/GoogleOAuthClient');
+const Auth0Client = require('./infrastructure/providers/clients/Auth0Client');
+const RedisClient = require('./infrastructure/redis/RedisClient');
 const { env } = require('../../config/env');
-const RegisterUserUseCase = require('./application/usecases/RegisterUserUseCase');
-const LoginUserUseCase = require('./application/usecases/LoginUserUseCase');
-const OAuthLoginUseCase = require('./application/usecases/OAuthLoginUseCase');
+
+const AuthStrategyFactory = require('./infrastructure/strategies/auth/AuthStrategyFactory');
+const AuthProviderType = require('./infrastructure/strategies/auth/AuthProviderType');
+const EmailPasswordStrategy = require('./infrastructure/strategies/auth/EmailPasswordStrategy');
+const GoogleStrategy = require('./infrastructure/strategies/auth/GoogleStrategy');
+const Auth0Strategy = require('./infrastructure/strategies/auth/Auth0Strategy');
+const QrVerificationStrategy = require('./infrastructure/strategies/verification/QrVerificationStrategy');
+const VerificationStrategyFactory = require('./infrastructure/strategies/verification/VerificationStrategyFactory');
+const VerificationService = require('./application/services/VerificationService');
+
+const LoginUseCase = require('./application/usecases/LoginUseCase');
+const RegisterUseCase = require('./application/usecases/RegisterUseCase');
 const RefreshTokenUseCase = require('./application/usecases/RefreshTokenUseCase');
 const LogoutUserUseCase = require('./application/usecases/LogoutUserUseCase');
-const VerifyQrUseCase = require('./application/usecases/VerifyQrUseCase');
-const PollQrStatusUseCase = require('./application/usecases/PollQrStatusUseCase');
+const VerifyVerificationUseCase = require('./application/usecases/VerifyVerificationUseCase');
+const PollVerificationUseCase = require('./application/usecases/PollVerificationUseCase');
 const GetCurrentUserUseCase = require('./application/queries/GetCurrentUserQuery');
 const AuthFacade = require('./application/facades/AuthFacade');
 const AuthController = require('./presentation/controllers/AuthController');
@@ -47,15 +52,42 @@ function createAuthModule() {
   const passwordHasher = new BcryptPasswordHasher();
   const tokenService = new JwtTokenService(userRepository, jwtSigner, tokenStore);
   const sessionService = new RedisSessionService(tokenStore);
-  const qrService = new RedisQrService(userRepository, authRedisClient);
+  const phoneService = new PhoneService(userRepository, authRedisClient);
+  const qrService = new RedisQrService(userRepository, authRedisClient, phoneService);
   const eventBus = new InMemoryEventBus();
 
-  const authProviderFactory = new AuthProviderFactory();
-  authProviderFactory.register(new EmailPasswordAuthProvider(userRepository, passwordHasher));
+  // Verification — Strategy pattern (QR today, magic link/email tomorrow)
+  const verificationStrategyFactory = new VerificationStrategyFactory();
+  verificationStrategyFactory.register(new QrVerificationStrategy(qrService));
+  // Future: verificationStrategyFactory.register(new MagicLinkVerificationStrategy(emailService));
+
+  const verificationService = new VerificationService({
+    factory: verificationStrategyFactory,
+    defaultType: 'qr',
+  });
+
+  // Register auth strategies (Strategy pattern — one per provider)
+  const authStrategyFactory = new AuthStrategyFactory();
+  authStrategyFactory.register(
+    new EmailPasswordStrategy({
+      userRepository,
+      passwordHasher,
+      tokenService,
+      verificationService,
+    }),
+  );
 
   if (env.GOOGLE_CLIENT_ID) {
     const googleOAuthClient = new GoogleOAuthClient({ clientId: env.GOOGLE_CLIENT_ID });
-    authProviderFactory.register(new GoogleAuthProvider(googleOAuthClient));
+    authStrategyFactory.register(
+      new GoogleStrategy({
+        userRepository,
+        tokenService,
+        verificationService,
+        eventBus,
+        googleOAuthClient,
+      }),
+    );
   }
 
   if (env.AUTH0_DOMAIN) {
@@ -63,43 +95,33 @@ function createAuthModule() {
       domain: env.AUTH0_DOMAIN,
       audience: env.AUTH0_AUDIENCE,
     });
-    authProviderFactory.register(new Auth0AuthProvider(auth0Client));
+    authStrategyFactory.register(
+      new Auth0Strategy({
+        userRepository,
+        tokenService,
+        verificationService,
+        eventBus,
+        auth0Client,
+      }),
+    );
   }
 
-  const registerUserUseCase = new RegisterUserUseCase({
-    userRepository,
-    qrService,
-    passwordHasher,
-  });
-
-  const loginUserUseCase = new LoginUserUseCase({
-    authProviderFactory,
-    tokenService,
-    eventBus,
-  });
-
-  const oauthLoginUseCase = new OAuthLoginUseCase({
-    authProviderFactory,
-    userRepository,
-    tokenService,
-    qrService,
-    eventBus,
-  });
-
+  // Use cases
+  const loginUseCase = new LoginUseCase({ authStrategyFactory });
+  const registerUseCase = new RegisterUseCase({ authStrategyFactory });
   const refreshTokenUseCase = new RefreshTokenUseCase({ tokenService });
   const logoutUserUseCase = new LogoutUserUseCase({ tokenService });
-  const verifyQrUseCase = new VerifyQrUseCase({ qrService });
-  const pollQrStatusUseCase = new PollQrStatusUseCase({ qrService });
+  const verifyUseCase = new VerifyVerificationUseCase({ verificationService });
+  const pollVerificationUseCase = new PollVerificationUseCase({ verificationService });
   const getCurrentUserUseCase = new GetCurrentUserUseCase({ userRepository });
 
   const authFacade = new AuthFacade({
-    registerUserUseCase,
-    loginUserUseCase,
-    oauthLoginUseCase,
+    registerUseCase,
+    loginUseCase,
     refreshTokenUseCase,
     logoutUserUseCase,
-    verifyQrUseCase,
-    pollQrStatusUseCase,
+    verifyUseCase,
+    pollVerificationUseCase,
     getCurrentUserUseCase,
   });
 
@@ -123,8 +145,8 @@ function createAuthModule() {
     tokenStore,
     jwtSigner,
     eventBus,
-    authProviderFactory,
+    authStrategyFactory,
   };
 }
 
-module.exports = { createAuthModule, AuthProviderTypes };
+module.exports = { createAuthModule, AuthProviderTypes: AuthProviderType };

@@ -1,7 +1,7 @@
 'use strict';
 
-const AuthRedisKeyScheme = require('../redis/AuthRedisKeyScheme');
-const JwtSigner = require('./JwtSigner');
+const AuthRedisKeyScheme = require('./AuthRedisKeyScheme');
+const JwtSigner = require('../services/JwtSigner');
 
 class AuthTokenStore {
   constructor(redisClient) {

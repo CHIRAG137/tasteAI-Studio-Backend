@@ -1,11 +1,10 @@
 'use strict';
 
 const mongoose = require('mongoose');
-const bcrypt = require('bcrypt');
 
 const LastLoginSchema = new mongoose.Schema(
   {
-    method: { type: String, enum: ['email_password', 'google', 'auth0'], default: null },
+    method: { type: String, default: null },
     ip: { type: String, default: null },
     device: { type: String, default: null },
     deviceId: { type: String, default: null },
@@ -76,7 +75,6 @@ const UserSchema = new mongoose.Schema(
     auth0Profile: { type: Auth0ProfileSchema, default: null },
     authMethods: {
       type: [String],
-      enum: ['email_password', 'google', 'auth0'],
       default: [],
     },
     refreshTokenFamily: { type: String, default: null },
@@ -122,13 +120,6 @@ UserSchema.statics.findByOAuthOrEmail = function ({ email, googleId, auth0Id }) 
     return null;
   }
   return this.findOne({ $or: conditions });
-};
-
-UserSchema.methods.verifyPassword = async function (plaintext) {
-  if (!this.password) {
-    return false;
-  }
-  return bcrypt.compare(plaintext, this.password);
 };
 
 module.exports = mongoose.models.User || mongoose.model('User', UserSchema);

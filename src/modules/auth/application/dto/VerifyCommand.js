@@ -1,6 +1,6 @@
 'use strict';
 
-class VerifyQrCommand {
+class VerifyCommand {
   constructor({ sessionId, phoneNumber, countryCode, deviceInfo }) {
     this.sessionId = sessionId;
     this.phoneNumber = phoneNumber;
@@ -10,4 +10,4 @@ class VerifyQrCommand {
   }
 }
 
-module.exports = VerifyQrCommand;
+module.exports = VerifyCommand;

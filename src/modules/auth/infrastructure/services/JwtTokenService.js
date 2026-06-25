@@ -1,10 +1,6 @@
 'use strict';
 
-const {
-  AppException,
-  UnauthorizedException,
-  ForbiddenException,
-} = require('../../../shared/exceptions');
+const { UnauthorizedException, ForbiddenException } = require('../../../shared/exceptions');
 const logger = require('../../../shared/logging');
 
 function buildLastLoginMeta(method, meta = {}) {
