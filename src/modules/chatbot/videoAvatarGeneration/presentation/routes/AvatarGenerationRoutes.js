@@ -1,29 +1,27 @@
 'use strict';
 
 const express = require('express');
+const asyncHandler = require('../../../../shared/middleware/asyncHandler');
 
 function createAvatarGenerationRoutes({ avatarGenerationController, authGuard, uploadMiddleware }) {
   const router = express.Router();
-
-  if (authGuard) {
-    router.use(authGuard);
-  }
+  const guard = authGuard ?? ((req, res, next) => next());
 
   router.post(
     '/generate-image',
+    guard,
     uploadMiddleware.single('video_bot_image'),
-    avatarGenerationController.generateAvatar.bind(avatarGenerationController),
+    asyncHandler(avatarGenerationController.generateAvatar),
   );
 
   router.post(
     '/upload-cropped-image',
+    guard,
     uploadMiddleware.single('video_bot_image'),
-    avatarGenerationController.uploadAvatar.bind(avatarGenerationController),
+    asyncHandler(avatarGenerationController.uploadCroppedImage),
   );
 
   return router;
 }
 
-module.exports = {
-  createAvatarGenerationRoutes,
-};
+module.exports = { createAvatarGenerationRoutes };

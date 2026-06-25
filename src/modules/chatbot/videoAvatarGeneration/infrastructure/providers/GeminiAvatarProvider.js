@@ -1,15 +1,21 @@
 'use strict';
 
-const IAvatarGenerationService = require('../../domain/services/IAvatarGenerationService');
+const AvatarProviderTypes = require('./AvatarProviderTypes');
+const logger = require('../../../../shared/logging');
 
-class GeminiAvatarGenerationService extends IAvatarGenerationService {
+class GeminiAvatarProvider {
   constructor(geminiClient) {
-    super();
-    this.geminiClient = geminiClient;
+    this._client = geminiClient;
+  }
+
+  getType() {
+    return AvatarProviderTypes.GEMINI;
   }
 
   async generateAvatar({ imageBuffer, mimeType, prompt }) {
-    const model = this.geminiClient.getGenerativeModel({
+    logger.info('Generating avatar with Gemini', { prompt });
+
+    const model = this._client.getGenerativeModel({
       model: 'gemini-3-pro-image-preview',
     });
 
@@ -33,12 +39,13 @@ class GeminiAvatarGenerationService extends IAvatarGenerationService {
       throw new Error('No image returned from Gemini');
     }
 
+    logger.info('Avatar generated successfully');
+
     return {
       videoBotImageBase64: imagePart.inlineData.data,
-
       videoBotImageMimeType: imagePart.inlineData.mimeType || 'image/png',
     };
   }
 }
 
-module.exports = GeminiAvatarGenerationService;
+module.exports = GeminiAvatarProvider;
