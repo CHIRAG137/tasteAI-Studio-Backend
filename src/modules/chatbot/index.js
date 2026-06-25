@@ -54,7 +54,7 @@ function createChatbotModule({ authMiddleware } = {}) {
   // ── Website Scraping ───────────────────────────────────────────────────────
   const { router: webScrapingRouter } = createWebScrapingSubModule({ authGuard: authMiddleware });
   router.use('/scrape', webScrapingRouter);
-  const { router: avatarRouter } = createAvatarGenerationSubModule({ authMiddleware });
+  const { router: avatarRouter } = createAvatarGenerationSubModule({ authGuard: authMiddleware });
   router.use('/avatar', avatarRouter);
   const { router: creationRouter } = createChatbotCreationModule({
     provisionBotAgentsUseCase: humanAgentModule.provisionBotAgentsUseCase,

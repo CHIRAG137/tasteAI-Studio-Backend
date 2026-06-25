@@ -1,50 +1,31 @@
 'use strict';
 
-const { createGeminiClient } = require('./infrastructure/ai/GeminiClient');
-
-const { createCloudinaryClient } = require('./infrastructure/storage/CloudinaryClient');
-
-const GeminiAvatarGenerationService = require('./infrastructure/ai/GeminiAvatarGenerationService');
-
-const CloudinaryAvatarStorageService = require('./infrastructure/storage/CloudinaryAvatarStorageService');
-
-const GenerateAvatarUseCase = require('./application/usecases/GenerateAvatarUseCase');
-
-const UploadAvatarUseCase = require('./application/usecases/UploadAvatarUseCase');
-
-const AvatarGenerationController = require('./api/controllers/AvatarGenerationController');
-
-const { createAvatarGenerationRoutes } = require('./api/routes/AvatarGenerationRoutes');
-
-const uploadMiddleware = require('./api/middleware/AvatarUploadMiddleware');
+const { createGeminiAvatarClient } = require('./infrastructure/strategies/GeminiAvatarClient');
+const { createCloudinaryClient } = require('./infrastructure/strategies/CloudinaryClient');
+const GeminiAvatarProvider = require('./infrastructure/providers/GeminiAvatarProvider');
+const CloudinaryAvatarProvider = require('./infrastructure/providers/CloudinaryAvatarProvider');
+const AvatarProviderFactory = require('./infrastructure/providers/AvatarProviderFactory');
+const AvatarGenerationFacade = require('./application/facades/AvatarGenerationFacade');
+const AvatarGenerationController = require('./presentation/controllers/AvatarGenerationController');
+const { createAvatarGenerationRoutes } = require('./presentation/routes/AvatarGenerationRoutes');
+const uploadMiddleware = require('./presentation/middleware/AvatarUploadMiddleware');
 
 function createAvatarGenerationSubModule({ authGuard } = {}) {
-  // Infrastructure
-
-  const geminiClient = createGeminiClient();
-
+  const geminiAvatarClient = createGeminiAvatarClient();
   const cloudinaryClient = createCloudinaryClient();
+  const geminiAvatarProvider = new GeminiAvatarProvider(geminiAvatarClient);
+  const cloudinaryAvatarProvider = new CloudinaryAvatarProvider(cloudinaryClient);
 
-  const avatarGenerationService = new GeminiAvatarGenerationService(geminiClient);
+  const providerFactory = new AvatarProviderFactory();
+  providerFactory.register(geminiAvatarProvider);
+  providerFactory.register(cloudinaryAvatarProvider);
 
-  const avatarStorageService = new CloudinaryAvatarStorageService(cloudinaryClient);
-
-  // Application
-
-  const generateAvatarUseCase = new GenerateAvatarUseCase({
-    avatarGenerationService,
+  const avatarGenerationFacade = new AvatarGenerationFacade({
+    avatarProvider: geminiAvatarProvider,
+    storageProvider: cloudinaryAvatarProvider,
   });
 
-  const uploadAvatarUseCase = new UploadAvatarUseCase({
-    avatarStorageService,
-  });
-
-  // API
-
-  const avatarGenerationController = new AvatarGenerationController({
-    generateAvatarUseCase,
-    uploadAvatarUseCase,
-  });
+  const avatarGenerationController = new AvatarGenerationController({ avatarGenerationFacade });
 
   const router = createAvatarGenerationRoutes({
     avatarGenerationController,
@@ -52,11 +33,7 @@ function createAvatarGenerationSubModule({ authGuard } = {}) {
     uploadMiddleware,
   });
 
-  return {
-    router,
-  };
+  return { router };
 }
 
-module.exports = {
-  createAvatarGenerationSubModule,
-};
+module.exports = { createAvatarGenerationSubModule };
