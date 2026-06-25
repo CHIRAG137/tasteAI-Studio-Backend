@@ -1,22 +1,15 @@
 'use strict';
 
-const ICustomizationProvisioningService = require('../../domain/services/ICustomizationProvisioningService');
-
-class CustomizationProvisioningAdapter extends ICustomizationProvisioningService {
+class CustomizationProvisioningAdapter {
   constructor({ createDefaultCustomizationUseCase }) {
-    super();
-
     if (!createDefaultCustomizationUseCase) {
       throw new Error('createDefaultCustomizationUseCase is required');
     }
-
     this.createDefaultCustomizationUseCase = createDefaultCustomizationUseCase;
   }
 
-  async createDefaults({ botId }) {
-    return this.createDefaultCustomizationUseCase.execute({
-      botId,
-    });
+  async createDefaults({ botId, botName }) {
+    return this.createDefaultCustomizationUseCase.execute({ botId, botName });
   }
 }
 

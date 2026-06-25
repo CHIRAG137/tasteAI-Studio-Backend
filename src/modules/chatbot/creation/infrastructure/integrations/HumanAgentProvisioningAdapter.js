@@ -1,19 +1,16 @@
 'use strict';
 
-const IHumanAgentProvisioningService = require('../../domain/services/IHumanAgentProvisioningService');
-
-class HumanAgentProvisioningAdapter extends IHumanAgentProvisioningService {
+class HumanAgentProvisioningAdapter {
   constructor({ provisionBotAgentsUseCase }) {
-    super();
-
     this.provisionBotAgentsUseCase = provisionBotAgentsUseCase;
   }
 
-  async provision({ botId, invitedBy, emails }) {
+  async provision({ botId, invitedBy, emails, botName }) {
     return this.provisionBotAgentsUseCase.execute({
       botId,
       invitedBy,
       emails,
+      botName,
     });
   }
 }

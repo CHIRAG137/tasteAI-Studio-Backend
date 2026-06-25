@@ -2,105 +2,199 @@
 
 class ChatbotCreationOrchestrator {
   constructor({
-    slackValidationService,
-    llmValidationService,
-
     chatbotRepository,
-
+    slackValidationService,
+    slackJoinService,
+    llmValidationService,
     customizationProvisioningService,
     humanAgentProvisioningService,
     qaKnowledgeProvisioningService,
+    logger,
   }) {
-    this.slackValidationService = slackValidationService;
-
-    this.llmValidationService = llmValidationService;
-
     this.chatbotRepository = chatbotRepository;
-
+    this.slackValidationService = slackValidationService;
+    this.slackJoinService = slackJoinService;
+    this.llmValidationService = llmValidationService;
     this.customizationProvisioningService = customizationProvisioningService;
-
     this.humanAgentProvisioningService = humanAgentProvisioningService;
-
     this.qaKnowledgeProvisioningService = qaKnowledgeProvisioningService;
+    this.logger = logger;
   }
 
   async create({ chatbot, command }) {
-    await this.validateSlack(command);
-
-    await this.validateLLM(command);
-
-    const createdBot = await this.chatbotRepository.create(chatbot);
-
-    await this.createCustomization(createdBot.id);
-
-    await this.provisionHumanAgents(createdBot.id, command);
-
-    await this.trainKnowledge(createdBot.id, command);
-
-    return createdBot;
-  }
-
-  async validateSlack(command) {
-    if (!command.isSlackEnabled) {
-      return;
-    }
-
     await this.slackValidationService.validate({
       userId: command.userId,
       slackChannelId: command.slackChannelId,
     });
-  }
-
-  async validateLLM(command) {
-    if (!command.llmProvider) {
-      return;
-    }
 
     await this.llmValidationService.validate({
       provider: command.llmProvider,
-
       model: command.llmModel,
-
       encryptedApiKey: command.encryptedApiKey,
     });
-  }
 
-  async createCustomization(botId) {
+    const createdBot = await this.chatbotRepository.create(chatbot);
+
     await this.customizationProvisioningService.createDefaults({
-      botId,
+      botId: createdBot._id,
+      botName: command.name,
     });
-  }
 
-  async provisionHumanAgents(botId, command) {
-    if (!command.humanHandoffEnabled) {
-      return;
+    const agentProvisioningResult =
+      command.humanHandoffEnabled && command.humanHandoffEmails.length > 0
+        ? await this.humanAgentProvisioningService.provision({
+            botId: createdBot._id,
+            invitedBy: command.userId,
+            emails: command.humanHandoffEmails,
+            botName: command.name,
+          })
+        : { agentsCount: 0, existingAgents: [] };
+
+    const processingPromises = [];
+
+    const hasScrapedContent = command.scrapedContent && command.scrapedContent.length > 0;
+    const hasFiles = command.files && command.files.length > 0;
+
+    if (hasScrapedContent || hasFiles) {
+      processingPromises.push(
+        this.qaKnowledgeProvisioningService
+          .train({
+            botId: createdBot._id,
+            scrapedContent: command.scrapedContent,
+            files: command.files,
+          })
+          .catch((err) => {
+            this.logger.error('Knowledge training failed', {
+              botId: createdBot._id,
+              error: err.message,
+            });
+            return { markdownQAs: 0, fileQAs: 0, trainingFilesMeta: [] };
+          }),
+      );
     }
 
-    await this.humanAgentProvisioningService.provision({
-      botId,
-
-      invitedBy: command.userId,
-
-      emails: command.humanHandoffEmails,
-    });
-  }
-
-  async trainKnowledge(botId, command) {
-    const hasFiles = command.files?.length > 0;
-
-    const hasUrls = command.scrapedUrls?.length > 0;
-
-    if (!hasFiles && !hasUrls) {
-      return;
+    if (command.isSlackEnabled && command.slackChannelId) {
+      processingPromises.push(
+        this.slackJoinService
+          .join({
+            userId: command.userId,
+            channelId: command.slackChannelId,
+          })
+          .catch((err) => {
+            this.logger.error('Slack join failed', { botId: createdBot._id, error: err.message });
+            return { slackJoined: false };
+          }),
+      );
     }
 
-    await this.qaKnowledgeProvisioningService.train({
-      botId,
+    let markdownQAs = 0;
+    let fileQAs = 0;
+    let trainingFilesMeta = [];
+    let slackJoined = false;
 
-      files: command.files,
+    if (processingPromises.length > 0) {
+      const results = await Promise.allSettled(processingPromises);
 
-      urls: command.scrapedUrls,
-    });
+      results.forEach((result) => {
+        if (result.status !== 'fulfilled') {
+          return;
+        }
+        const val = result.value;
+        if ('markdownQAs' in val) {
+          markdownQAs = val.markdownQAs || 0;
+          fileQAs = val.fileQAs || 0;
+          trainingFilesMeta = val.trainingFilesMeta || [];
+        } else if ('slackJoined' in val) {
+          slackJoined = val.slackJoined;
+        }
+      });
+    }
+
+    if (trainingFilesMeta.length > 0) {
+      try {
+        await this.chatbotRepository.update(createdBot._id, { training_files: trainingFilesMeta });
+      } catch (err) {
+        this.logger.error('Failed to save training file metadata', {
+          botId: createdBot._id,
+          error: err.message,
+        });
+      }
+    }
+
+    const humanHandoffEnabled = command.humanHandoffEnabled === true;
+    const parsedHumanEmails = command.humanHandoffEmails || [];
+    const scrapedPagesCount = command.scrapedContent ? command.scrapedContent.length : 0;
+    const filesCount = command.files ? command.files.length : 0;
+
+    const messageParts = [`Bot "${command.name}" created successfully`];
+
+    const capabilities = [];
+    if (command.isVoiceEnabled) {
+      capabilities.push('voice');
+    }
+    if (command.isVideoBot) {
+      capabilities.push('video');
+    }
+    if (capabilities.length > 0) {
+      messageParts.push(`with ${capabilities.join(' & ')} support`);
+    }
+
+    if (command.supportedLanguages && command.supportedLanguages.length > 0) {
+      messageParts.push(`supporting ${command.supportedLanguages.length} language(s)`);
+    }
+
+    const processedSources = [];
+    if (markdownQAs > 0) {
+      processedSources.push(`${scrapedPagesCount} scraped page(s) (${markdownQAs} Q&As)`);
+    }
+    if (fileQAs > 0) {
+      processedSources.push(`${filesCount} uploaded file(s) (${fileQAs} Q&As)`);
+    }
+    if (processedSources.length > 0) {
+      messageParts.push(`trained on ${processedSources.join(' and ')}`);
+    }
+
+    if (humanHandoffEnabled && parsedHumanEmails.length > 0) {
+      messageParts.push(
+        `with human handoff enabled for ${agentProvisioningResult.agentsCount} agent(s)`,
+      );
+    }
+
+    if (slackJoined) {
+      messageParts.push('and connected to Slack');
+    }
+
+    const message = `${messageParts.join(', ')}.`;
+
+    return {
+      message,
+      chatbot: createdBot,
+      scrapedContent: {
+        pages: scrapedPagesCount,
+        qas: markdownQAs,
+      },
+      files: {
+        uploaded: filesCount > 0,
+        count: filesCount,
+        qas: fileQAs,
+      },
+      totalQAs: markdownQAs + fileQAs,
+      integrations: {
+        slack: {
+          enabled: command.isSlackEnabled,
+          channelId: command.slackChannelId || null,
+          connected: slackJoined,
+        },
+        humanHandoff: {
+          enabled: humanHandoffEnabled,
+          agentCount: agentProvisioningResult.agentsCount,
+          agentEmails: parsedHumanEmails,
+        },
+      },
+      meta: {
+        createdBy: command.userId,
+      },
+    };
   }
 }
 

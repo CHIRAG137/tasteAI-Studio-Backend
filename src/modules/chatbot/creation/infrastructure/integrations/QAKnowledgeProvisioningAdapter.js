@@ -1,19 +1,15 @@
 'use strict';
 
-const IQAKnowledgeProvisioningService = require('../../domain/services/IQAKnowledgeProvisioningService');
-
-class QAKnowledgeProvisioningAdapter extends IQAKnowledgeProvisioningService {
+class QAKnowledgeProvisioningAdapter {
   constructor({ trainKnowledgeBaseUseCase }) {
-    super();
-
     this.trainKnowledgeBaseUseCase = trainKnowledgeBaseUseCase;
   }
 
-  async train({ botId, files, urls }) {
+  async train({ botId, scrapedContent, files }) {
     return this.trainKnowledgeBaseUseCase.execute({
       botId,
+      scrapedContent,
       files,
-      urls,
     });
   }
 }
