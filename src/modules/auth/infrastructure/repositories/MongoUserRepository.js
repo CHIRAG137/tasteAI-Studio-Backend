@@ -2,8 +2,9 @@
 
 const UserModel = require('../persistence/UserModel');
 const UserMapper = require('../mappers/UserMapper');
+const IUserRepository = require('../../domain/contracts/IUserRepository');
 
-class MongoUserRepository {
+class MongoUserRepository extends IUserRepository {
   async findById(id) {
     const doc = await UserModel.findById(id);
     return UserMapper.toDomain(doc);

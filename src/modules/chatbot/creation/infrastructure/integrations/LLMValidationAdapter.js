@@ -1,16 +1,16 @@
 'use strict';
 
-const ILLMValidationService = require('../../domain/services/ILLMValidationService');
-
-class LLMValidationAdapter extends ILLMValidationService {
+class LLMValidationAdapter {
   constructor({ validateLLMConnectionUseCase }) {
-    super();
-
     this.validateLLMConnectionUseCase = validateLLMConnectionUseCase;
   }
 
-  async validate(payload) {
-    return this.validateLLMConnectionUseCase.execute(payload);
+  async validate({ provider, model, encryptedApiKey }) {
+    return this.validateLLMConnectionUseCase.execute({
+      provider,
+      model,
+      apiKey: encryptedApiKey,
+    });
   }
 }
 

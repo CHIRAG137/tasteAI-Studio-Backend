@@ -1,18 +1,23 @@
 'use strict';
 
 const TrainKnowledgeBaseUseCase = require('./application/TrainKnowledgeBaseUseCase');
+const QAContentProcessingAdapter = require('./infrastructure/QAContentProcessingAdapter');
 
-const QAHistoryModel = require('../models/QAHistory');
+const QAHistoryModel = require('../../../../models/QAHistory');
+const SpreadsheetConfigModel = require('../../../../models/SpreadsheetConfig');
 
-const QAHistoryRepository = require('../repositories/QAHistoryRepository');
+const logger = require('../../shared/logging');
 
 function createQAKnowledgeTrainingModule() {
-  const qaHistoryRepository = new QAHistoryRepository({
+  const contentProcessor = new QAContentProcessingAdapter({
     QAHistoryModel,
+    SpreadsheetConfigModel,
+    logger,
   });
 
   const trainKnowledgeBaseUseCase = new TrainKnowledgeBaseUseCase({
-    qaHistoryRepository,
+    contentProcessor,
+    logger,
   });
 
   return {

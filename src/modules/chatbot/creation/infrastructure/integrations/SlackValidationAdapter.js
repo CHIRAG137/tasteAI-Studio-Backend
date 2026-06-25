@@ -1,16 +1,15 @@
 'use strict';
 
-const ISlackValidationService = require('../../domain/services/ISlackValidationService');
-
-class SlackValidationAdapter extends ISlackValidationService {
+class SlackValidationAdapter {
   constructor({ validateSlackWorkspaceUseCase }) {
-    super();
-
     this.validateSlackWorkspaceUseCase = validateSlackWorkspaceUseCase;
   }
 
-  async validate(payload) {
-    return this.validateSlackWorkspaceUseCase.execute(payload);
+  async validate({ userId, slackChannelId }) {
+    return this.validateSlackWorkspaceUseCase.execute({
+      userId,
+      slackEnabled: Boolean(slackChannelId),
+    });
   }
 }
 

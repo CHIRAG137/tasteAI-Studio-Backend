@@ -1,94 +1,35 @@
 'use strict';
 
-/*
-|--------------------------------------------------------------------------
-| Repository
-|--------------------------------------------------------------------------
-*/
-
 const MongoChatbotRepository = require('./infrastructure/persistence/MongoChatbotRepository');
-
 const ChatBotModel = require('../models/ChatbotModel');
 
-/*
-|--------------------------------------------------------------------------
-| Adapters
-|--------------------------------------------------------------------------
-*/
-
 const HumanAgentProvisioningAdapter = require('./infrastructure/integrations/HumanAgentProvisioningAdapter');
-
 const SlackValidationAdapter = require('./infrastructure/integrations/SlackValidationAdapter');
-
+const SlackJoinAdapter = require('./infrastructure/integrations/SlackJoinAdapter');
 const CustomizationProvisioningAdapter = require('./infrastructure/integrations/CustomizationProvisioningAdapter');
-
 const QAKnowledgeProvisioningAdapter = require('./infrastructure/integrations/QAKnowledgeProvisioningAdapter');
-
 const LLMValidationAdapter = require('./infrastructure/integrations/LLMValidationAdapter');
-
-/*
-|--------------------------------------------------------------------------
-| Application
-|--------------------------------------------------------------------------
-*/
+const EncryptionAdapter = require('./infrastructure/security/EncryptionAdapter');
 
 const ChatbotCreationOrchestrator = require('./application/orchestrators/ChatbotCreationOrchestrator');
-
 const CreateChatbotUseCase = require('./application/usecases/CreateChatbotUseCase');
 
-/*
-|--------------------------------------------------------------------------
-| API
-|--------------------------------------------------------------------------
-*/
-
 const ChatbotCreationController = require('./api/controllers/ChatbotCreationController');
-
 const { createChatbotCreationRoutes } = require('./api/routes/ChatbotCreationRoutes');
 
-const { createAuthModule } = require('../../auth/index');
-
-const authModule = createAuthModule();
-
-/*
-|--------------------------------------------------------------------------
-| Shared
-|--------------------------------------------------------------------------
-*/
-
 const logger = require('../../shared/logging');
-
 const responseBuilder = require('../../shared/response/ApiResponse');
 
 function createChatbotCreationModule({
+  authMiddleware,
   provisionBotAgentsUseCase,
   validateSlackWorkspaceUseCase,
+  joinSlackChannelUseCase,
   createDefaultCustomizationUseCase,
   trainKnowledgeBaseUseCase,
   validateLLMConnectionUseCase,
 }) {
-  console.log({
-    provisionBotAgentsUseCase,
-    validateSlackWorkspaceUseCase,
-    createDefaultCustomizationUseCase,
-    trainKnowledgeBaseUseCase,
-    validateLLMConnectionUseCase,
-  });
-  /*
-  |--------------------------------------------------------------------------
-  | Repository
-  |--------------------------------------------------------------------------
-  */
-
-  const chatbotRepository = new MongoChatbotRepository({
-    ChatBotModel,
-  });
-
-  /*
-  |--------------------------------------------------------------------------
-  | Adapters
-  |--------------------------------------------------------------------------
-  */
+  const chatbotRepository = new MongoChatbotRepository({ ChatBotModel });
 
   const humanAgentProvisioningService = new HumanAgentProvisioningAdapter({
     provisionBotAgentsUseCase,
@@ -96,6 +37,10 @@ function createChatbotCreationModule({
 
   const slackValidationService = new SlackValidationAdapter({
     validateSlackWorkspaceUseCase,
+  });
+
+  const slackJoinService = new SlackJoinAdapter({
+    joinSlackChannelUseCase,
   });
 
   const customizationProvisioningService = new CustomizationProvisioningAdapter({
@@ -110,55 +55,36 @@ function createChatbotCreationModule({
     validateLLMConnectionUseCase,
   });
 
-  /*
-  |--------------------------------------------------------------------------
-  | Application
-  |--------------------------------------------------------------------------
-  */
+  const encryptionService = new EncryptionAdapter();
 
   const chatbotCreationOrchestrator = new ChatbotCreationOrchestrator({
     chatbotRepository,
-
     humanAgentProvisioningService,
-
     slackValidationService,
-
+    slackJoinService,
     customizationProvisioningService,
-
     qaKnowledgeProvisioningService,
-
     llmValidationService,
+    logger,
   });
 
   const createChatbotUseCase = new CreateChatbotUseCase({
     chatbotCreationOrchestrator,
+    encryptionService,
   });
-
-  /*
-  |--------------------------------------------------------------------------
-  | API
-  |--------------------------------------------------------------------------
-  */
 
   const chatbotCreationController = new ChatbotCreationController({
     createChatbotUseCase,
-
     logger,
-
     responseBuilder,
   });
 
   const router = createChatbotCreationRoutes({
     chatbotCreationController,
-
-    authMiddleware: authModule.authMiddleware,
+    authMiddleware,
   });
 
-  return {
-    router,
-  };
+  return { router };
 }
 
-module.exports = {
-  createChatbotCreationModule,
-};
+module.exports = { createChatbotCreationModule };
