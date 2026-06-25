@@ -142,7 +142,23 @@ const {
   createServiceIntegrationStrategy,
 } = require('./src/config/serviceIntegration/ServiceIntegrationFactory');
 
+// Mount auth first — its middleware is needed by downstream services
+const authModule = createServiceIntegrationStrategy('auth').mount(
+  app,
+  SERVICE_REGISTRY.auth.mountPath,
+);
+
+// Inject auth middleware into chatbot so web scraping routes are protected
+SERVICE_REGISTRY.chatbot.createModule = () =>
+  require('./src/modules/chatbot').createChatbotModule({
+    authMiddleware: authModule.authMiddleware.requireAuth,
+  });
+
+// Mount remaining services
 Object.entries(SERVICE_REGISTRY).forEach(([key, config]) => {
+  if (key === 'auth') {
+    return;
+  }
   const strategy = createServiceIntegrationStrategy(key);
   strategy.mount(app, config.mountPath);
 });

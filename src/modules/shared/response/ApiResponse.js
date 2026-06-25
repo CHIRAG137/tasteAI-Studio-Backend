@@ -20,6 +20,11 @@ class ApiResponse {
     return res.status(201).json({ success: true, message, data: data ?? null });
   }
 
+  /** 202 Accepted */
+  static accepted(res, data, message = 'Accepted') {
+    return res.status(202).json({ success: true, message, data: data ?? null });
+  }
+
   /** 204 No Content */
   static noContent(res) {
     return res.status(204).end();

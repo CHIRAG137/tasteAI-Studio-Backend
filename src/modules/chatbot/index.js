@@ -52,7 +52,7 @@ function createChatbotModule({ authMiddleware } = {}) {
   const router = express.Router();
 
   // ── Website Scraping ───────────────────────────────────────────────────────
-  const { router: webScrapingRouter } = createWebScrapingSubModule({ authMiddleware });
+  const { router: webScrapingRouter } = createWebScrapingSubModule({ authGuard: authMiddleware });
   router.use('/scrape', webScrapingRouter);
   const { router: avatarRouter } = createAvatarGenerationSubModule({ authMiddleware });
   router.use('/avatar', avatarRouter);

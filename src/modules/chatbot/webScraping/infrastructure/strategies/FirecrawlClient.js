@@ -2,20 +2,13 @@
 
 const axios = require('axios');
 const { env } = require('../../../../../config/env');
+const logger = require('../../../../shared/logging');
 
 const FIRECRAWL_BASE_URL = 'https://api.firecrawl.dev/v1';
 
-/**
- * FirecrawlClient — thin Axios instance pre-configured for the
- * Firecrawl API.
- *
- * This is infrastructure config only. No business logic lives here.
- * Provider-specific request/response mapping belongs in
- * FirecrawlScraperService, not here.
- */
 function createFirecrawlClient() {
   if (!env.FIRECRAWL_API_KEY) {
-    throw new Error('[website-scraping] FIRECRAWL_API_KEY is required');
+    throw new Error('[webScraping] FIRECRAWL_API_KEY is required');
   }
 
   const client = axios.create({
@@ -30,11 +23,11 @@ function createFirecrawlClient() {
   client.interceptors.response.use(
     (response) => response,
     (error) => {
-      // Normalize provider errors so callers always get a consistent
-      // Error shape rather than an Axios-shaped object
+      const status = error.response?.status;
       const message = error.response?.data?.message || error.response?.data?.error || error.message;
+      logger.error('Firecrawl API request failed', { status, message });
       const normalized = new Error(`Firecrawl API error: ${message}`);
-      normalized.statusCode = error.response?.status;
+      normalized.statusCode = status;
       normalized.raw = error.response?.data;
       return Promise.reject(normalized);
     },
