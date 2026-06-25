@@ -17,4 +17,4 @@ const slackIntegrationSchema = new mongoose.Schema({
   slackAuthedUserId: String,
 });
 
-module.exports = mongoose.model('SlackIntegration', slackIntegrationSchema);
+module.exports = mongoose.model('SlackIntegrationV2', slackIntegrationSchema);

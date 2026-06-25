@@ -298,4 +298,4 @@ HumanAgentSchema.statics.findOnlineAgents = function () {
   });
 };
 
-module.exports = mongoose.model('HumanAgent', HumanAgentSchema);
+module.exports = mongoose.model('HumanAgentV2', HumanAgentSchema);

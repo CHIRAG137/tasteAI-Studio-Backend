@@ -102,4 +102,4 @@ const ChatBotSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
-module.exports = mongoose.model('ChatBot', ChatBotSchema);
+module.exports = mongoose.model('ChatBotV2', ChatBotSchema);

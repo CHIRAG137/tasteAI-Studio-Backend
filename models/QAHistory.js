@@ -22,4 +22,4 @@ const QAHistorySchema = new mongoose.Schema(
   { timestamps: true },
 );
 
-module.exports = mongoose.model('QAHistory', QAHistorySchema);
+module.exports = mongoose.model('QAHistoryV2', QAHistorySchema);
