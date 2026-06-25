@@ -1,30 +1,18 @@
 'use strict';
 
-const BaseUseCase = require('../../../shared/usecases/BaseUseCase');
+const { NotFoundException } = require('../../../shared/exceptions');
 const AuthResponseMapper = require('../mappers/AuthResponseMapper');
-const UserNotFoundException = require('../../domain/exceptions/UserNotFoundException');
 
-/**
- * Query: returns the authenticated user's public profile.
- * Separated from commands as it has no side effects (CQRS).
- */
-class GetCurrentUserUseCase extends BaseUseCase {
-  /**
-   * @param {object} deps
-   * @param {import('../../domain/repositories/IUserRepository')} deps.userRepository
-   */
+class GetCurrentUserUseCase {
   constructor({ userRepository }) {
-    super();
     this.userRepository = userRepository;
   }
 
   async execute(userId) {
     const user = await this.userRepository.findById(userId);
-
     if (!user) {
-      throw new UserNotFoundException();
+      throw new NotFoundException('User not found', 'USER_NOT_FOUND');
     }
-
     return AuthResponseMapper.profile(user);
   }
 }

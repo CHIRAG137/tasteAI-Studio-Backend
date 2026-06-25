@@ -1,6 +1,6 @@
 'use strict';
 
-const User = require('../../domain/entities/User');
+const User = require('../../domain/User');
 
 class UserMapper {
   static toDomain(doc) {

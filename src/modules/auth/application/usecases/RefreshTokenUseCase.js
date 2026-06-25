@@ -1,18 +1,9 @@
 'use strict';
 
-const BaseUseCase = require('../../../shared/usecases/BaseUseCase');
 const AuthResponseMapper = require('../mappers/AuthResponseMapper');
 
-/**
- * Issues a new access/refresh token pair using a valid refresh token (token rotation).
- */
-class RefreshTokenUseCase extends BaseUseCase {
-  /**
-   * @param {object} deps
-   * @param {import('../../domain/services/ITokenService')} deps.tokenService
-   */
+class RefreshTokenUseCase {
   constructor({ tokenService }) {
-    super();
     this.tokenService = tokenService;
   }
 
