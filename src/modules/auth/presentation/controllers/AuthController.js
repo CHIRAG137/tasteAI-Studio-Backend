@@ -39,11 +39,15 @@ class AuthController {
   };
 
   login = async (req, res) => {
-    const result = await this.authFacade.login({
-      email: req.body.email,
-      password: req.body.password,
-      ...AuthController._requestMeta(req),
-    });
+    const providerType = req.authProvider;
+    const result = await this.authFacade.login(
+      {
+        email: req.body.email,
+        password: req.body.password,
+        ...AuthController._requestMeta(req),
+      },
+      providerType,
+    );
 
     return ApiResponse.success(res, result, 'Login successful');
   };

@@ -55,6 +55,7 @@ module.exports = function createAuthRoutes({ authController, authMiddleware }) {
 
   router.post(
     '/login',
+    setAuthProvider(AuthProviderType.EMAIL_PASSWORD),
     attachIpAddress,
     authLimiter,
     authValidator.loginRules,
