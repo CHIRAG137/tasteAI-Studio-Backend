@@ -17,13 +17,11 @@ const cors = require('cors');
 const path = require('path');
 const rateLimit = require('express-rate-limit');
 const botRoutes = require('./routes/botRoutes');
-const crawlRoutes = require('./routes/crawlRoutes');
 const slackRoutes = require('./routes/slackRoutes');
 const authRoutes = require('./routes/authRoutes');
 const flowRoutes = require('./routes/flowRoutes');
 const summarizeRoutes = require('./routes/summarizeRoutes');
 const elevenlabsRoutes = require('./routes/elevenlabsRoutes');
-const imageGenerationRoutes = require('./routes/imageGenerationRoutes');
 const humanAgentRoutes = require('./routes/humanAgentRoutes');
 const handoffRoutes = require('./routes/handoffRoutes');
 const workflowRoutes = require('./routes/workflowRoutes');
@@ -123,14 +121,12 @@ mongoose
   .catch((err) => console.error('MongoDB error:', err));
 
 app.use('/api/bots', botRoutes);
-app.use('/api/scrape', crawlRoutes);
 app.use('/api/slack', slackRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/workflows', workflowRoutes);
 app.use('/api/flow', flowRoutes);
 app.use('/api/summarize', summarizeRoutes);
 app.use('/api/elevenlabs', elevenlabsRoutes);
-app.use('/api/human', imageGenerationRoutes);
 app.use('/api/human-agent', humanAgentRoutes);
 app.use('/api/handoff', handoffRoutes);
 app.use('/api/issue-reports', issueReportRoutes);
