@@ -1,6 +1,5 @@
 const ChatBot = require('../models/ChatBot');
 const QAHistory = require('../models/QAHistory');
-const Customization = require('../models/Customisation');
 const { getEmbedding } = require('../utils/gptUtils');
 const { generateEmbedding } = require('../utils/llmClientUtils');
 const { cosineSimilarity } = require('../utils/embedUtils');
@@ -13,52 +12,6 @@ const {
   setPhoenixSpanAttributes,
 } = require('../config/phoenixTracing');
 const BotInteractionMetric = require('../models/BotInteractionMetric');
-
-const DEFAULT_EMBED_CUSTOMIZATION = {
-  // Chat defaults
-  headerTitle: 'Chat Assistant',
-  headerSubtitle: 'Online',
-  placeholder: 'Type your message...',
-  primaryColor: '#3b82f6',
-  backgroundColor: '#ffffff',
-  messageBackgroundColor: '#f1f5f9',
-  userMessageColor: '#3b82f6',
-  botMessageColor: '#f1f5f9',
-  textColor: '#1e293b',
-  borderRadius: 8,
-  fontFamily: 'Inter, sans-serif',
-  headerBackground: '#ffffff',
-  chatCustomCSS: '',
-  useChatCustomCSS: false,
-
-  // Button defaults (match schema defaults)
-  buttonBackground: 'linear-gradient(135deg, #9b5de5, #f15bb5)',
-  buttonColor: '#ffffff',
-  buttonSize: '56',
-  buttonBorderRadius: '50',
-  buttonPosition: 'bottom-right',
-  buttonBottom: '20',
-  buttonRight: '20',
-  buttonLeft: '20',
-  buttonCustomCSS: '',
-  useButtonCustomCSS: false,
-
-  // Button features
-  buttonText: 'Chat with us',
-  buttonShowText: false,
-  buttonTextPosition: 'left',
-  buttonIcon: 'chat',
-  buttonIconType: 'default',
-  buttonCustomIcon: '',
-  buttonIconSize: '24',
-  buttonAnimation: 'none',
-  buttonHoverAnimation: 'scale',
-  buttonPulse: false,
-  buttonShadow: '0 4px 10px rgba(0,0,0,0.3)',
-  buttonTextColor: '#1e293b',
-  buttonTextSize: '14',
-  buttonPadding: '12',
-};
 
 async function askBotImpl(
   question,
@@ -622,47 +575,6 @@ exports.askBot = async (
       return result;
     },
   );
-};
-
-// get customization by bot id
-exports.getCustomizationByBotId = async (botId) => {
-  if (!botId) {
-    logger.error('Get customization failed: Bot ID missing');
-    throw new Error('Bot ID is required');
-  }
-
-  logger.info('Fetching customization', { botId });
-
-  let customization = await Customization.findOne({ botId });
-
-  if (customization) {
-    logger.info('Customization fetched successfully', { botId });
-    return customization;
-  }
-
-  // If missing, create it with defaults so clients (embed/widget) always get a full object.
-  logger.warn('No customization found; creating defaults', { botId });
-  customization = await Customization.create({ ...DEFAULT_EMBED_CUSTOMIZATION, botId });
-  return customization;
-};
-
-// save bot customization
-exports.saveBotCustomization = async (botId, data) => {
-  if (!botId) {
-    logger.error('Save customization failed: Bot ID missing');
-    throw new Error('Bot ID is required');
-  }
-
-  logger.info('Saving customization', { botId, data });
-
-  const customization = await Customization.findOneAndUpdate(
-    { botId },
-    { ...data, botId },
-    { new: true, upsert: true },
-  );
-
-  logger.info('Customization saved successfully', { botId });
-  return customization;
 };
 
 const serializeTraceMetric = (metric) => {

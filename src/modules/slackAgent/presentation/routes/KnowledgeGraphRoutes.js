@@ -85,5 +85,12 @@ module.exports = function createKnowledgeGraphRoutes({ knowledgeGraphController,
     asyncHandler(knowledgeGraphController.getEntityGraph),
   );
 
+  // Get full graph (all nodes + their edges for the workspace)
+  router.get(
+    '/:workspaceId/full-graph',
+    authMiddleware.requireAuth,
+    asyncHandler(knowledgeGraphController.getFullGraph),
+  );
+
   return router;
 };

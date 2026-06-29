@@ -24,20 +24,6 @@ router.post('/test-custom-llm', authMiddleware, botController.testCustomLLMConne
 router.post('/ask', optionalUserAuth, botController.askBot);
 
 /**
- * @route   GET /api/bots/customisation/:botId
- * @desc    Get UI / behavior customization settings for a chatbot
- * @access  Public / Private
- */
-router.get('/customisation/:botId', optionalUserAuth, botController.getBotCustomizationByBotId);
-
-/**
- * @route   POST /api/bots/customisation/:botId
- * @desc    Save or update chatbot customization settings
- * @access  Private
- */
-router.post('/customisation/:botId', authMiddleware, botController.saveBotCustomization);
-
-/**
  * @route   GET /api/bots/:botId/history
  * @desc    Get paginated chat session history for a chatbot
  * @access  Private

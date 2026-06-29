@@ -20,7 +20,10 @@ function createChatbotManagementModule({ authMiddleware, encryptionService } = {
   const listChatbotsUseCase = new ListChatbotsUseCase({ managementRepository });
   const getChatbotUseCase = new GetChatbotUseCase({ managementRepository });
   const deleteChatbotUseCase = new DeleteChatbotUseCase({ managementRepository });
-  const updateChatbotUseCase = new UpdateChatbotUseCase({ managementRepository, encryptionService });
+  const updateChatbotUseCase = new UpdateChatbotUseCase({
+    managementRepository,
+    encryptionService,
+  });
 
   const managementController = new ChatbotManagementController({
     listChatbotsUseCase,

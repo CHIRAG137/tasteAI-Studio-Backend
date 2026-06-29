@@ -4,24 +4,75 @@ const mongoose = require('mongoose');
 
 const NODE_TYPES = [
   // Original
-  'user', 'message', 'channel',
+  'user',
+  'message',
+  'channel',
   // People
-  'person', 'team', 'department', 'role',
+  'person',
+  'team',
+  'department',
+  'role',
   // Technical
-  'technology', 'programming_language', 'framework', 'library', 'api', 'database',
-  'repository', 'branch', 'file', 'folder', 'class', 'function',
-  'service', 'microservice', 'endpoint',
+  'technology',
+  'programming_language',
+  'framework',
+  'library',
+  'api',
+  'database',
+  'repository',
+  'branch',
+  'file',
+  'folder',
+  'class',
+  'function',
+  'service',
+  'microservice',
+  'endpoint',
   // Business
-  'project', 'product', 'feature', 'requirement', 'customer', 'company', 'deal', 'contract',
+  'project',
+  'product',
+  'feature',
+  'requirement',
+  'customer',
+  'company',
+  'deal',
+  'contract',
   // Knowledge
-  'topic', 'concept', 'documentation', 'wiki', 'rfc', 'meeting', 'architecture', 'design_pattern',
+  'topic',
+  'concept',
+  'documentation',
+  'wiki',
+  'rfc',
+  'meeting',
+  'architecture',
+  'design_pattern',
   // Reasoning
-  'decision', 'proposal', 'question', 'answer', 'idea', 'opinion', 'assumption', 'constraint', 'risk',
+  'decision',
+  'proposal',
+  'question',
+  'answer',
+  'idea',
+  'opinion',
+  'assumption',
+  'constraint',
+  'risk',
   // Work Tracking
-  'task', 'action_item', 'issue', 'bug', 'incident', 'pull_request', 'commit',
-  'deployment', 'release', 'version', 'sprint', 'milestone',
+  'task',
+  'action_item',
+  'issue',
+  'bug',
+  'incident',
+  'pull_request',
+  'commit',
+  'deployment',
+  'release',
+  'version',
+  'sprint',
+  'milestone',
   // Time
-  'date', 'time', 'deadline',
+  'date',
+  'time',
+  'deadline',
 ];
 
 const nodeMetadataSchema = new mongoose.Schema(
@@ -209,10 +260,13 @@ const knowledgeNodeSchema = new mongoose.Schema(
   },
 );
 
-knowledgeNodeSchema.index({ organizationId: 1, workspaceId: 1, externalId: 1, nodeType: 1 }, { unique: true });
+knowledgeNodeSchema.index(
+  { organizationId: 1, workspaceId: 1, externalId: 1, nodeType: 1 },
+  { unique: true },
+);
 knowledgeNodeSchema.index({ text: 'text', label: 'text' });
 knowledgeNodeSchema.index({ organizationId: 1, workspaceId: 1, 'properties.key': 1 });
-knowledgeNodeSchema.index({ organizationId: 1, 'mentionUserIds': 1 });
+knowledgeNodeSchema.index({ organizationId: 1, mentionUserIds: 1 });
 knowledgeNodeSchema.index({ canonicalName: 1 });
 knowledgeNodeSchema.index({ nodeType: 1, importanceScore: -1 });
 

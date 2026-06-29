@@ -11,14 +11,13 @@ const eventSchema = new mongoose.Schema(
     },
 
     workspaceId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'SlackWorkspace',
+      type: String,
       index: true,
     },
 
     channelId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'SlackChannel',
+      type: String,
+      index: true,
     },
 
     teamId: String,

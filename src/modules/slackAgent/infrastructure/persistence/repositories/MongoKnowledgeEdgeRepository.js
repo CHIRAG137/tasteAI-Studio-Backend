@@ -123,7 +123,9 @@ class MongoKnowledgeEdgeRepository extends IKnowledgeEdgeRepository {
     } catch (err) {
       if (err.code === 11000) {
         // E11000 duplicate key — race condition on upsert; retry as a simple update
-        const existing = await KnowledgeEdgeModel.findOneAndUpdate(filter, data, { new: true }).lean();
+        const existing = await KnowledgeEdgeModel.findOneAndUpdate(filter, data, {
+          new: true,
+        }).lean();
         if (existing) return existing;
       }
       throw err;
@@ -146,10 +148,7 @@ class MongoKnowledgeEdgeRepository extends IKnowledgeEdgeRepository {
     return KnowledgeEdgeModel.find({
       organizationId,
       workspaceId,
-      $or: [
-        { sourceNodeId: { $in: nodeIds } },
-        { targetNodeId: { $in: nodeIds } },
-      ],
+      $or: [{ sourceNodeId: { $in: nodeIds } }, { targetNodeId: { $in: nodeIds } }],
     })
       .sort({ weight: -1 })
       .limit(200)

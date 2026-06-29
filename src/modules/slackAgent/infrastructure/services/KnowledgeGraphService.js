@@ -37,7 +37,11 @@ class KnowledgeGraphService {
     );
 
     // 3. Analyze message with Gemini AI
-    const analysis = await this.analysisService.analyzeMessage(text, slackEvent.channel_name, userId);
+    const analysis = await this.analysisService.analyzeMessage(
+      text,
+      slackEvent.channel_name,
+      userId,
+    );
 
     // 4. Upsert message node with rich AI metadata
     const messageExternalId = `${channelId}_${eventTs}`;
@@ -131,59 +135,78 @@ class KnowledgeGraphService {
       );
     }
 
-    return { userNode, messageNode, channelNode, mentionedUserIds, entities: analysis.entities, relationships: analysis.relationships };
+    return {
+      userNode,
+      messageNode,
+      channelNode,
+      mentionedUserIds,
+      entities: analysis.entities,
+      relationships: analysis.relationships,
+    };
   }
 
-  async _processEntityEdges(orgId, wsId, msgExternalId, userId, channelId, messageNode, analysis, threadTs, eventTs) {
+  async _processEntityEdges(
+    orgId,
+    wsId,
+    msgExternalId,
+    userId,
+    channelId,
+    messageNode,
+    analysis,
+    threadTs,
+    eventTs,
+  ) {
     // Create edges from message to detected entities
     for (const entity of analysis.entities || []) {
       const entityExternalId = this._generateEntityExternalId(entity);
-      const entityNode = await this._upsertEntityNode(orgId, wsId, entityExternalId, entity, msgExternalId);
-
-      // Create ABOUT edge from message to entity
-      await this._createEdge(
+      const entityNode = await this._upsertEntityNode(
         orgId,
         wsId,
-        msgExternalId,
         entityExternalId,
-        'ABOUT',
-        {
-          label: `Message about ${entity.canonicalName}`,
-          weight: entity.importance || 0.5,
-          confidence: entity.confidence || 0.7,
-          reason: `AI detected entity type=${entity.type}`,
-          metadata: [
-            { key: 'entityType', value: entity.type },
-            { key: 'entityConfidence', value: entity.confidence || 0 },
-          ],
-          timestamp: messageNode.timestamp,
-        },
+        entity,
+        msgExternalId,
       );
+
+      // Create ABOUT edge from message to entity
+      await this._createEdge(orgId, wsId, msgExternalId, entityExternalId, 'ABOUT', {
+        label: `Message about ${entity.canonicalName}`,
+        weight: entity.importance || 0.5,
+        confidence: entity.confidence || 0.7,
+        reason: `AI detected entity type=${entity.type}`,
+        metadata: [
+          { key: 'entityType', value: entity.type },
+          { key: 'entityConfidence', value: entity.confidence || 0 },
+        ],
+        timestamp: messageNode.timestamp,
+      });
     }
 
     // Create edges for detected relationships
     for (const rel of analysis.relationships || []) {
-      const sourceExtId = this._resolveRelationshipEntityId(rel.sourceEntity, analysis.entities, msgExternalId, userId, channelId);
-      const targetExtId = this._resolveRelationshipEntityId(rel.targetEntity, analysis.entities, msgExternalId, userId, channelId);
+      const sourceExtId = this._resolveRelationshipEntityId(
+        rel.sourceEntity,
+        analysis.entities,
+        msgExternalId,
+        userId,
+        channelId,
+      );
+      const targetExtId = this._resolveRelationshipEntityId(
+        rel.targetEntity,
+        analysis.entities,
+        msgExternalId,
+        userId,
+        channelId,
+      );
 
       if (sourceExtId && targetExtId && sourceExtId !== targetExtId) {
-        await this._createEdge(
-          orgId,
-          wsId,
-          sourceExtId,
-          targetExtId,
-          rel.relationshipType,
-          {
-            label: `${rel.sourceEntity} ${rel.relationshipType} ${rel.targetEntity}`,
-            weight: rel.weight || 1.0,
-            confidence: rel.confidence || 0.7,
-            reason: rel.reason || 'AI detected relationship',
-            metadata: [
-              { key: 'sourceMessage', value: msgExternalId },
-            ],
-            timestamp: messageNode.timestamp,
-          },
-        );
+        await this._createEdge(orgId, wsId, sourceExtId, targetExtId, rel.relationshipType, {
+          label: `${rel.sourceEntity} ${rel.relationshipType} ${rel.targetEntity}`,
+          weight: rel.weight || 1.0,
+          confidence: rel.confidence || 0.7,
+          reason: rel.reason || 'AI detected relationship',
+          metadata: [{ key: 'sourceMessage', value: msgExternalId }],
+          timestamp: messageNode.timestamp,
+        });
       }
     }
   }
@@ -201,7 +224,7 @@ class KnowledgeGraphService {
     // Check if it matches a detected entity
     for (const entity of entities || []) {
       const entityName = (entity.canonicalName || '').toLowerCase().trim();
-      const aliases = (entity.aliases || []).map(a => a.toLowerCase().trim());
+      const aliases = (entity.aliases || []).map((a) => a.toLowerCase().trim());
       if (entityName === normalizedName || aliases.includes(normalizedName)) {
         return this._generateEntityExternalId(entity);
       }
@@ -245,10 +268,16 @@ class KnowledgeGraphService {
 
   async findMessagesBetweenUsers(organizationId, workspaceId, userSlackIdA, userSlackIdB) {
     const messagesAtoB = await this.nodeRepository.findMessagesBetweenUsers(
-      organizationId, workspaceId, userSlackIdA, userSlackIdB,
+      organizationId,
+      workspaceId,
+      userSlackIdA,
+      userSlackIdB,
     );
     const messagesBtoA = await this.nodeRepository.findMessagesBetweenUsers(
-      organizationId, workspaceId, userSlackIdB, userSlackIdA,
+      organizationId,
+      workspaceId,
+      userSlackIdB,
+      userSlackIdA,
     );
     return [...messagesAtoB, ...messagesBtoA].sort(
       (a, b) => new Date(b.timestamp) - new Date(a.timestamp),
@@ -256,19 +285,41 @@ class KnowledgeGraphService {
   }
 
   async getSubgraph(nodeId, depth = 2) {
-    return this.nodeRepository.findConnected(nodeId, [
-      'sent', 'SENT_BY', 'mentions', 'MENTIONS', 'replies_to', 'REPLIES_TO',
-      'in_channel', 'POSTED_IN', 'references', 'ABOUT', 'USES', 'DEPENDS_ON',
-      'MENTIONED_IN', 'REFERENCES', 'PART_OF_THREAD',
-    ], depth);
+    return this.nodeRepository.findConnected(
+      nodeId,
+      [
+        'sent',
+        'SENT_BY',
+        'mentions',
+        'MENTIONS',
+        'replies_to',
+        'REPLIES_TO',
+        'in_channel',
+        'POSTED_IN',
+        'references',
+        'ABOUT',
+        'USES',
+        'DEPENDS_ON',
+        'MENTIONED_IN',
+        'REFERENCES',
+        'PART_OF_THREAD',
+      ],
+      depth,
+    );
   }
 
   async findPathBetweenUsers(organizationId, workspaceId, userSlackIdA, userSlackIdB) {
     const userANode = await this.nodeRepository.findByExternalId(
-      organizationId, workspaceId, userSlackIdA, 'user',
+      organizationId,
+      workspaceId,
+      userSlackIdA,
+      'user',
     );
     const userBNode = await this.nodeRepository.findByExternalId(
-      organizationId, workspaceId, userSlackIdB, 'user',
+      organizationId,
+      workspaceId,
+      userSlackIdB,
+      'user',
     );
 
     if (!userANode || !userBNode) return null;
@@ -289,18 +340,47 @@ class KnowledgeGraphService {
   async getGraphStats(organizationId, workspaceId) {
     const nodeCount = await this.nodeRepository.count({ organizationId, workspaceId });
     const edgeCount = await this.edgeRepository.count({ organizationId, workspaceId });
-    const userCount = await this.nodeRepository.count({ organizationId, workspaceId, nodeType: 'user' });
-    const messageCount = await this.nodeRepository.count({ organizationId, workspaceId, nodeType: 'message' });
+    const userCount = await this.nodeRepository.count({
+      organizationId,
+      workspaceId,
+      nodeType: 'user',
+    });
+    const messageCount = await this.nodeRepository.count({
+      organizationId,
+      workspaceId,
+      nodeType: 'message',
+    });
     const entityCount = await this.nodeRepository.count({
       organizationId,
       workspaceId,
       nodeType: { $nin: ['user', 'message', 'channel'] },
     });
-    const decisionCount = await this.nodeRepository.count({ organizationId, workspaceId, isDecision: true });
-    const taskCount = await this.nodeRepository.count({ organizationId, workspaceId, isTask: true });
-    const questionCount = await this.nodeRepository.count({ organizationId, workspaceId, isQuestion: true });
+    const decisionCount = await this.nodeRepository.count({
+      organizationId,
+      workspaceId,
+      isDecision: true,
+    });
+    const taskCount = await this.nodeRepository.count({
+      organizationId,
+      workspaceId,
+      isTask: true,
+    });
+    const questionCount = await this.nodeRepository.count({
+      organizationId,
+      workspaceId,
+      isQuestion: true,
+    });
 
-    return { nodeCount, edgeCount, userCount, messageCount, entityCount, decisionCount, taskCount, questionCount };
+    return {
+      nodeCount,
+      edgeCount,
+      userCount,
+      messageCount,
+      entityCount,
+      decisionCount,
+      taskCount,
+      questionCount,
+    };
   }
 
   // ──────────────────────────────────────────────
@@ -308,12 +388,32 @@ class KnowledgeGraphService {
   // ──────────────────────────────────────────────
 
   async getEntityGraph(organizationId, workspaceId, entityType, limit = 50) {
-    const nodes = await this.nodeRepository.findByNodeType(organizationId, workspaceId, entityType, limit);
-    const nodeIds = nodes.map(n => n._id);
+    const nodes = await this.nodeRepository.findByNodeType(
+      organizationId,
+      workspaceId,
+      entityType,
+      limit,
+    );
+    const nodeIds = nodes.map((n) => n._id);
 
     const edges = await this.edgeRepository.findByNodeIds(organizationId, workspaceId, nodeIds);
 
     return { nodes, edges };
+  }
+
+  // ──────────────────────────────────────────────
+  //  Full Graph (all nodes + edges for workspace)
+  // ──────────────────────────────────────────────
+
+  async getFullGraph(organizationId, workspaceId, limit = 100) {
+    const nodes = await this.nodeRepository.findByOrganization(organizationId, { workspaceId });
+    const sorted = nodes.sort((a, b) => (b.importanceScore || 0) - (a.importanceScore || 0));
+    const topNodes = sorted.slice(0, limit);
+    const nodeIds = topNodes.map((n) => n._id);
+
+    const edges = await this.edgeRepository.findByNodeIds(organizationId, workspaceId, nodeIds);
+
+    return { nodes: topNodes, edges };
   }
 
   // ──────────────────────────────────────────────
@@ -322,7 +422,10 @@ class KnowledgeGraphService {
 
   async _upsertUserNode(organizationId, workspaceMongoId, slackUserId) {
     return this.nodeRepository.upsertByExternalId(
-      organizationId, workspaceMongoId, slackUserId, 'user',
+      organizationId,
+      workspaceMongoId,
+      slackUserId,
+      'user',
       {
         label: slackUserId,
         canonicalName: slackUserId,
@@ -335,7 +438,10 @@ class KnowledgeGraphService {
 
   async _ensureUserNodeExists(organizationId, workspaceMongoId, slackUserId) {
     const existing = await this.nodeRepository.findByExternalId(
-      organizationId, workspaceMongoId, slackUserId, 'user',
+      organizationId,
+      workspaceMongoId,
+      slackUserId,
+      'user',
     );
     if (!existing) {
       await this._upsertUserNode(organizationId, workspaceMongoId, slackUserId);
@@ -344,7 +450,10 @@ class KnowledgeGraphService {
 
   async _upsertChannelNode(organizationId, workspaceMongoId, slackChannelId, channelName) {
     return this.nodeRepository.upsertByExternalId(
-      organizationId, workspaceMongoId, slackChannelId, 'channel',
+      organizationId,
+      workspaceMongoId,
+      slackChannelId,
+      'channel',
       {
         label: channelName || slackChannelId,
         canonicalName: channelName || slackChannelId,
@@ -469,27 +578,35 @@ class KnowledgeGraphService {
     };
 
     return this.nodeRepository.upsertByExternalId(
-      organizationId, workspaceMongoId, externalId, 'message', nodeData,
+      organizationId,
+      workspaceMongoId,
+      externalId,
+      'message',
+      nodeData,
     );
   }
 
-  async _createEdge(organizationId, workspaceMongoId, sourceExternalId, targetExternalId, relationshipType, data) {
-    return this.edgeRepository.upsert(
-      sourceExternalId, targetExternalId, relationshipType,
-      {
-        organizationId,
-        workspaceId: workspaceMongoId,
-        sourceExternalId,
-        targetExternalId,
-        relationshipType,
-        label: data.label || '',
-        weight: data.weight || 1.0,
-        confidence: data.confidence || 1.0,
-        reason: data.reason || '',
-        metadata: data.metadata || [],
-        timestamp: data.timestamp || new Date(),
-      },
-    );
+  async _createEdge(
+    organizationId,
+    workspaceMongoId,
+    sourceExternalId,
+    targetExternalId,
+    relationshipType,
+    data,
+  ) {
+    return this.edgeRepository.upsert(sourceExternalId, targetExternalId, relationshipType, {
+      organizationId,
+      workspaceId: workspaceMongoId,
+      sourceExternalId,
+      targetExternalId,
+      relationshipType,
+      label: data.label || '',
+      weight: data.weight || 1.0,
+      confidence: data.confidence || 1.0,
+      reason: data.reason || '',
+      metadata: data.metadata || [],
+      timestamp: data.timestamp || new Date(),
+    });
   }
 
   _extractMentions(text) {
@@ -536,12 +653,26 @@ Return ONLY valid JSON.`;
 
       const planResponse = await this._callLLM(planPrompt);
       if (!planResponse) {
-        return { searchType: 'text', searchTerms: [question], mentionedUserId: null, userIds: [], entityType: null, intent: null };
+        return {
+          searchType: 'text',
+          searchTerms: [question],
+          mentionedUserId: null,
+          userIds: [],
+          entityType: null,
+          intent: null,
+        };
       }
       return JSON.parse(planResponse);
     } catch (err) {
       console.warn(`[KnowledgeGraph] Search planning error: ${err.message}`);
-      return { searchType: 'text', searchTerms: [question], mentionedUserId: null, userIds: [], entityType: null, intent: null };
+      return {
+        searchType: 'text',
+        searchTerms: [question],
+        mentionedUserId: null,
+        userIds: [],
+        entityType: null,
+        intent: null,
+      };
     }
   }
 
@@ -557,29 +688,56 @@ Return ONLY valid JSON.`;
       }
 
       if ((plan.searchType === 'mentions' || plan.searchType === 'all') && plan.mentionedUserId) {
-        const mentionResults = await this.findMessagesMentioningUser(organizationId, workspaceId, plan.mentionedUserId);
+        const mentionResults = await this.findMessagesMentioningUser(
+          organizationId,
+          workspaceId,
+          plan.mentionedUserId,
+        );
         results.messages.push(...mentionResults);
       }
 
-      if ((plan.searchType === 'between_users' || plan.searchType === 'all') && plan.userIds?.length >= 2) {
-        const betweenResults = await this.findMessagesBetweenUsers(organizationId, workspaceId, plan.userIds[0], plan.userIds[1]);
+      if (
+        (plan.searchType === 'between_users' || plan.searchType === 'all') &&
+        plan.userIds?.length >= 2
+      ) {
+        const betweenResults = await this.findMessagesBetweenUsers(
+          organizationId,
+          workspaceId,
+          plan.userIds[0],
+          plan.userIds[1],
+        );
         results.messages.push(...betweenResults);
       }
 
-      if ((plan.searchType === 'user_messages' || plan.searchType === 'all') && plan.userIds?.length >= 1) {
+      if (
+        (plan.searchType === 'user_messages' || plan.searchType === 'all') &&
+        plan.userIds?.length >= 1
+      ) {
         for (const uid of plan.userIds) {
-          const userMsgs = await this.nodeRepository.findMessagesByUser(organizationId, workspaceId, uid);
+          const userMsgs = await this.nodeRepository.findMessagesByUser(
+            organizationId,
+            workspaceId,
+            uid,
+          );
           results.messages.push(...userMsgs);
         }
       }
 
       if ((plan.searchType === 'entity' || plan.searchType === 'all') && plan.entityType) {
-        const entityNodes = await this.nodeRepository.findByNodeType(organizationId, workspaceId, plan.entityType);
+        const entityNodes = await this.nodeRepository.findByNodeType(
+          organizationId,
+          workspaceId,
+          plan.entityType,
+        );
         results.entities.push(...entityNodes);
       }
 
       if ((plan.searchType === 'intent' || plan.searchType === 'all') && plan.intent) {
-        const intentNodes = await this.nodeRepository.findByIntent(organizationId, workspaceId, plan.intent);
+        const intentNodes = await this.nodeRepository.findByIntent(
+          organizationId,
+          workspaceId,
+          plan.intent,
+        );
         results.messages.push(...intentNodes);
       }
     } catch (err) {
@@ -711,7 +869,7 @@ Return ONLY valid JSON.`;
         },
         {
           headers: {
-            'Authorization': `Bearer ${openaiKey}`,
+            Authorization: `Bearer ${openaiKey}`,
             'Content-Type': 'application/json',
           },
         },

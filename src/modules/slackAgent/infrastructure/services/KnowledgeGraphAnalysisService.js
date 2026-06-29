@@ -2,7 +2,10 @@
 
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { OpenAI } = require('openai');
-const { runPhoenixSpan, setPhoenixSpanAttributes } = require('../../../../../config/phoenixTracing');
+const {
+  runPhoenixSpan,
+  setPhoenixSpanAttributes,
+} = require('../../../../../config/phoenixTracing');
 
 const ANALYSIS_PROMPT = `You are a semantic knowledge graph analyzer for Slack messages.
 Analyze the given Slack message and extract comprehensive semantic information.
@@ -242,11 +245,41 @@ class KnowledgeGraphAnalysisService {
       entities: [],
       relationships: [],
       taskExtraction: { hasTask: false, tasks: [] },
-      decisionExtraction: { hasDecision: false, decision: '', supportingReason: '', rejectedAlternatives: [], affectedSystems: [], impact: 'low' },
-      questionExtraction: { hasQuestion: false, question: '', expectedResponder: null, topic: '', urgency: 'low' },
-      riskExtraction: { risks: [], blockers: [], assumptions: [], constraints: [], severity: 'low' },
-      knowledgeExtraction: { knowledgeCreated: [], knowledgeUpdated: [], knowledgeContradicted: [], knowledgeRemoved: [] },
-      searchMetadata: { retrievalKeywords: [], semanticKeywords: [], graphTags: [], searchQueries: [], embeddingText: messageText || '' },
+      decisionExtraction: {
+        hasDecision: false,
+        decision: '',
+        supportingReason: '',
+        rejectedAlternatives: [],
+        affectedSystems: [],
+        impact: 'low',
+      },
+      questionExtraction: {
+        hasQuestion: false,
+        question: '',
+        expectedResponder: null,
+        topic: '',
+        urgency: 'low',
+      },
+      riskExtraction: {
+        risks: [],
+        blockers: [],
+        assumptions: [],
+        constraints: [],
+        severity: 'low',
+      },
+      knowledgeExtraction: {
+        knowledgeCreated: [],
+        knowledgeUpdated: [],
+        knowledgeContradicted: [],
+        knowledgeRemoved: [],
+      },
+      searchMetadata: {
+        retrievalKeywords: [],
+        semanticKeywords: [],
+        graphTags: [],
+        searchQueries: [],
+        embeddingText: messageText || '',
+      },
     };
   }
 }

@@ -1,7 +1,9 @@
 'use strict';
 
 class IKnowledgeEdgeRepository {
-  async findById(id) { throw new Error('Not implemented'); }
+  async findById(id) {
+    throw new Error('Not implemented');
+  }
 
   async findByOrganization(organizationId, filters = {}) {
     throw new Error('Not implemented');
@@ -27,17 +29,25 @@ class IKnowledgeEdgeRepository {
     throw new Error('Not implemented');
   }
 
-  async save(data) { throw new Error('Not implemented'); }
+  async save(data) {
+    throw new Error('Not implemented');
+  }
 
   async upsert(sourceExternalId, targetExternalId, relationshipType, data) {
     throw new Error('Not implemented');
   }
 
-  async delete(id) { throw new Error('Not implemented'); }
+  async delete(id) {
+    throw new Error('Not implemented');
+  }
 
-  async deleteByWorkspace(workspaceId) { throw new Error('Not implemented'); }
+  async deleteByWorkspace(workspaceId) {
+    throw new Error('Not implemented');
+  }
 
-  async count(filters = {}) { throw new Error('Not implemented'); }
+  async count(filters = {}) {
+    throw new Error('Not implemented');
+  }
 
   async findByNodeIds(organizationId, workspaceId, nodeIds) {
     throw new Error('Not implemented');

@@ -7,7 +7,14 @@ const UpdateChatbotCommand = require('../../application/dto/UpdateChatbotCommand
 const ChatbotManagementResponseMapper = require('../mappers/ChatbotManagementResponseMapper');
 
 class ChatbotManagementController {
-  constructor({ listChatbotsUseCase, getChatbotUseCase, deleteChatbotUseCase, updateChatbotUseCase, responseBuilder, logger }) {
+  constructor({
+    listChatbotsUseCase,
+    getChatbotUseCase,
+    deleteChatbotUseCase,
+    updateChatbotUseCase,
+    responseBuilder,
+    logger,
+  }) {
     this.listChatbotsUseCase = listChatbotsUseCase;
     this.getChatbotUseCase = getChatbotUseCase;
     this.deleteChatbotUseCase = deleteChatbotUseCase;
@@ -102,16 +109,27 @@ class ChatbotManagementController {
         keyTopics: req.body.key_topics || req.body.keyTopics,
         keywords: req.body.keywords,
         customInstructions: req.body.custom_instructions || req.body.customInstructions,
-        isVoiceEnabled: req.body.is_voice_enabled !== undefined ? req.body.is_voice_enabled : req.body.isVoiceEnabled,
-        isVideoBot: req.body.is_video_bot !== undefined ? req.body.is_video_bot : req.body.isVideoBot,
+        isVoiceEnabled:
+          req.body.is_voice_enabled !== undefined
+            ? req.body.is_voice_enabled
+            : req.body.isVoiceEnabled,
+        isVideoBot:
+          req.body.is_video_bot !== undefined ? req.body.is_video_bot : req.body.isVideoBot,
         avatarUrl: req.body.video_bot_image_url || req.body.avatarUrl,
         avatarPublicId: req.body.video_bot_image_public_id || req.body.avatarPublicId,
-        humanHandoffEnabled: req.body.human_handoff_enabled !== undefined ? req.body.human_handoff_enabled : req.body.humanHandoffEnabled,
+        humanHandoffEnabled:
+          req.body.human_handoff_enabled !== undefined
+            ? req.body.human_handoff_enabled
+            : req.body.humanHandoffEnabled,
         humanHandoffEmails: req.body.human_handoff_emails || req.body.humanHandoffEmails,
-        requireVisitorEmailVerification: req.body.require_visitor_email_verification !== undefined
-          ? req.body.require_visitor_email_verification
-          : req.body.requireVisitorEmailVerification,
-        isSlackEnabled: req.body.is_slack_enabled !== undefined ? req.body.is_slack_enabled : req.body.isSlackEnabled,
+        requireVisitorEmailVerification:
+          req.body.require_visitor_email_verification !== undefined
+            ? req.body.require_visitor_email_verification
+            : req.body.requireVisitorEmailVerification,
+        isSlackEnabled:
+          req.body.is_slack_enabled !== undefined
+            ? req.body.is_slack_enabled
+            : req.body.isSlackEnabled,
         slackChannelId: req.body.slack_channel_id || req.body.slackChannelId,
         llmProvider: req.body.custom_llm_provider || req.body.llmProvider,
         llmModel: req.body.custom_model || req.body.llmModel,

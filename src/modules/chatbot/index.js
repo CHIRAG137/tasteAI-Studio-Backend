@@ -7,14 +7,14 @@ const { createChatbotCreationModule } = require('./creation/index');
 const { createChatbotManagementModule } = require('./management/index');
 const { createHumanAgentProvisioningModule } = require('../humanAgent/provisioning');
 const { createSlackValidationModule } = require('../slackIntegration/validation');
-const { createCustomizationProvisioningModule } = require('../customization/provisioning');
+const { createCustomizationProvisioningModule } = require('../chatbotIntegration');
 const { createQAKnowledgeTrainingModule } = require('../qaKnowledge/training');
 const { createLLMValidationModule } = require('../llm/validation');
 const EncryptionAdapter = require('./creation/infrastructure/security/EncryptionAdapter');
 
 const humanAgentModule = createHumanAgentProvisioningModule();
 const slackModule = createSlackValidationModule();
-const customizationModule = createCustomizationProvisioningModule();
+const customizationProvisioning = createCustomizationProvisioningModule();
 const qaKnowledgeModule = createQAKnowledgeTrainingModule();
 const llmValidationModule = createLLMValidationModule();
 
@@ -33,7 +33,7 @@ function createChatbotModule({ authMiddleware } = {}) {
     provisionBotAgentsUseCase: humanAgentModule.provisionBotAgentsUseCase,
     validateSlackWorkspaceUseCase: slackModule.validateSlackWorkspaceUseCase,
     joinSlackChannelUseCase: slackModule.joinSlackChannelUseCase,
-    createDefaultCustomizationUseCase: customizationModule.createDefaultCustomizationUseCase,
+    createDefaultCustomizationUseCase: customizationProvisioning.createDefaultCustomizationUseCase,
     trainKnowledgeBaseUseCase: qaKnowledgeModule.trainKnowledgeBaseUseCase,
     validateLLMConnectionUseCase: llmValidationModule.validateLLMConnectionUseCase,
   });

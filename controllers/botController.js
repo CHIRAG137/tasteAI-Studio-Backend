@@ -105,55 +105,6 @@ exports.testCustomLLMConnection = async (req, res) => {
   }
 };
 
-// get bot customization by bot id
-exports.getBotCustomizationByBotId = async (req, res) => {
-  try {
-    const { botId } = req.params;
-
-    const customization = await botService.getCustomizationByBotId(botId);
-
-    logger.info('Customization fetched successfully', {
-      botId,
-      userId: req.user?.id,
-    });
-    return responseBuilder.ok(res, customization, 'Customization fetched successfully');
-  } catch (error) {
-    logger.error('Error fetching customization', {
-      error: error.message,
-      botId: req.params.botId,
-      userId: req.user?.id,
-    });
-    return responseBuilder.internalError(res, null, 'Failed to fetch customization');
-  }
-};
-
-// save bot customisation
-exports.saveBotCustomization = async (req, res) => {
-  try {
-    const { botId } = req.params;
-    logger.info('Saving customization', {
-      botId,
-      userId: req.user?.id,
-      body: req.body,
-    });
-
-    const customization = await botService.saveBotCustomization(botId, req.body);
-
-    logger.info('Customization saved successfully', {
-      botId,
-      userId: req.user?.id,
-    });
-    return responseBuilder.ok(res, customization, 'Customization saved successfully');
-  } catch (error) {
-    logger.error('Error saving customization', {
-      error: error.message,
-      botId: req.params.botId,
-      userId: req.user?.id,
-    });
-    return responseBuilder.internalError(res, null, 'Failed to save customization');
-  }
-};
-
 // get all chat histories by bot id(paginated)
 exports.getAllChatHistoriesByBotId = async (req, res) => {
   const { botId } = req.params;

@@ -160,6 +160,12 @@ SERVICE_REGISTRY.slackAgent.createModule = () =>
     authMiddleware: authModule.authMiddleware,
   });
 
+// Inject auth middleware into chatbotIntegration so customization routes are protected
+SERVICE_REGISTRY.chatbotIntegration.createModule = () =>
+  require('./src/modules/chatbotIntegration').createChatbotIntegrationModule({
+    authMiddleware: authModule.authMiddleware.requireAuth,
+  });
+
 // Mount remaining services
 Object.entries(SERVICE_REGISTRY).forEach(([key, config]) => {
   if (key === 'auth') {

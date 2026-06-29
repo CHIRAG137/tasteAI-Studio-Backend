@@ -87,21 +87,26 @@ class UpdateChatbotCommand {
     if (this.websiteUrl !== undefined) payload.website_url = this.websiteUrl;
     if (this.scrapedUrls !== undefined) payload.scraped_urls = this.scrapedUrls;
     if (this.conversationFlow !== undefined) payload.conversationFlow = this.conversationFlow;
-    if (this.supportedLanguages !== undefined) payload.supported_languages = this.supportedLanguages;
+    if (this.supportedLanguages !== undefined)
+      payload.supported_languages = this.supportedLanguages;
     if (this.primaryPurpose !== undefined) payload.primary_purpose = this.primaryPurpose;
-    if (this.specialisationArea !== undefined) payload.specialisation_area = this.specialisationArea;
+    if (this.specialisationArea !== undefined)
+      payload.specialisation_area = this.specialisationArea;
     if (this.conversationTone !== undefined) payload.conversation_tone = this.conversationTone;
     if (this.responseStyle !== undefined) payload.response_style = this.responseStyle;
     if (this.targetAudience !== undefined) payload.target_audience = this.targetAudience;
     if (this.keyTopics !== undefined) payload.key_topics = this.keyTopics;
     if (this.keywords !== undefined) payload.keywords = this.keywords;
-    if (this.customInstructions !== undefined) payload.custom_instructions = this.customInstructions;
+    if (this.customInstructions !== undefined)
+      payload.custom_instructions = this.customInstructions;
     if (this.isVoiceEnabled !== undefined) payload.is_voice_enabled = this.isVoiceEnabled;
     if (this.isVideoBot !== undefined) payload.is_video_bot = this.isVideoBot;
     if (this.avatarUrl !== undefined) payload.video_bot_image_url = this.avatarUrl;
     if (this.avatarPublicId !== undefined) payload.video_bot_image_public_id = this.avatarPublicId;
-    if (this.humanHandoffEnabled !== undefined) payload.human_handoff_enabled = this.humanHandoffEnabled;
-    if (this.humanHandoffEmails !== undefined) payload.human_handoff_emails = this.humanHandoffEmails;
+    if (this.humanHandoffEnabled !== undefined)
+      payload.human_handoff_enabled = this.humanHandoffEnabled;
+    if (this.humanHandoffEmails !== undefined)
+      payload.human_handoff_emails = this.humanHandoffEmails;
     if (this.requireVisitorEmailVerification !== undefined) {
       payload.require_visitor_email_verification = this.requireVisitorEmailVerification;
     }

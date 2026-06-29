@@ -784,7 +784,10 @@ function createSlackAgentModule({ authMiddleware } = {}) {
   router.use('/webhooks', createWebhookRoutes({ webhookController, authMiddleware }));
   router.use('/slack-ai', createSlackAIRoutes({ slackAIController, authMiddleware }));
   router.use('/agents', createAgentInvocationRoutes({ agentInvocationController, authMiddleware }));
-  router.use('/knowledge-graph', createKnowledgeGraphRoutes({ knowledgeGraphController, authMiddleware }));
+  router.use(
+    '/knowledge-graph',
+    createKnowledgeGraphRoutes({ knowledgeGraphController, authMiddleware }),
+  );
 
   // Start the AI cron scheduler (runs every 60s, checks for due channel summaries)
   slackAiCronService.start();

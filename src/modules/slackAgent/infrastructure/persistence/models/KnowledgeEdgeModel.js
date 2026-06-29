@@ -4,21 +4,57 @@ const mongoose = require('mongoose');
 
 const RELATIONSHIP_TYPES = [
   // Communication
-  'SENT_BY', 'POSTED_IN', 'PART_OF_THREAD', 'REPLIES_TO', 'MENTIONS', 'MENTIONED_IN',
+  'SENT_BY',
+  'POSTED_IN',
+  'PART_OF_THREAD',
+  'REPLIES_TO',
+  'MENTIONS',
+  'MENTIONED_IN',
   // Original backward-compat
-  'sent', 'mentions', 'replies_to', 'in_channel', 'reacted', 'references',
-  'thread_participant', 'direct_message', 'parent_child',
+  'sent',
+  'mentions',
+  'replies_to',
+  'in_channel',
+  'reacted',
+  'references',
+  'thread_participant',
+  'direct_message',
+  'parent_child',
   // Knowledge
-  'ABOUT', 'REFERENCES', 'USES', 'IMPLEMENTS', 'DEPENDS_ON', 'CALLS', 'IMPORTS',
-  'DEFINES', 'EXPLAINS', 'RELATES_TO', 'CONFLICTS_WITH',
+  'ABOUT',
+  'REFERENCES',
+  'USES',
+  'IMPLEMENTS',
+  'DEPENDS_ON',
+  'CALLS',
+  'IMPORTS',
+  'DEFINES',
+  'EXPLAINS',
+  'RELATES_TO',
+  'CONFLICTS_WITH',
   // Decision
-  'PROPOSES', 'APPROVES', 'REJECTS', 'SUPPORTS', 'OPPOSES', 'SUPERSEDES',
+  'PROPOSES',
+  'APPROVES',
+  'REJECTS',
+  'SUPPORTS',
+  'OPPOSES',
+  'SUPERSEDES',
   // Task
-  'CREATES_TASK', 'ASSIGNED_TO', 'BLOCKS', 'COMPLETED_BY', 'REQUESTS',
+  'CREATES_TASK',
+  'ASSIGNED_TO',
+  'BLOCKS',
+  'COMPLETED_BY',
+  'REQUESTS',
   // Incident
-  'CAUSES', 'FIXES', 'AFFECTS', 'MITIGATES',
+  'CAUSES',
+  'FIXES',
+  'AFFECTS',
+  'MITIGATES',
   // Time
-  'HAS_DEADLINE', 'STARTS_ON', 'ENDS_ON', 'HAPPENED_AT',
+  'HAS_DEADLINE',
+  'STARTS_ON',
+  'ENDS_ON',
+  'HAPPENED_AT',
 ];
 
 const edgeMetadataSchema = new mongoose.Schema(
@@ -102,16 +138,23 @@ const knowledgeEdgeSchema = new mongoose.Schema(
 knowledgeEdgeSchema.index({ organizationId: 1, sourceNodeId: 1, relationshipType: 1 });
 knowledgeEdgeSchema.index({ organizationId: 1, targetNodeId: 1, relationshipType: 1 });
 knowledgeEdgeSchema.index({ organizationId: 1, workspaceId: 1, relationshipType: 1 });
-knowledgeEdgeSchema.index({ sourceExternalId: 1, targetExternalId: 1, relationshipType: 1 }, { unique: true });
+knowledgeEdgeSchema.index(
+  { sourceExternalId: 1, targetExternalId: 1, relationshipType: 1 },
+  { unique: true },
+);
 knowledgeEdgeSchema.index({ relationshipType: 1, weight: -1 });
 
 const KnowledgeEdgeModel = mongoose.model('KnowledgeEdge', knowledgeEdgeSchema);
 
 if (mongoose.connection.readyState === 1) {
-  KnowledgeEdgeModel.collection.dropIndex('sourceNodeId_1_targetNodeId_1_relationshipType_1').catch(() => {});
+  KnowledgeEdgeModel.collection
+    .dropIndex('sourceNodeId_1_targetNodeId_1_relationshipType_1')
+    .catch(() => {});
 } else {
   mongoose.connection.once('open', () => {
-    KnowledgeEdgeModel.collection.dropIndex('sourceNodeId_1_targetNodeId_1_relationshipType_1').catch(() => {});
+    KnowledgeEdgeModel.collection
+      .dropIndex('sourceNodeId_1_targetNodeId_1_relationshipType_1')
+      .catch(() => {});
   });
 }
 

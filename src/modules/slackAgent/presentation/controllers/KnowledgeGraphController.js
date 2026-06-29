@@ -182,16 +182,62 @@ class KnowledgeGraphController {
     return ApiResponse.success(res, result);
   };
 
+  getFullGraph = async (req, res) => {
+    const { organizationId } = req.user || {};
+    const { workspaceId } = req.params;
+    const { limit } = req.query;
+
+    const result = await this.facade.knowledgeGraphService.getFullGraph(
+      organizationId,
+      workspaceId,
+      parseInt(limit, 10) || 100,
+    );
+
+    return ApiResponse.success(res, result);
+  };
+
   getNodeTypes = async (req, res) => {
     const NODE_TYPES = [
-      'person', 'team', 'department', 'role',
-      'technology', 'programming_language', 'framework', 'library', 'api', 'database',
-      'repository', 'service', 'microservice', 'endpoint',
-      'project', 'product', 'feature', 'company',
-      'topic', 'concept', 'documentation', 'meeting', 'architecture', 'design_pattern',
-      'decision', 'proposal', 'question', 'task', 'action_item', 'issue', 'bug', 'incident',
-      'pull_request', 'deployment', 'release', 'version', 'sprint', 'milestone',
-      'date', 'deadline',
+      'person',
+      'team',
+      'department',
+      'role',
+      'technology',
+      'programming_language',
+      'framework',
+      'library',
+      'api',
+      'database',
+      'repository',
+      'service',
+      'microservice',
+      'endpoint',
+      'project',
+      'product',
+      'feature',
+      'company',
+      'topic',
+      'concept',
+      'documentation',
+      'meeting',
+      'architecture',
+      'design_pattern',
+      'decision',
+      'proposal',
+      'question',
+      'task',
+      'action_item',
+      'issue',
+      'bug',
+      'incident',
+      'pull_request',
+      'deployment',
+      'release',
+      'version',
+      'sprint',
+      'milestone',
+      'date',
+      'deadline',
     ];
 
     return ApiResponse.success(res, { nodeTypes: NODE_TYPES });

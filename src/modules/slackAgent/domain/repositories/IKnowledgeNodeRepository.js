@@ -1,7 +1,9 @@
 'use strict';
 
 class IKnowledgeNodeRepository {
-  async findById(id) { throw new Error('Not implemented'); }
+  async findById(id) {
+    throw new Error('Not implemented');
+  }
 
   async findByExternalId(organizationId, workspaceId, externalId, nodeType) {
     throw new Error('Not implemented');
@@ -43,17 +45,25 @@ class IKnowledgeNodeRepository {
     throw new Error('Not implemented');
   }
 
-  async save(data) { throw new Error('Not implemented'); }
+  async save(data) {
+    throw new Error('Not implemented');
+  }
 
   async upsertByExternalId(organizationId, workspaceId, externalId, nodeType, data) {
     throw new Error('Not implemented');
   }
 
-  async delete(id) { throw new Error('Not implemented'); }
+  async delete(id) {
+    throw new Error('Not implemented');
+  }
 
-  async deleteByWorkspace(workspaceId) { throw new Error('Not implemented'); }
+  async deleteByWorkspace(workspaceId) {
+    throw new Error('Not implemented');
+  }
 
-  async count(filters = {}) { throw new Error('Not implemented'); }
+  async count(filters = {}) {
+    throw new Error('Not implemented');
+  }
 
   async findByNodeType(organizationId, workspaceId, nodeType, limit = 50) {
     throw new Error('Not implemented');
