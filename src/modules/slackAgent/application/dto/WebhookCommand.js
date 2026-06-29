@@ -1,7 +1,17 @@
 'use strict';
 
 class CreateWebhookCommand {
-  constructor({ organizationId, name, type, url, secret, events, headers, retryConfig, createdById }) {
+  constructor({
+    organizationId,
+    name,
+    type,
+    url,
+    secret,
+    events,
+    headers,
+    retryConfig,
+    createdById,
+  }) {
     this.organizationId = organizationId;
     this.name = name;
     this.type = type;
@@ -15,10 +25,18 @@ class CreateWebhookCommand {
     Object.freeze(this);
   }
   validate() {
-    if (!this.organizationId) throw new Error('Organization id is required');
-    if (!this.name || !this.name.trim()) throw new Error('Webhook name is required');
-    if (!this.url) throw new Error('Webhook URL is required');
-    if (!this.type) throw new Error('Webhook type is required');
+    if (!this.organizationId) {
+      throw new Error('Organization id is required');
+    }
+    if (!this.name || !this.name.trim()) {
+      throw new Error('Webhook name is required');
+    }
+    if (!this.url) {
+      throw new Error('Webhook URL is required');
+    }
+    if (!this.type) {
+      throw new Error('Webhook type is required');
+    }
   }
 }
 
@@ -31,8 +49,12 @@ class TriggerWebhookCommand {
     Object.freeze(this);
   }
   validate() {
-    if (!this.webhookId) throw new Error('Webhook id is required');
-    if (!this.payload) throw new Error('Payload is required');
+    if (!this.webhookId) {
+      throw new Error('Webhook id is required');
+    }
+    if (!this.payload) {
+      throw new Error('Payload is required');
+    }
   }
 }
 
@@ -45,7 +67,9 @@ class RetryWebhookCommand {
     Object.freeze(this);
   }
   validate() {
-    if (!this.webhookId) throw new Error('Webhook id is required');
+    if (!this.webhookId) {
+      throw new Error('Webhook id is required');
+    }
   }
 }
 

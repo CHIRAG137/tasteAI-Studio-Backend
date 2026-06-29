@@ -8,7 +8,9 @@ class SyncChannelsCommand {
     Object.freeze(this);
   }
   validate() {
-    if (!this.workspaceId) throw new Error('Workspace id is required');
+    if (!this.workspaceId) {
+      throw new Error('Workspace id is required');
+    }
   }
 }
 
@@ -20,7 +22,9 @@ class AddMonitoredChannelCommand {
     Object.freeze(this);
   }
   validate() {
-    if (!this.channelId) throw new Error('Channel id is required');
+    if (!this.channelId) {
+      throw new Error('Channel id is required');
+    }
   }
 }
 
@@ -32,7 +36,9 @@ class RemoveMonitoredChannelCommand {
     Object.freeze(this);
   }
   validate() {
-    if (!this.channelId) throw new Error('Channel id is required');
+    if (!this.channelId) {
+      throw new Error('Channel id is required');
+    }
   }
 }
 
@@ -45,8 +51,12 @@ class UpdateChannelPermissionsCommand {
     Object.freeze(this);
   }
   validate() {
-    if (!this.channelId) throw new Error('Channel id is required');
-    if (!this.permissions) throw new Error('Permissions are required');
+    if (!this.channelId) {
+      throw new Error('Channel id is required');
+    }
+    if (!this.permissions) {
+      throw new Error('Permissions are required');
+    }
   }
 }
 
@@ -59,9 +69,19 @@ class UpdateChannelConfigCommand {
     Object.freeze(this);
   }
   validate() {
-    if (!this.channelId) throw new Error('Channel id is required');
-    if (!this.configuration) throw new Error('Configuration is required');
+    if (!this.channelId) {
+      throw new Error('Channel id is required');
+    }
+    if (!this.configuration) {
+      throw new Error('Configuration is required');
+    }
   }
 }
 
-module.exports = { SyncChannelsCommand, AddMonitoredChannelCommand, RemoveMonitoredChannelCommand, UpdateChannelPermissionsCommand, UpdateChannelConfigCommand };
+module.exports = {
+  SyncChannelsCommand,
+  AddMonitoredChannelCommand,
+  RemoveMonitoredChannelCommand,
+  UpdateChannelPermissionsCommand,
+  UpdateChannelConfigCommand,
+};

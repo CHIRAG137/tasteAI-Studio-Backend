@@ -1,7 +1,27 @@
 'use strict';
 
 class SLA {
-  constructor({ id, organizationId, name, description, priority, responseTimeMinutes, resolutionTimeMinutes, businessHoursOnly, businessHoursId, escalateAfterBreach, escalationRuleId, notifyOnBreach, notificationConfig, reminderConfig, isActive, conditions, metadata, createdAt, updatedAt }) {
+  constructor({
+    id,
+    organizationId,
+    name,
+    description,
+    priority,
+    responseTimeMinutes,
+    resolutionTimeMinutes,
+    businessHoursOnly,
+    businessHoursId,
+    escalateAfterBreach,
+    escalationRuleId,
+    notifyOnBreach,
+    notificationConfig,
+    reminderConfig,
+    isActive,
+    conditions,
+    metadata,
+    createdAt,
+    updatedAt,
+  }) {
     this.id = id;
     this.organizationId = organizationId;
     this.name = name;
@@ -25,10 +45,18 @@ class SLA {
   }
 
   validate() {
-    if (!this.organizationId) throw new Error('Organization id is required');
-    if (!this.name || !this.name.trim()) throw new Error('SLA name is required');
-    if (!this.responseTimeMinutes) throw new Error('Response time is required');
-    if (!this.resolutionTimeMinutes) throw new Error('Resolution time is required');
+    if (!this.organizationId) {
+      throw new Error('Organization id is required');
+    }
+    if (!this.name || !this.name.trim()) {
+      throw new Error('SLA name is required');
+    }
+    if (!this.responseTimeMinutes) {
+      throw new Error('Response time is required');
+    }
+    if (!this.resolutionTimeMinutes) {
+      throw new Error('Resolution time is required');
+    }
   }
 }
 

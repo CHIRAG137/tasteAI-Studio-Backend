@@ -11,8 +11,12 @@ class CreateDepartmentCommand {
     Object.freeze(this);
   }
   validate() {
-    if (!this.organizationId) throw new Error('Organization id is required');
-    if (!this.name || !this.name.trim()) throw new Error('Department name is required');
+    if (!this.organizationId) {
+      throw new Error('Organization id is required');
+    }
+    if (!this.name || !this.name.trim()) {
+      throw new Error('Department name is required');
+    }
   }
 }
 
@@ -28,8 +32,12 @@ class CreateTeamCommand {
     Object.freeze(this);
   }
   validate() {
-    if (!this.organizationId) throw new Error('Organization id is required');
-    if (!this.name || !this.name.trim()) throw new Error('Team name is required');
+    if (!this.organizationId) {
+      throw new Error('Organization id is required');
+    }
+    if (!this.name || !this.name.trim()) {
+      throw new Error('Team name is required');
+    }
   }
 }
 
@@ -44,8 +52,12 @@ class CreateCategoryCommand {
     Object.freeze(this);
   }
   validate() {
-    if (!this.organizationId) throw new Error('Organization id is required');
-    if (!this.name || !this.name.trim()) throw new Error('Category name is required');
+    if (!this.organizationId) {
+      throw new Error('Organization id is required');
+    }
+    if (!this.name || !this.name.trim()) {
+      throw new Error('Category name is required');
+    }
   }
 }
 
@@ -59,8 +71,12 @@ class CreateTagCommand {
     Object.freeze(this);
   }
   validate() {
-    if (!this.organizationId) throw new Error('Organization id is required');
-    if (!this.name || !this.name.trim()) throw new Error('Tag name is required');
+    if (!this.organizationId) {
+      throw new Error('Organization id is required');
+    }
+    if (!this.name || !this.name.trim()) {
+      throw new Error('Tag name is required');
+    }
   }
 }
 
@@ -74,8 +90,12 @@ class CreateBusinessHoursCommand {
     Object.freeze(this);
   }
   validate() {
-    if (!this.organizationId) throw new Error('Organization id is required');
-    if (!this.name || !this.name.trim()) throw new Error('Business hours name is required');
+    if (!this.organizationId) {
+      throw new Error('Organization id is required');
+    }
+    if (!this.name || !this.name.trim()) {
+      throw new Error('Business hours name is required');
+    }
   }
 }
 
@@ -89,10 +109,23 @@ class CreateHolidayCommand {
     Object.freeze(this);
   }
   validate() {
-    if (!this.organizationId) throw new Error('Organization id is required');
-    if (!this.name || !this.name.trim()) throw new Error('Holiday name is required');
-    if (!this.date) throw new Error('Holiday date is required');
+    if (!this.organizationId) {
+      throw new Error('Organization id is required');
+    }
+    if (!this.name || !this.name.trim()) {
+      throw new Error('Holiday name is required');
+    }
+    if (!this.date) {
+      throw new Error('Holiday date is required');
+    }
   }
 }
 
-module.exports = { CreateDepartmentCommand, CreateTeamCommand, CreateCategoryCommand, CreateTagCommand, CreateBusinessHoursCommand, CreateHolidayCommand };
+module.exports = {
+  CreateDepartmentCommand,
+  CreateTeamCommand,
+  CreateCategoryCommand,
+  CreateTagCommand,
+  CreateBusinessHoursCommand,
+  CreateHolidayCommand,
+};

@@ -21,7 +21,10 @@ exports.createPolicyRules = [
 exports.updatePolicyRules = [
   param('policyId').notEmpty().withMessage('Policy id is required'),
   body('name').optional().trim().notEmpty().withMessage('Name cannot be empty'),
-  body('conditions').optional().isArray({ min: 1 }).withMessage('Conditions must be a non-empty array'),
+  body('conditions')
+    .optional()
+    .isArray({ min: 1 })
+    .withMessage('Conditions must be a non-empty array'),
   body('targetUserId').optional().notEmpty().withMessage('Target user id cannot be empty'),
   runValidation,
 ];

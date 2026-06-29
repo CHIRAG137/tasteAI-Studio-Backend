@@ -54,15 +54,28 @@ class GetDefaultInvocationModesUseCase {
       routing: {
         id: 'routing',
         name: 'Query Routing',
-        description: 'Control how queries are routed to this agent — all messages, AI-filtered, keyword-only, or disabled',
+        description:
+          'Control how queries are routed to this agent — all messages, AI-filtered, keyword-only, or disabled',
         icon: 'git-branch',
         enabledDefault: false,
         configurable: true,
         options: [
           { value: 'all', label: 'All Messages', description: 'Process every message in scope' },
-          { value: 'ai_filter', label: 'AI Filter', description: 'Let AI decide which messages to handle' },
-          { value: 'keyword_only', label: 'Keyword Only', description: 'Only respond to keyword-triggered messages' },
-          { value: 'disabled', label: 'Disabled', description: 'Do not auto-respond to any messages' },
+          {
+            value: 'ai_filter',
+            label: 'AI Filter',
+            description: 'Let AI decide which messages to handle',
+          },
+          {
+            value: 'keyword_only',
+            label: 'Keyword Only',
+            description: 'Only respond to keyword-triggered messages',
+          },
+          {
+            value: 'disabled',
+            label: 'Disabled',
+            description: 'Do not auto-respond to any messages',
+          },
         ],
       },
     };

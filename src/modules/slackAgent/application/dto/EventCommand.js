@@ -8,7 +8,9 @@ class ProcessEventCommand {
     Object.freeze(this);
   }
   validate() {
-    if (!this.eventId) throw new Error('Event id is required');
+    if (!this.eventId) {
+      throw new Error('Event id is required');
+    }
   }
 }
 
@@ -21,7 +23,9 @@ class IngestEventCommand {
     Object.freeze(this);
   }
   validate() {
-    if (!this.rawBody) throw new Error('Raw event body is required');
+    if (!this.rawBody) {
+      throw new Error('Raw event body is required');
+    }
   }
 }
 

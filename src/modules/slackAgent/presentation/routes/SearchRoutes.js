@@ -25,7 +25,11 @@ module.exports = function createSearchRoutes({ searchController, authMiddleware 
    * @desc    Search conversations/threads
    * @access  Private
    */
-  router.get('/conversations', authMiddleware.requireAuth, asyncHandler(searchController.conversations));
+  router.get(
+    '/conversations',
+    authMiddleware.requireAuth,
+    asyncHandler(searchController.conversations),
+  );
 
   /**
    * @route   GET /search/knowledge

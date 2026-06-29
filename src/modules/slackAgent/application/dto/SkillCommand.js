@@ -1,7 +1,17 @@
 'use strict';
 
 class RegisterSkillCommand {
-  constructor({ organizationId, name, description, type, version, configuration, entryPoint, dependencies, createdById }) {
+  constructor({
+    organizationId,
+    name,
+    description,
+    type,
+    version,
+    configuration,
+    entryPoint,
+    dependencies,
+    createdById,
+  }) {
     this.organizationId = organizationId;
     this.name = name;
     this.description = description;
@@ -15,9 +25,15 @@ class RegisterSkillCommand {
     Object.freeze(this);
   }
   validate() {
-    if (!this.organizationId) throw new Error('Organization id is required');
-    if (!this.name || !this.name.trim()) throw new Error('Skill name is required');
-    if (!this.type) throw new Error('Skill type is required');
+    if (!this.organizationId) {
+      throw new Error('Organization id is required');
+    }
+    if (!this.name || !this.name.trim()) {
+      throw new Error('Skill name is required');
+    }
+    if (!this.type) {
+      throw new Error('Skill type is required');
+    }
   }
 }
 
@@ -30,8 +46,12 @@ class ToggleSkillCommand {
     Object.freeze(this);
   }
   validate() {
-    if (!this.skillId) throw new Error('Skill id is required');
-    if (this.isEnabled === undefined) throw new Error('isEnabled flag is required');
+    if (!this.skillId) {
+      throw new Error('Skill id is required');
+    }
+    if (this.isEnabled === undefined) {
+      throw new Error('isEnabled flag is required');
+    }
   }
 }
 
@@ -44,8 +64,12 @@ class ConfigureSkillCommand {
     Object.freeze(this);
   }
   validate() {
-    if (!this.skillId) throw new Error('Skill id is required');
-    if (!this.configuration) throw new Error('Configuration is required');
+    if (!this.skillId) {
+      throw new Error('Skill id is required');
+    }
+    if (!this.configuration) {
+      throw new Error('Configuration is required');
+    }
   }
 }
 
@@ -59,9 +83,18 @@ class ExecuteSkillCommand {
     Object.freeze(this);
   }
   validate() {
-    if (!this.skillId) throw new Error('Skill id is required');
-    if (!this.input) throw new Error('Input is required');
+    if (!this.skillId) {
+      throw new Error('Skill id is required');
+    }
+    if (!this.input) {
+      throw new Error('Input is required');
+    }
   }
 }
 
-module.exports = { RegisterSkillCommand, ToggleSkillCommand, ConfigureSkillCommand, ExecuteSkillCommand };
+module.exports = {
+  RegisterSkillCommand,
+  ToggleSkillCommand,
+  ConfigureSkillCommand,
+  ExecuteSkillCommand,
+};

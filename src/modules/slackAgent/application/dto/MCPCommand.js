@@ -1,7 +1,16 @@
 'use strict';
 
 class RegisterMCPServerCommand {
-  constructor({ organizationId, name, serverUrl, serverType, apiKey, authentication, configuration, createdById }) {
+  constructor({
+    organizationId,
+    name,
+    serverUrl,
+    serverType,
+    apiKey,
+    authentication,
+    configuration,
+    createdById,
+  }) {
     this.organizationId = organizationId;
     this.name = name;
     this.serverUrl = serverUrl;

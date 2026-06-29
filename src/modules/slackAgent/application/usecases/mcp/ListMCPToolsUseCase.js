@@ -8,7 +8,9 @@ class ListMCPToolsUseCase {
   async execute(command) {
     const { connectionId, organizationId } = command;
     const server = await this.mcpRepository.findById(connectionId);
-    if (!server) throw new Error('MCP server not found');
+    if (!server) {
+      throw new Error('MCP server not found');
+    }
 
     return server.tools || [];
   }

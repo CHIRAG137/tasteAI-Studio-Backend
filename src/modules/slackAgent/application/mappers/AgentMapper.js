@@ -22,7 +22,7 @@ class AgentMapper {
   }
 
   static toListResponse(agents) {
-    return agents.map(a => AgentMapper.toResponse(a));
+    return agents.map((a) => AgentMapper.toResponse(a));
   }
 }
 

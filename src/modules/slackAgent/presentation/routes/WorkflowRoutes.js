@@ -25,7 +25,11 @@ module.exports = function createWorkflowRoutes({ workflowController, authMiddlew
    * @desc    List workflow templates
    * @access  Private
    */
-  router.get('/templates', authMiddleware.requireAuth, asyncHandler(workflowController.getTemplates));
+  router.get(
+    '/templates',
+    authMiddleware.requireAuth,
+    asyncHandler(workflowController.getTemplates),
+  );
 
   /**
    * @route   GET /workflows/:workflowId
@@ -46,35 +50,55 @@ module.exports = function createWorkflowRoutes({ workflowController, authMiddlew
    * @desc    Delete workflow
    * @access  Private
    */
-  router.delete('/:workflowId', authMiddleware.requireAuth, asyncHandler(workflowController.delete));
+  router.delete(
+    '/:workflowId',
+    authMiddleware.requireAuth,
+    asyncHandler(workflowController.delete),
+  );
 
   /**
    * @route   POST /workflows/:workflowId/execute
    * @desc    Execute a workflow
    * @access  Private
    */
-  router.post('/:workflowId/execute', authMiddleware.requireAuth, asyncHandler(workflowController.execute));
+  router.post(
+    '/:workflowId/execute',
+    authMiddleware.requireAuth,
+    asyncHandler(workflowController.execute),
+  );
 
   /**
    * @route   GET /workflows/:workflowId/history
    * @desc    Get workflow execution history
    * @access  Private
    */
-  router.get('/:workflowId/history', authMiddleware.requireAuth, asyncHandler(workflowController.getHistory));
+  router.get(
+    '/:workflowId/history',
+    authMiddleware.requireAuth,
+    asyncHandler(workflowController.getHistory),
+  );
 
   /**
    * @route   GET /workflows/executions/:executionId/logs
    * @desc    Get workflow execution logs
    * @access  Private
    */
-  router.get('/executions/:executionId/logs', authMiddleware.requireAuth, asyncHandler(workflowController.getLogs));
+  router.get(
+    '/executions/:executionId/logs',
+    authMiddleware.requireAuth,
+    asyncHandler(workflowController.getLogs),
+  );
 
   /**
    * @route   POST /workflows/executions/approve
    * @desc    Approve a human-in-the-loop workflow step
    * @access  Private
    */
-  router.post('/executions/approve', authMiddleware.requireAuth, asyncHandler(workflowController.approveStep));
+  router.post(
+    '/executions/approve',
+    authMiddleware.requireAuth,
+    asyncHandler(workflowController.approveStep),
+  );
 
   return router;
 };

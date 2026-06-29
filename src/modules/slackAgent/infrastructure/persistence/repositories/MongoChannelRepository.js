@@ -4,8 +4,12 @@ const SlackChannelModel = require('../models/SlackChannelModel');
 
 class MongoChannelRepository {
   _addId(doc) {
-    if (!doc) return doc;
-    if (Array.isArray(doc)) return doc.map(d => ({ ...d, id: d._id?.toString() }));
+    if (!doc) {
+      return doc;
+    }
+    if (Array.isArray(doc)) {
+      return doc.map((d) => ({ ...d, id: d._id?.toString() }));
+    }
     return { ...doc, id: doc._id?.toString() };
   }
 
@@ -60,7 +64,7 @@ class MongoChannelRepository {
   }
 
   async bulkSave(channels) {
-    const ops = channels.map(c => ({
+    const ops = channels.map((c) => ({
       updateOne: {
         filter: { workspaceId: c.workspaceId, channelId: c.channelId },
         update: { $set: { ...c, lastSyncedAt: new Date() } },

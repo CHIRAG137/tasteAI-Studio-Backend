@@ -37,7 +37,9 @@ class MongoSLARepository {
 
   async checkOverdue(ticketPriority) {
     const sla = await this.findByPriority(null, ticketPriority);
-    if (!sla) return null;
+    if (!sla) {
+      return null;
+    }
     const deadline = new Date(Date.now() - sla.responseTimeMinutes * 60000);
     return { sla, deadline };
   }

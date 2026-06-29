@@ -11,6 +11,7 @@ class IngestEventUseCase {
     agentRepository,
     channelRepository,
     slackAiService,
+    knowledgeGraphService,
   }) {
     this.eventRepository = eventRepository;
     this.slackEventHandlerService = slackEventHandlerService;
@@ -20,6 +21,7 @@ class IngestEventUseCase {
     this.channelRepository = channelRepository;
     this.llmResponseService = new LLMResponseService();
     this.slackAiService = slackAiService;
+    this.knowledgeGraphService = knowledgeGraphService;
   }
 
   async execute(command) {
@@ -67,6 +69,21 @@ class IngestEventUseCase {
       status: 'processing',
       processedAt: null,
     });
+
+    // Knowledge graph: process ALL messages (not just routed ones) to build search index
+    if (this.knowledgeGraphService && (eventType === 'message' || eventType === 'app_mention')) {
+      this.knowledgeGraphService
+        .processMessage({
+          organizationId,
+          workspaceId: slackWorkspaceId,
+          workspaceMongoId,
+          channelMongoId,
+          slackEvent,
+        })
+        .catch((err) => {
+          console.warn(`[IngestEvent] Knowledge graph processing error: ${err.message}`);
+        });
+    }
 
     const routingResult = await this.slackEventHandlerService.processEvent({
       eventType,

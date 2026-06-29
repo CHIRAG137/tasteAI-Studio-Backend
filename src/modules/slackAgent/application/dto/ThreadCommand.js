@@ -9,8 +9,12 @@ class LinkThreadToTicketCommand {
     Object.freeze(this);
   }
   validate() {
-    if (!this.threadId) throw new Error('Thread id is required');
-    if (!this.ticketId) throw new Error('Ticket id is required');
+    if (!this.threadId) {
+      throw new Error('Thread id is required');
+    }
+    if (!this.ticketId) {
+      throw new Error('Ticket id is required');
+    }
   }
 }
 
@@ -22,7 +26,9 @@ class SyncThreadCommand {
     Object.freeze(this);
   }
   validate() {
-    if (!this.threadId) throw new Error('Thread id is required');
+    if (!this.threadId) {
+      throw new Error('Thread id is required');
+    }
   }
 }
 
@@ -34,7 +40,9 @@ class GenerateThreadSummaryCommand {
     Object.freeze(this);
   }
   validate() {
-    if (!this.threadId) throw new Error('Thread id is required');
+    if (!this.threadId) {
+      throw new Error('Thread id is required');
+    }
   }
 }
 

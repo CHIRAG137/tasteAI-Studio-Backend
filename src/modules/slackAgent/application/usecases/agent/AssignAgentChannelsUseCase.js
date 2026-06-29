@@ -12,20 +12,26 @@ class AssignAgentChannelsUseCase {
     const { agentId, channelIds } = command;
 
     const agent = await this.agentRepository.findById(agentId);
-    if (!agent) throw new Error('Agent not found');
+    if (!agent) {
+      throw new Error('Agent not found');
+    }
 
-    const previousIds = (agent.assignedChannelIds || []).map(id => id.toString());
-    const newIds = channelIds.filter(id => !previousIds.includes(id));
+    const previousIds = (agent.assignedChannelIds || []).map((id) => id.toString());
+    const newIds = channelIds.filter((id) => !previousIds.includes(id));
 
     // Auto-join new Slack channels
     for (const mongoChannelId of newIds) {
       try {
         const channel = await this.channelRepository.findById(mongoChannelId);
-        if (!channel) continue;
+        if (!channel) {
+          continue;
+        }
 
         const workspace = await this.workspaceRepository.findById(channel.workspaceId);
         const botToken = workspace?.accessToken;
-        if (!botToken) continue;
+        if (!botToken) {
+          continue;
+        }
 
         await this.slackApiClient.joinChannel(botToken, channel.channelId);
 

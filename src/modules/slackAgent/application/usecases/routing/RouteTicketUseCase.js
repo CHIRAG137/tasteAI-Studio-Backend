@@ -10,7 +10,10 @@ class RouteTicketUseCase {
   async execute(command) {
     const assignment = await this.routingService.route(command.ticketId);
     await this.ticketRepository.update(command.ticketId, { assignedToId: assignment.assignedToId });
-    await this.auditService.log('ticket.routed', { ticketId: command.ticketId, assignedToId: assignment.assignedToId });
+    await this.auditService.log('ticket.routed', {
+      ticketId: command.ticketId,
+      assignedToId: assignment.assignedToId,
+    });
     return assignment;
   }
 }

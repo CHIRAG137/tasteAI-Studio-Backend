@@ -1,7 +1,15 @@
 'use strict';
 
 class AIRuntimeService {
-  constructor({ llmService, contextBuilder, memoryService, knowledgeService, toolSelectionService, responseValidationService, eventBus }) {
+  constructor({
+    llmService,
+    contextBuilder,
+    memoryService,
+    knowledgeService,
+    toolSelectionService,
+    responseValidationService,
+    eventBus,
+  }) {
     this.llmService = llmService;
     this.contextBuilder = contextBuilder;
     this.memoryService = memoryService;

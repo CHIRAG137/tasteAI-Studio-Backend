@@ -17,7 +17,9 @@ class AgentController {
   };
 
   list = async (req, res) => {
-    const agents = await this.slackAgentFacade.listAgentsUseCase.execute(req.user.organizationId || req.user.id);
+    const agents = await this.slackAgentFacade.listAgentsUseCase.execute(
+      req.user.organizationId || req.user.id,
+    );
     return ApiResponse.success(res, agents);
   };
 
@@ -27,7 +29,10 @@ class AgentController {
   };
 
   update = async (req, res) => {
-    const agent = await this.slackAgentFacade.updateAgentUseCase.execute({ agentId: req.params.agentId, ...req.body });
+    const agent = await this.slackAgentFacade.updateAgentUseCase.execute({
+      agentId: req.params.agentId,
+      ...req.body,
+    });
     return ApiResponse.success(res, agent, 'Agent updated successfully');
   };
 
@@ -55,7 +60,11 @@ class AgentController {
       isEnabled: req.body.isEnabled,
       organizationId: req.user.organizationId || req.user.id,
     });
-    return ApiResponse.success(res, agent, `Agent ${req.body.isEnabled ? 'enabled' : 'disabled'} successfully`);
+    return ApiResponse.success(
+      res,
+      agent,
+      `Agent ${req.body.isEnabled ? 'enabled' : 'disabled'} successfully`,
+    );
   };
 
   assignChannels = async (req, res) => {

@@ -21,7 +21,10 @@ class UserController {
   };
 
   lookup = async (req, res) => {
-    const user = await this.slackAgentFacade.lookupSlackUserUseCase.execute(req.params.workspaceId, req.params.slackUserId);
+    const user = await this.slackAgentFacade.lookupSlackUserUseCase.execute(
+      req.params.workspaceId,
+      req.params.slackUserId,
+    );
     return ApiResponse.success(res, user);
   };
 

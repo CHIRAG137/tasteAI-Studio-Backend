@@ -11,8 +11,12 @@ class AIInstruction {
   }
 
   validate() {
-    if (!this.type) throw new Error('Instruction type is required');
-    if (!this.content || !this.content.trim()) throw new Error('Instruction content is required');
+    if (!this.type) {
+      throw new Error('Instruction type is required');
+    }
+    if (!this.content || !this.content.trim()) {
+      throw new Error('Instruction content is required');
+    }
   }
 }
 

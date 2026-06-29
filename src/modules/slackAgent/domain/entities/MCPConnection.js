@@ -1,7 +1,25 @@
 'use strict';
 
 class MCPConnection {
-  constructor({ id, organizationId, name, serverUrl, serverType, apiKey, authentication, tools, isConnected, isEnabled, healthStatus, lastHealthCheckAt, configuration, metadata, createdById, createdAt, updatedAt }) {
+  constructor({
+    id,
+    organizationId,
+    name,
+    serverUrl,
+    serverType,
+    apiKey,
+    authentication,
+    tools,
+    isConnected,
+    isEnabled,
+    healthStatus,
+    lastHealthCheckAt,
+    configuration,
+    metadata,
+    createdById,
+    createdAt,
+    updatedAt,
+  }) {
     this.id = id;
     this.organizationId = organizationId;
     this.name = name;
@@ -23,9 +41,15 @@ class MCPConnection {
   }
 
   validate() {
-    if (!this.organizationId) throw new Error('Organization id is required');
-    if (!this.name || !this.name.trim()) throw new Error('MCP connection name is required');
-    if (!this.serverUrl) throw new Error('Server URL is required');
+    if (!this.organizationId) {
+      throw new Error('Organization id is required');
+    }
+    if (!this.name || !this.name.trim()) {
+      throw new Error('MCP connection name is required');
+    }
+    if (!this.serverUrl) {
+      throw new Error('Server URL is required');
+    }
   }
 }
 

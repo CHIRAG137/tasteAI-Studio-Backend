@@ -37,7 +37,9 @@ class MongoMCPRepository {
 
   async testConnection(id) {
     const connection = await this.findById(id);
-    if (!connection) return null;
+    if (!connection) {
+      return null;
+    }
     return { status: 'unknown', latency: 0 };
   }
 

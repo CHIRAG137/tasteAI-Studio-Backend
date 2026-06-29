@@ -8,7 +8,10 @@ class CreateWebhookUseCase {
 
   async execute(command) {
     const webhook = await this.webhookRepository.save(command);
-    await this.auditService.log('webhook.created', { webhookId: webhook.id, organizationId: command.organizationId });
+    await this.auditService.log('webhook.created', {
+      webhookId: webhook.id,
+      organizationId: command.organizationId,
+    });
     return webhook;
   }
 }

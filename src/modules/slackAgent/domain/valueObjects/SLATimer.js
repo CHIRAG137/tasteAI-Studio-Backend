@@ -1,7 +1,21 @@
 'use strict';
 
 class SLATimer {
-  constructor({ slaPolicyId, ticketId, responseDeadline, resolutionDeadline, responseReminderSent, resolutionReminderSent, responseBreached, resolutionBreached, pausedAt, pausedDuration, businessHoursId, startedAt, createdAt }) {
+  constructor({
+    slaPolicyId,
+    ticketId,
+    responseDeadline,
+    resolutionDeadline,
+    responseReminderSent,
+    resolutionReminderSent,
+    responseBreached,
+    resolutionBreached,
+    pausedAt,
+    pausedDuration,
+    businessHoursId,
+    startedAt,
+    createdAt,
+  }) {
     this.slaPolicyId = slaPolicyId;
     this.ticketId = ticketId;
     this.responseDeadline = responseDeadline;
@@ -19,10 +33,18 @@ class SLATimer {
   }
 
   validate() {
-    if (!this.slaPolicyId) throw new Error('SLA policy id is required');
-    if (!this.ticketId) throw new Error('Ticket id is required');
-    if (!this.responseDeadline) throw new Error('Response deadline is required');
-    if (!this.resolutionDeadline) throw new Error('Resolution deadline is required');
+    if (!this.slaPolicyId) {
+      throw new Error('SLA policy id is required');
+    }
+    if (!this.ticketId) {
+      throw new Error('Ticket id is required');
+    }
+    if (!this.responseDeadline) {
+      throw new Error('Response deadline is required');
+    }
+    if (!this.resolutionDeadline) {
+      throw new Error('Resolution deadline is required');
+    }
   }
 
   isResponseOvertime() {

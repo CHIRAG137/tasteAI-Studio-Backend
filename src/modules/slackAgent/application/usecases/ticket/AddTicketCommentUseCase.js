@@ -8,7 +8,10 @@ class AddTicketCommentUseCase {
 
   async execute(command) {
     const comment = await this.ticketRepository.addComment(command.ticketId, command);
-    await this.auditService.log('ticket.comment_added', { ticketId: command.ticketId, authorId: command.authorId });
+    await this.auditService.log('ticket.comment_added', {
+      ticketId: command.ticketId,
+      authorId: command.authorId,
+    });
     return comment;
   }
 }

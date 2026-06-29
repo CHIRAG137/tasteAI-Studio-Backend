@@ -16,7 +16,9 @@ class SLAController {
   };
 
   list = async (req, res) => {
-    const slas = await this.slackAgentFacade.listSLAsUseCase.execute(req.user.organizationId || req.user.id);
+    const slas = await this.slackAgentFacade.listSLAsUseCase.execute(
+      req.user.organizationId || req.user.id,
+    );
     return ApiResponse.success(res, slas);
   };
 

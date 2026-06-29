@@ -32,28 +32,44 @@ module.exports = function createKnowledgeRoutes({ knowledgeController, authMiddl
    * @desc    Get knowledge entry details
    * @access  Private
    */
-  router.get('/:knowledgeId', authMiddleware.requireAuth, asyncHandler(knowledgeController.getById));
+  router.get(
+    '/:knowledgeId',
+    authMiddleware.requireAuth,
+    asyncHandler(knowledgeController.getById),
+  );
 
   /**
    * @route   POST /knowledge/:knowledgeId/index
    * @desc    Index knowledge for vector search
    * @access  Private
    */
-  router.post('/:knowledgeId/index', authMiddleware.requireAuth, asyncHandler(knowledgeController.index));
+  router.post(
+    '/:knowledgeId/index',
+    authMiddleware.requireAuth,
+    asyncHandler(knowledgeController.index),
+  );
 
   /**
    * @route   POST /knowledge/:knowledgeId/refresh
    * @desc    Refresh knowledge (re-index)
    * @access  Private
    */
-  router.post('/:knowledgeId/refresh', authMiddleware.requireAuth, asyncHandler(knowledgeController.refresh));
+  router.post(
+    '/:knowledgeId/refresh',
+    authMiddleware.requireAuth,
+    asyncHandler(knowledgeController.refresh),
+  );
 
   /**
    * @route   DELETE /knowledge/:knowledgeId
    * @desc    Delete knowledge entry
    * @access  Private
    */
-  router.delete('/:knowledgeId', authMiddleware.requireAuth, asyncHandler(knowledgeController.delete));
+  router.delete(
+    '/:knowledgeId',
+    authMiddleware.requireAuth,
+    asyncHandler(knowledgeController.delete),
+  );
 
   return router;
 };

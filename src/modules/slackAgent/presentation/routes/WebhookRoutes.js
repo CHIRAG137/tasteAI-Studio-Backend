@@ -46,21 +46,33 @@ module.exports = function createWebhookRoutes({ webhookController, authMiddlewar
    * @desc    Trigger an outgoing webhook
    * @access  Private
    */
-  router.post('/:webhookId/trigger', authMiddleware.requireAuth, asyncHandler(webhookController.trigger));
+  router.post(
+    '/:webhookId/trigger',
+    authMiddleware.requireAuth,
+    asyncHandler(webhookController.trigger),
+  );
 
   /**
    * @route   POST /webhooks/:webhookId/retry
    * @desc    Retry a failed webhook delivery from dead-letter queue
    * @access  Private
    */
-  router.post('/:webhookId/retry', authMiddleware.requireAuth, asyncHandler(webhookController.retry));
+  router.post(
+    '/:webhookId/retry',
+    authMiddleware.requireAuth,
+    asyncHandler(webhookController.retry),
+  );
 
   /**
    * @route   GET /webhooks/:webhookId/dead-letter
    * @desc    Get dead-letter queue entries for webhook
    * @access  Private
    */
-  router.get('/:webhookId/dead-letter', authMiddleware.requireAuth, asyncHandler(webhookController.getDeadLetter));
+  router.get(
+    '/:webhookId/dead-letter',
+    authMiddleware.requireAuth,
+    asyncHandler(webhookController.getDeadLetter),
+  );
 
   return router;
 };

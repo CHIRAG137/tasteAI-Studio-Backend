@@ -1,7 +1,30 @@
 'use strict';
 
 class Knowledge {
-  constructor({ id, organizationId, name, description, sourceType, sourceUrl, content, contentType, fileUrl, fileSize, vectorIds, indexStatus, embeddingModel, chunkCount, isActive, tags, metadata, uploadedById, lastIndexedAt, expiresAt, createdAt, updatedAt }) {
+  constructor({
+    id,
+    organizationId,
+    name,
+    description,
+    sourceType,
+    sourceUrl,
+    content,
+    contentType,
+    fileUrl,
+    fileSize,
+    vectorIds,
+    indexStatus,
+    embeddingModel,
+    chunkCount,
+    isActive,
+    tags,
+    metadata,
+    uploadedById,
+    lastIndexedAt,
+    expiresAt,
+    createdAt,
+    updatedAt,
+  }) {
     this.id = id;
     this.organizationId = organizationId;
     this.name = name;
@@ -28,9 +51,15 @@ class Knowledge {
   }
 
   validate() {
-    if (!this.organizationId) throw new Error('Organization id is required');
-    if (!this.name || !this.name.trim()) throw new Error('Knowledge name is required');
-    if (!this.sourceType) throw new Error('Source type is required');
+    if (!this.organizationId) {
+      throw new Error('Organization id is required');
+    }
+    if (!this.name || !this.name.trim()) {
+      throw new Error('Knowledge name is required');
+    }
+    if (!this.sourceType) {
+      throw new Error('Source type is required');
+    }
   }
 }
 

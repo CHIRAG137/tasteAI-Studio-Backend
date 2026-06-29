@@ -1,7 +1,27 @@
 'use strict';
 
 class Webhook {
-  constructor({ id, organizationId, name, type, url, secret, events, headers, retryConfig, isActive, lastTriggeredAt, lastResponse, deadLetterQueue, failureCount, successCount, metadata, createdById, createdAt, updatedAt }) {
+  constructor({
+    id,
+    organizationId,
+    name,
+    type,
+    url,
+    secret,
+    events,
+    headers,
+    retryConfig,
+    isActive,
+    lastTriggeredAt,
+    lastResponse,
+    deadLetterQueue,
+    failureCount,
+    successCount,
+    metadata,
+    createdById,
+    createdAt,
+    updatedAt,
+  }) {
     this.id = id;
     this.organizationId = organizationId;
     this.name = name;
@@ -25,10 +45,18 @@ class Webhook {
   }
 
   validate() {
-    if (!this.organizationId) throw new Error('Organization id is required');
-    if (!this.name || !this.name.trim()) throw new Error('Webhook name is required');
-    if (!this.url) throw new Error('Webhook URL is required');
-    if (!this.type) throw new Error('Webhook type is required');
+    if (!this.organizationId) {
+      throw new Error('Organization id is required');
+    }
+    if (!this.name || !this.name.trim()) {
+      throw new Error('Webhook name is required');
+    }
+    if (!this.url) {
+      throw new Error('Webhook URL is required');
+    }
+    if (!this.type) {
+      throw new Error('Webhook type is required');
+    }
   }
 }
 

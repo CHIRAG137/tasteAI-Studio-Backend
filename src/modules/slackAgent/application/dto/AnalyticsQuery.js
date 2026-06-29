@@ -11,7 +11,9 @@ class GetTicketAnalyticsQuery {
     Object.freeze(this);
   }
   validate() {
-    if (!this.organizationId) throw new Error('Organization id is required');
+    if (!this.organizationId) {
+      throw new Error('Organization id is required');
+    }
   }
 }
 
@@ -24,7 +26,9 @@ class GetSLAMetricsQuery {
     Object.freeze(this);
   }
   validate() {
-    if (!this.organizationId) throw new Error('Organization id is required');
+    if (!this.organizationId) {
+      throw new Error('Organization id is required');
+    }
   }
 }
 
@@ -38,7 +42,9 @@ class GetCostAnalyticsQuery {
     Object.freeze(this);
   }
   validate() {
-    if (!this.organizationId) throw new Error('Organization id is required');
+    if (!this.organizationId) {
+      throw new Error('Organization id is required');
+    }
   }
 }
 
@@ -52,8 +58,15 @@ class GetLatencyAnalyticsQuery {
     Object.freeze(this);
   }
   validate() {
-    if (!this.organizationId) throw new Error('Organization id is required');
+    if (!this.organizationId) {
+      throw new Error('Organization id is required');
+    }
   }
 }
 
-module.exports = { GetTicketAnalyticsQuery, GetSLAMetricsQuery, GetCostAnalyticsQuery, GetLatencyAnalyticsQuery };
+module.exports = {
+  GetTicketAnalyticsQuery,
+  GetSLAMetricsQuery,
+  GetCostAnalyticsQuery,
+  GetLatencyAnalyticsQuery,
+};

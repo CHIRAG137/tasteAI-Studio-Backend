@@ -21,7 +21,9 @@ class MongoSlackUserRepository {
 
   async search(query) {
     const regex = new RegExp(query, 'i');
-    return SlackUserModel.find({ $or: [{ name: regex }, { email: regex }, { realName: regex }] }).lean();
+    return SlackUserModel.find({
+      $or: [{ name: regex }, { email: regex }, { realName: regex }],
+    }).lean();
   }
 
   async findByEmail(workspaceId, email) {
@@ -41,7 +43,7 @@ class MongoSlackUserRepository {
   }
 
   async bulkSave(users) {
-    const ops = users.map(u => ({
+    const ops = users.map((u) => ({
       updateOne: {
         filter: { workspaceId: u.workspaceId, slackUserId: u.slackUserId },
         update: { $set: { ...u, lastSyncedAt: new Date() } },

@@ -1,7 +1,41 @@
 'use strict';
 
 class Ticket {
-  constructor({ id, organizationId, workspaceId, channelId, threadId, title, description, status, priority, category, assignedToId, assignedTeamId, createdById, createdByType, source, tags, labels, customFields, slaPolicyId, slaDueAt, firstResponseAt, resolvedAt, closedAt, reopenedAt, mergedIntoId, mergedTicketIds, splitFromId, escalationLevel, isEscalated, satisfactionScore, metadata, createdAt, updatedAt }) {
+  constructor({
+    id,
+    organizationId,
+    workspaceId,
+    channelId,
+    threadId,
+    title,
+    description,
+    status,
+    priority,
+    category,
+    assignedToId,
+    assignedTeamId,
+    createdById,
+    createdByType,
+    source,
+    tags,
+    labels,
+    customFields,
+    slaPolicyId,
+    slaDueAt,
+    firstResponseAt,
+    resolvedAt,
+    closedAt,
+    reopenedAt,
+    mergedIntoId,
+    mergedTicketIds,
+    splitFromId,
+    escalationLevel,
+    isEscalated,
+    satisfactionScore,
+    metadata,
+    createdAt,
+    updatedAt,
+  }) {
     this.id = id;
     this.organizationId = organizationId;
     this.workspaceId = workspaceId;
@@ -39,8 +73,12 @@ class Ticket {
   }
 
   validate() {
-    if (!this.organizationId) throw new Error('Organization id is required');
-    if (!this.title || !this.title.trim()) throw new Error('Ticket title is required');
+    if (!this.organizationId) {
+      throw new Error('Organization id is required');
+    }
+    if (!this.title || !this.title.trim()) {
+      throw new Error('Ticket title is required');
+    }
   }
 }
 

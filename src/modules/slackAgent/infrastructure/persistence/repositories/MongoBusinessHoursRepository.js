@@ -39,7 +39,9 @@ class MongoBusinessHoursRepository {
     const now = new Date();
     const day = now.getDay();
     const hours = await this.findByDayOfWeek(organizationId, day);
-    if (!hours || !hours.isEnabled) return false;
+    if (!hours || !hours.isEnabled) {
+      return false;
+    }
     const currentMinutes = now.getHours() * 60 + now.getMinutes();
     const [startH, startM] = hours.startTime.split(':').map(Number);
     const [endH, endM] = hours.endTime.split(':').map(Number);

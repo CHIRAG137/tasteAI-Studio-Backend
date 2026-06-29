@@ -9,10 +9,18 @@ class MongoTicketRepository {
 
   async findByOrganizationId(organizationId, filters = {}) {
     const query = { organizationId, ...filters };
-    if (filters.status) query.status = filters.status;
-    if (filters.priority) query.priority = filters.priority;
-    if (filters.assignedToId) query.assignedToId = filters.assignedToId;
-    if (filters.category) query.category = filters.category;
+    if (filters.status) {
+      query.status = filters.status;
+    }
+    if (filters.priority) {
+      query.priority = filters.priority;
+    }
+    if (filters.assignedToId) {
+      query.assignedToId = filters.assignedToId;
+    }
+    if (filters.category) {
+      query.category = filters.category;
+    }
     return TicketModel.find(query).sort({ createdAt: -1 }).lean();
   }
 
@@ -39,12 +47,10 @@ class MongoTicketRepository {
   async search(query) {
     const regex = new RegExp(query, 'i');
     return TicketModel.find({
-      $or: [
-        { title: regex },
-        { description: regex },
-        { tags: regex },
-      ],
-    }).sort({ createdAt: -1 }).lean();
+      $or: [{ title: regex }, { description: regex }, { tags: regex }],
+    })
+      .sort({ createdAt: -1 })
+      .lean();
   }
 
   async findAll(filters = {}) {

@@ -25,21 +25,33 @@ module.exports = function createRoutingRoutes({ routingController, authMiddlewar
    * @desc    Update routing rule
    * @access  Private
    */
-  router.patch('/rules/:ruleId', authMiddleware.requireAuth, asyncHandler(routingController.updateRule));
+  router.patch(
+    '/rules/:ruleId',
+    authMiddleware.requireAuth,
+    asyncHandler(routingController.updateRule),
+  );
 
   /**
    * @route   DELETE /routing/rules/:ruleId
    * @desc    Delete routing rule
    * @access  Private
    */
-  router.delete('/rules/:ruleId', authMiddleware.requireAuth, asyncHandler(routingController.deleteRule));
+  router.delete(
+    '/rules/:ruleId',
+    authMiddleware.requireAuth,
+    asyncHandler(routingController.deleteRule),
+  );
 
   /**
    * @route   POST /routing/route-ticket
    * @desc    Route a ticket based on rules
    * @access  Private
    */
-  router.post('/route-ticket', authMiddleware.requireAuth, asyncHandler(routingController.routeTicket));
+  router.post(
+    '/route-ticket',
+    authMiddleware.requireAuth,
+    asyncHandler(routingController.routeTicket),
+  );
 
   return router;
 };

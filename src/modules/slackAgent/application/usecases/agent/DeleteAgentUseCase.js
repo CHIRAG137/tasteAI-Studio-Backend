@@ -9,7 +9,10 @@ class DeleteAgentUseCase {
   async execute(command) {
     const { agentId } = command;
     await this.agentRepository.delete(agentId);
-    await this.auditService.log('agent.deleted', { agentId, actorId: command.createdById || command.userId });
+    await this.auditService.log('agent.deleted', {
+      agentId,
+      actorId: command.createdById || command.userId,
+    });
   }
 }
 

@@ -1,7 +1,19 @@
 'use strict';
 
 class CreateWorkflowCommand {
-  constructor({ organizationId, name, description, trigger, conditions, steps, variables, timeout, maxRetries, isTemplate, createdById }) {
+  constructor({
+    organizationId,
+    name,
+    description,
+    trigger,
+    conditions,
+    steps,
+    variables,
+    timeout,
+    maxRetries,
+    isTemplate,
+    createdById,
+  }) {
     this.organizationId = organizationId;
     this.name = name;
     this.description = description;
@@ -17,9 +29,15 @@ class CreateWorkflowCommand {
     Object.freeze(this);
   }
   validate() {
-    if (!this.organizationId) throw new Error('Organization id is required');
-    if (!this.name || !this.name.trim()) throw new Error('Workflow name is required');
-    if (!this.trigger) throw new Error('Workflow trigger is required');
+    if (!this.organizationId) {
+      throw new Error('Organization id is required');
+    }
+    if (!this.name || !this.name.trim()) {
+      throw new Error('Workflow name is required');
+    }
+    if (!this.trigger) {
+      throw new Error('Workflow trigger is required');
+    }
   }
 }
 
@@ -33,7 +51,9 @@ class ExecuteWorkflowCommand {
     Object.freeze(this);
   }
   validate() {
-    if (!this.workflowId) throw new Error('Workflow id is required');
+    if (!this.workflowId) {
+      throw new Error('Workflow id is required');
+    }
   }
 }
 
@@ -47,9 +67,15 @@ class ApproveWorkflowStepCommand {
     Object.freeze(this);
   }
   validate() {
-    if (!this.executionId) throw new Error('Execution id is required');
-    if (!this.stepId) throw new Error('Step id is required');
-    if (!this.approvedBy) throw new Error('Approved by is required');
+    if (!this.executionId) {
+      throw new Error('Execution id is required');
+    }
+    if (!this.stepId) {
+      throw new Error('Step id is required');
+    }
+    if (!this.approvedBy) {
+      throw new Error('Approved by is required');
+    }
   }
 }
 

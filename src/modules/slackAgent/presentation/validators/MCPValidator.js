@@ -24,10 +24,7 @@ exports.updateRules = [
   runValidation,
 ];
 
-exports.mcpIdParam = [
-  param('mcpId').notEmpty().withMessage('MCP id is required'),
-  runValidation,
-];
+exports.mcpIdParam = [param('mcpId').notEmpty().withMessage('MCP id is required'), runValidation];
 
 exports.invokeRules = [
   param('mcpId').notEmpty().withMessage('MCP id is required'),

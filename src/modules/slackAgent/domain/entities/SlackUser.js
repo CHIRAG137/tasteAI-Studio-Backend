@@ -1,7 +1,31 @@
 'use strict';
 
 class SlackUser {
-  constructor({ id, workspaceId, organizationId, slackUserId, slackTeamId, name, realName, displayName, email, avatarUrl, isBot, isAdmin, isOwner, isDeleted, timezone, title, phone, userGroups, teams, role, lastSyncedAt, createdAt, updatedAt }) {
+  constructor({
+    id,
+    workspaceId,
+    organizationId,
+    slackUserId,
+    slackTeamId,
+    name,
+    realName,
+    displayName,
+    email,
+    avatarUrl,
+    isBot,
+    isAdmin,
+    isOwner,
+    isDeleted,
+    timezone,
+    title,
+    phone,
+    userGroups,
+    teams,
+    role,
+    lastSyncedAt,
+    createdAt,
+    updatedAt,
+  }) {
     this.id = id;
     this.workspaceId = workspaceId;
     this.organizationId = organizationId;
@@ -29,9 +53,15 @@ class SlackUser {
   }
 
   validate() {
-    if (!this.workspaceId) throw new Error('Workspace id is required');
-    if (!this.slackUserId) throw new Error('Slack user id is required');
-    if (!this.name) throw new Error('User name is required');
+    if (!this.workspaceId) {
+      throw new Error('Workspace id is required');
+    }
+    if (!this.slackUserId) {
+      throw new Error('Slack user id is required');
+    }
+    if (!this.name) {
+      throw new Error('User name is required');
+    }
   }
 }
 

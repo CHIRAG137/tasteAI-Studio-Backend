@@ -9,8 +9,16 @@ class ClassifyTicketUseCase {
 
   async execute(command) {
     const result = await this.classificationService.classify(command.ticketId);
-    await this.ticketRepository.update(command.ticketId, { category: result.category, priority: result.priority, tags: result.tags });
-    await this.auditService.log('ticket.classified', { ticketId: command.ticketId, category: result.category, priority: result.priority });
+    await this.ticketRepository.update(command.ticketId, {
+      category: result.category,
+      priority: result.priority,
+      tags: result.tags,
+    });
+    await this.auditService.log('ticket.classified', {
+      ticketId: command.ticketId,
+      category: result.category,
+      priority: result.priority,
+    });
     return result;
   }
 }

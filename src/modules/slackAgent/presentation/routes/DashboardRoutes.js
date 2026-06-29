@@ -11,7 +11,11 @@ module.exports = function createDashboardRoutes({ dashboardController, authMiddl
    * @desc    Executive dashboard metrics
    * @access  Private
    */
-  router.get('/executive', authMiddleware.requireAuth, asyncHandler(dashboardController.getExecutive));
+  router.get(
+    '/executive',
+    authMiddleware.requireAuth,
+    asyncHandler(dashboardController.getExecutive),
+  );
 
   /**
    * @route   GET /dashboard/team
@@ -39,7 +43,11 @@ module.exports = function createDashboardRoutes({ dashboardController, authMiddl
    * @desc    Live monitoring dashboard
    * @access  Private
    */
-  router.get('/live', authMiddleware.requireAuth, asyncHandler(dashboardController.getLiveMonitoring));
+  router.get(
+    '/live',
+    authMiddleware.requireAuth,
+    asyncHandler(dashboardController.getLiveMonitoring),
+  );
 
   return router;
 };

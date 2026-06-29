@@ -39,7 +39,10 @@ class LLMResponseService {
           },
         );
 
-        return response.data.choices?.[0]?.message?.content?.trim() || this._fallbackResponse(agent, userMessage);
+        return (
+          response.data.choices?.[0]?.message?.content?.trim() ||
+          this._fallbackResponse(agent, userMessage)
+        );
       } catch (err) {
         console.warn(`LLM API error: ${err.message}`);
         return this._fallbackResponse(agent, userMessage);
@@ -72,7 +75,9 @@ class LLMResponseService {
           },
         );
 
-        return response.data.content?.[0]?.text?.trim() || this._fallbackResponse(agent, userMessage);
+        return (
+          response.data.content?.[0]?.text?.trim() || this._fallbackResponse(agent, userMessage)
+        );
       } catch (err) {
         console.warn(`Anthropic API error: ${err.message}`);
         return this._fallbackResponse(agent, userMessage);
@@ -90,12 +95,12 @@ class LLMResponseService {
     }
 
     const instructions = (agent.aiInstructions || [])
-      .filter(i => i.isActive !== false)
+      .filter((i) => i.isActive !== false)
       .sort((a, b) => {
         const order = { high: 0, normal: 1, low: 2 };
         return (order[a.priority] || 1) - (order[b.priority] || 1);
       })
-      .map(i => i.content);
+      .map((i) => i.content);
 
     if (instructions.length > 0) {
       parts.push('--- Instructions ---');

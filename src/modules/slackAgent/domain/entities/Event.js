@@ -1,7 +1,24 @@
 'use strict';
 
 class Event {
-  constructor({ id, organizationId, workspaceId, channelId, teamId, eventId, eventType, eventTs, source, rawBody, processedBy, status, error, retryCount, processedAt, createdAt }) {
+  constructor({
+    id,
+    organizationId,
+    workspaceId,
+    channelId,
+    teamId,
+    eventId,
+    eventType,
+    eventTs,
+    source,
+    rawBody,
+    processedBy,
+    status,
+    error,
+    retryCount,
+    processedAt,
+    createdAt,
+  }) {
     this.id = id;
     this.organizationId = organizationId;
     this.workspaceId = workspaceId;
@@ -22,8 +39,12 @@ class Event {
   }
 
   validate() {
-    if (!this.eventId) throw new Error('Event id is required');
-    if (!this.eventType) throw new Error('Event type is required');
+    if (!this.eventId) {
+      throw new Error('Event id is required');
+    }
+    if (!this.eventType) {
+      throw new Error('Event type is required');
+    }
   }
 }
 

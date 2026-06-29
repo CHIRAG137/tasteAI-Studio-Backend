@@ -13,7 +13,11 @@ const runValidation = (req, res, next) => {
 
 exports.createRules = [
   body('name').notEmpty().trim().withMessage('SLA name is required'),
-  body('responseTimeMinutes').isInt({ min: 1 }).withMessage('Response time must be a positive integer'),
-  body('resolutionTimeMinutes').isInt({ min: 1 }).withMessage('Resolution time must be a positive integer'),
+  body('responseTimeMinutes')
+    .isInt({ min: 1 })
+    .withMessage('Response time must be a positive integer'),
+  body('resolutionTimeMinutes')
+    .isInt({ min: 1 })
+    .withMessage('Resolution time must be a positive integer'),
   runValidation,
 ];

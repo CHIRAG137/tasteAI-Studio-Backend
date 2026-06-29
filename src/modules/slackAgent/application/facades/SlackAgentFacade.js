@@ -105,6 +105,8 @@ class SlackAgentFacade {
     listAgentConnectorsUseCase,
     updateSlackAICapabilitiesUseCase,
     triggerChannelSummaryUseCase,
+    searchKnowledgeGraphUseCase,
+    knowledgeGraphService,
     updateAgentInvocationConfigUseCase,
     getAgentInvocationConfigUseCase,
     getDefaultInvocationModesUseCase,
@@ -213,6 +215,8 @@ class SlackAgentFacade {
     this.listAgentConnectorsUseCase = listAgentConnectorsUseCase;
     this.updateSlackAICapabilitiesUseCase = updateSlackAICapabilitiesUseCase;
     this.triggerChannelSummaryUseCase = triggerChannelSummaryUseCase;
+    this.searchKnowledgeGraphUseCase = searchKnowledgeGraphUseCase;
+    this.knowledgeGraphService = knowledgeGraphService;
     this.updateAgentInvocationConfigUseCase = updateAgentInvocationConfigUseCase;
     this.getAgentInvocationConfigUseCase = getAgentInvocationConfigUseCase;
     this.getDefaultInvocationModesUseCase = getDefaultInvocationModesUseCase;

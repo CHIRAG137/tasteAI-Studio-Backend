@@ -8,7 +8,11 @@ class CreateAgentUseCase {
 
   async execute(command) {
     const agent = await this.agentRepository.save(command);
-    await this.auditService.log('agent.created', { agentId: agent.id, organizationId: command.organizationId, actorId: command.createdById || command.userId });
+    await this.auditService.log('agent.created', {
+      agentId: agent.id,
+      organizationId: command.organizationId,
+      actorId: command.createdById || command.userId,
+    });
     return agent;
   }
 }

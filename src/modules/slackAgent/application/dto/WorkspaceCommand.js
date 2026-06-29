@@ -10,9 +10,15 @@ class InstallWorkspaceCommand {
     Object.freeze(this);
   }
   validate() {
-    if (!this.organizationId) throw new Error('Organization id is required');
-    if (!this.authCode) throw new Error('Auth code is required');
-    if (!this.redirectUri) throw new Error('Redirect URI is required');
+    if (!this.organizationId) {
+      throw new Error('Organization id is required');
+    }
+    if (!this.authCode) {
+      throw new Error('Auth code is required');
+    }
+    if (!this.redirectUri) {
+      throw new Error('Redirect URI is required');
+    }
   }
 }
 
@@ -24,8 +30,12 @@ class SyncWorkspaceCommand {
     Object.freeze(this);
   }
   validate() {
-    if (!this.organizationId) throw new Error('Organization id is required');
-    if (!this.workspaceId) throw new Error('Workspace id is required');
+    if (!this.organizationId) {
+      throw new Error('Organization id is required');
+    }
+    if (!this.workspaceId) {
+      throw new Error('Workspace id is required');
+    }
   }
 }
 
@@ -37,8 +47,12 @@ class UpdateWorkspaceSettingsCommand {
     Object.freeze(this);
   }
   validate() {
-    if (!this.workspaceId) throw new Error('Workspace id is required');
-    if (!this.settings) throw new Error('Settings are required');
+    if (!this.workspaceId) {
+      throw new Error('Workspace id is required');
+    }
+    if (!this.settings) {
+      throw new Error('Settings are required');
+    }
   }
 }
 
@@ -50,8 +64,15 @@ class DisconnectWorkspaceCommand {
     Object.freeze(this);
   }
   validate() {
-    if (!this.workspaceId) throw new Error('Workspace id is required');
+    if (!this.workspaceId) {
+      throw new Error('Workspace id is required');
+    }
   }
 }
 
-module.exports = { InstallWorkspaceCommand, SyncWorkspaceCommand, UpdateWorkspaceSettingsCommand, DisconnectWorkspaceCommand };
+module.exports = {
+  InstallWorkspaceCommand,
+  SyncWorkspaceCommand,
+  UpdateWorkspaceSettingsCommand,
+  DisconnectWorkspaceCommand,
+};

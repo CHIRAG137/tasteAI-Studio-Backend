@@ -4,8 +4,16 @@ const AgentModel = require('../models/AgentModel');
 
 class MongoAgentRepository {
   _addId(doc) {
-    if (!doc) return doc;
-    if (Array.isArray(doc)) return doc.map(d => ({ ...d, id: d._id?.toString(), assignedChannels: d.assignedChannelIds }));
+    if (!doc) {
+      return doc;
+    }
+    if (Array.isArray(doc)) {
+      return doc.map((d) => ({
+        ...d,
+        id: d._id?.toString(),
+        assignedChannels: d.assignedChannelIds,
+      }));
+    }
     return { ...doc, id: doc._id?.toString(), assignedChannels: doc.assignedChannelIds };
   }
 
@@ -56,7 +64,9 @@ class MongoAgentRepository {
 
   async clone(id, overrides = {}) {
     const source = await AgentModel.findById(id).lean();
-    if (!source) return null;
+    if (!source) {
+      return null;
+    }
     delete source._id;
     delete source.__v;
     delete source.createdAt;

@@ -7,8 +7,14 @@ class MergeTicketsUseCase {
   }
 
   async execute(command) {
-    const result = await this.ticketRepository.merge(command.sourceTicketIds, command.targetTicketId);
-    await this.auditService.log('tickets.merged', { sourceIds: command.sourceTicketIds, targetId: command.targetTicketId });
+    const result = await this.ticketRepository.merge(
+      command.sourceTicketIds,
+      command.targetTicketId,
+    );
+    await this.auditService.log('tickets.merged', {
+      sourceIds: command.sourceTicketIds,
+      targetId: command.targetTicketId,
+    });
     return result;
   }
 }

@@ -1,7 +1,28 @@
 'use strict';
 
 class Classification {
-  constructor({ id, organizationId, ticketId, threadId, messageTs, intent, category, subCategory, priority, sentiment, urgency, confidence, isDuplicate, duplicateOfId, suggestedAssignee, suggestedResponse, modelUsed, processedAt, metadata, createdAt }) {
+  constructor({
+    id,
+    organizationId,
+    ticketId,
+    threadId,
+    messageTs,
+    intent,
+    category,
+    subCategory,
+    priority,
+    sentiment,
+    urgency,
+    confidence,
+    isDuplicate,
+    duplicateOfId,
+    suggestedAssignee,
+    suggestedResponse,
+    modelUsed,
+    processedAt,
+    metadata,
+    createdAt,
+  }) {
     this.id = id;
     this.organizationId = organizationId;
     this.ticketId = ticketId;
@@ -26,7 +47,9 @@ class Classification {
   }
 
   validate() {
-    if (!this.organizationId) throw new Error('Organization id is required');
+    if (!this.organizationId) {
+      throw new Error('Organization id is required');
+    }
   }
 }
 

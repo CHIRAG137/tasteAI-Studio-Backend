@@ -14,7 +14,10 @@ const runValidation = (req, res, next) => {
 exports.sendRules = [
   body('recipientId').notEmpty().withMessage('Recipient id is required'),
   body('message').notEmpty().trim().withMessage('Message is required'),
-  body('type').optional().isIn(['info', 'warning', 'error', 'success']).withMessage('Invalid notification type'),
+  body('type')
+    .optional()
+    .isIn(['info', 'warning', 'error', 'success'])
+    .withMessage('Invalid notification type'),
   runValidation,
 ];
 

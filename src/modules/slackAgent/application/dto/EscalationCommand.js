@@ -1,7 +1,17 @@
 'use strict';
 
 class CreateEscalationCommand {
-  constructor({ organizationId, name, description, trigger, conditions, levels, notifyOnEscalate, notificationConfig, autoResolve }) {
+  constructor({
+    organizationId,
+    name,
+    description,
+    trigger,
+    conditions,
+    levels,
+    notifyOnEscalate,
+    notificationConfig,
+    autoResolve,
+  }) {
     this.organizationId = organizationId;
     this.name = name;
     this.description = description;
@@ -15,9 +25,15 @@ class CreateEscalationCommand {
     Object.freeze(this);
   }
   validate() {
-    if (!this.organizationId) throw new Error('Organization id is required');
-    if (!this.name || !this.name.trim()) throw new Error('Escalation name is required');
-    if (!this.trigger) throw new Error('Escalation trigger is required');
+    if (!this.organizationId) {
+      throw new Error('Organization id is required');
+    }
+    if (!this.name || !this.name.trim()) {
+      throw new Error('Escalation name is required');
+    }
+    if (!this.trigger) {
+      throw new Error('Escalation trigger is required');
+    }
   }
 }
 
@@ -30,8 +46,12 @@ class TriggerEscalationCommand {
     Object.freeze(this);
   }
   validate() {
-    if (!this.escalationId) throw new Error('Escalation id is required');
-    if (!this.ticketId) throw new Error('Ticket id is required');
+    if (!this.escalationId) {
+      throw new Error('Escalation id is required');
+    }
+    if (!this.ticketId) {
+      throw new Error('Ticket id is required');
+    }
   }
 }
 

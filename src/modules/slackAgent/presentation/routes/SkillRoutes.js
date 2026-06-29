@@ -39,21 +39,33 @@ module.exports = function createSkillRoutes({ skillController, authMiddleware })
    * @desc    Configure skill settings
    * @access  Private
    */
-  router.patch('/:skillId/config', authMiddleware.requireAuth, asyncHandler(skillController.configure));
+  router.patch(
+    '/:skillId/config',
+    authMiddleware.requireAuth,
+    asyncHandler(skillController.configure),
+  );
 
   /**
    * @route   POST /skills/:skillId/execute
    * @desc    Execute a skill
    * @access  Private
    */
-  router.post('/:skillId/execute', authMiddleware.requireAuth, asyncHandler(skillController.execute));
+  router.post(
+    '/:skillId/execute',
+    authMiddleware.requireAuth,
+    asyncHandler(skillController.execute),
+  );
 
   /**
    * @route   GET /skills/:skillId/versions
    * @desc    List skill versions
    * @access  Private
    */
-  router.get('/:skillId/versions', authMiddleware.requireAuth, asyncHandler(skillController.getVersions));
+  router.get(
+    '/:skillId/versions',
+    authMiddleware.requireAuth,
+    asyncHandler(skillController.getVersions),
+  );
 
   return router;
 };

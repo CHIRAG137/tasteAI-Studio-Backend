@@ -1,7 +1,19 @@
 'use strict';
 
 class UploadKnowledgeCommand {
-  constructor({ organizationId, name, description, sourceType, sourceUrl, content, fileUrl, fileSize, tags, metadata, uploadedById }) {
+  constructor({
+    organizationId,
+    name,
+    description,
+    sourceType,
+    sourceUrl,
+    content,
+    fileUrl,
+    fileSize,
+    tags,
+    metadata,
+    uploadedById,
+  }) {
     this.organizationId = organizationId;
     this.name = name;
     this.description = description;
@@ -17,9 +29,15 @@ class UploadKnowledgeCommand {
     Object.freeze(this);
   }
   validate() {
-    if (!this.organizationId) throw new Error('Organization id is required');
-    if (!this.name || !this.name.trim()) throw new Error('Knowledge name is required');
-    if (!this.sourceType) throw new Error('Source type is required');
+    if (!this.organizationId) {
+      throw new Error('Organization id is required');
+    }
+    if (!this.name || !this.name.trim()) {
+      throw new Error('Knowledge name is required');
+    }
+    if (!this.sourceType) {
+      throw new Error('Source type is required');
+    }
   }
 }
 
@@ -31,7 +49,9 @@ class IndexKnowledgeCommand {
     Object.freeze(this);
   }
   validate() {
-    if (!this.knowledgeId) throw new Error('Knowledge id is required');
+    if (!this.knowledgeId) {
+      throw new Error('Knowledge id is required');
+    }
   }
 }
 
@@ -45,8 +65,12 @@ class SearchKnowledgeCommand {
     Object.freeze(this);
   }
   validate() {
-    if (!this.organizationId) throw new Error('Organization id is required');
-    if (!this.query || !this.query.trim()) throw new Error('Search query is required');
+    if (!this.organizationId) {
+      throw new Error('Organization id is required');
+    }
+    if (!this.query || !this.query.trim()) {
+      throw new Error('Search query is required');
+    }
   }
 }
 

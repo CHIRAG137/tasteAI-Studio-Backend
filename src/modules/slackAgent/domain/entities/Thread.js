@@ -1,7 +1,24 @@
 'use strict';
 
 class Thread {
-  constructor({ id, organizationId, workspaceId, channelId, threadTs, parentMessageTs, topic, participants, messageCount, linkedTicketId, isMonitored, aiSummary, lastActivityAt, lastSyncedAt, createdAt, updatedAt }) {
+  constructor({
+    id,
+    organizationId,
+    workspaceId,
+    channelId,
+    threadTs,
+    parentMessageTs,
+    topic,
+    participants,
+    messageCount,
+    linkedTicketId,
+    isMonitored,
+    aiSummary,
+    lastActivityAt,
+    lastSyncedAt,
+    createdAt,
+    updatedAt,
+  }) {
     this.id = id;
     this.organizationId = organizationId;
     this.workspaceId = workspaceId;
@@ -22,9 +39,15 @@ class Thread {
   }
 
   validate() {
-    if (!this.workspaceId) throw new Error('Workspace id is required');
-    if (!this.channelId) throw new Error('Channel id is required');
-    if (!this.threadTs) throw new Error('Thread timestamp is required');
+    if (!this.workspaceId) {
+      throw new Error('Workspace id is required');
+    }
+    if (!this.channelId) {
+      throw new Error('Channel id is required');
+    }
+    if (!this.threadTs) {
+      throw new Error('Thread timestamp is required');
+    }
   }
 }
 

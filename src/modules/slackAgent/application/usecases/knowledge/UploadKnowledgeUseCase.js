@@ -8,7 +8,10 @@ class UploadKnowledgeUseCase {
 
   async execute(command) {
     const document = await this.knowledgeRepository.save(command);
-    await this.auditService.log('knowledge.uploaded', { documentId: document.id, organizationId: command.organizationId });
+    await this.auditService.log('knowledge.uploaded', {
+      documentId: document.id,
+      organizationId: command.organizationId,
+    });
     return document;
   }
 }

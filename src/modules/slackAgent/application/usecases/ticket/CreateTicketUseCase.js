@@ -1,7 +1,13 @@
 'use strict';
 
 class CreateTicketUseCase {
-  constructor({ ticketRepository, classificationService, routingService, slaService, auditService }) {
+  constructor({
+    ticketRepository,
+    classificationService,
+    routingService,
+    slaService,
+    auditService,
+  }) {
     this.ticketRepository = ticketRepository;
     this.classificationService = classificationService;
     this.routingService = routingService;

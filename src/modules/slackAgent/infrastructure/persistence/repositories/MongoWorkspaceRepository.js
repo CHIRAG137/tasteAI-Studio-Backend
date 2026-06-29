@@ -4,8 +4,12 @@ const SlackWorkspaceModel = require('../models/SlackWorkspaceModel');
 
 class MongoWorkspaceRepository {
   _addId(doc) {
-    if (!doc) return doc;
-    if (Array.isArray(doc)) return doc.map(d => ({ ...d, id: d._id?.toString() }));
+    if (!doc) {
+      return doc;
+    }
+    if (Array.isArray(doc)) {
+      return doc.map((d) => ({ ...d, id: d._id?.toString() }));
+    }
     return { ...doc, id: doc._id?.toString() };
   }
 

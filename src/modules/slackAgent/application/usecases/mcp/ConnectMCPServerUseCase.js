@@ -9,7 +9,9 @@ class ConnectMCPServerUseCase {
   async execute(command) {
     const { connectionId, organizationId } = command;
     const server = await this.mcpRepository.findById(connectionId);
-    if (!server) throw new Error('MCP server not found');
+    if (!server) {
+      throw new Error('MCP server not found');
+    }
 
     const testResult = await this.mcpRepository.testConnection(connectionId);
     const updated = await this.mcpRepository.update(connectionId, {

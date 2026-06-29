@@ -60,49 +60,77 @@ module.exports = function createAgentRoutes({ agentController, authMiddleware })
    * @desc    Assign channels to agent
    * @access  Private
    */
-  router.post('/:agentId/channels', authMiddleware.requireAuth, asyncHandler(agentController.assignChannels));
+  router.post(
+    '/:agentId/channels',
+    authMiddleware.requireAuth,
+    asyncHandler(agentController.assignChannels),
+  );
 
   /**
    * @route   PATCH /agents/:agentId/skills
    * @desc    Update skills attached to agent
    * @access  Private
    */
-  router.patch('/:agentId/skills', authMiddleware.requireAuth, asyncHandler(agentController.updateSkills));
+  router.patch(
+    '/:agentId/skills',
+    authMiddleware.requireAuth,
+    asyncHandler(agentController.updateSkills),
+  );
 
   /**
    * @route   PATCH /agents/:agentId/permissions
    * @desc    Update agent permissions
    * @access  Private
    */
-  router.patch('/:agentId/permissions', authMiddleware.requireAuth, asyncHandler(agentController.updatePermissions));
+  router.patch(
+    '/:agentId/permissions',
+    authMiddleware.requireAuth,
+    asyncHandler(agentController.updatePermissions),
+  );
 
   /**
    * @route   POST /agents/:agentId/mcp-servers
    * @desc    Assign MCP servers to agent
    * @access  Private
    */
-  router.post('/:agentId/mcp-servers', authMiddleware.requireAuth, asyncHandler(agentController.assignMCPServers));
+  router.post(
+    '/:agentId/mcp-servers',
+    authMiddleware.requireAuth,
+    asyncHandler(agentController.assignMCPServers),
+  );
 
   /**
    * @route   POST /agents/:agentId/webhooks
    * @desc    Assign webhooks to agent
    * @access  Private
    */
-  router.post('/:agentId/webhooks', authMiddleware.requireAuth, asyncHandler(agentController.assignWebhooks));
+  router.post(
+    '/:agentId/webhooks',
+    authMiddleware.requireAuth,
+    asyncHandler(agentController.assignWebhooks),
+  );
 
   /**
    * @route   PATCH /agents/:agentId/connectors
    * @desc    Update agent connector configuration
    * @access  Private
    */
-  router.patch('/:agentId/connectors', authMiddleware.requireAuth, asyncHandler(agentController.updateConnectors));
+  router.patch(
+    '/:agentId/connectors',
+    authMiddleware.requireAuth,
+    asyncHandler(agentController.updateConnectors),
+  );
 
   /**
    * @route   GET /agents/:agentId/connectors
    * @desc    List all connectors configured for an agent
    * @access  Private
    */
-  router.get('/:agentId/connectors', authMiddleware.requireAuth, asyncHandler(agentController.listConnectors));
+  router.get(
+    '/:agentId/connectors',
+    authMiddleware.requireAuth,
+    asyncHandler(agentController.listConnectors),
+  );
 
   return router;
 };

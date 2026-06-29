@@ -34,7 +34,7 @@ class TicketMapper {
   }
 
   static toListResponse(tickets) {
-    return tickets.map(t => TicketMapper.toResponse(t));
+    return tickets.map((t) => TicketMapper.toResponse(t));
   }
 }
 

@@ -8,7 +8,9 @@ class ChannelController {
   }
 
   list = async (req, res) => {
-    const channels = await this.slackAgentFacade.listChannelsUseCase.execute(req.params.workspaceId);
+    const channels = await this.slackAgentFacade.listChannelsUseCase.execute(
+      req.params.workspaceId,
+    );
     return ApiResponse.success(res, channels);
   };
 
@@ -30,7 +32,9 @@ class ChannelController {
   };
 
   getById = async (req, res) => {
-    const channel = await this.slackAgentFacade.getChannelDetailsUseCase.execute(req.params.channelId);
+    const channel = await this.slackAgentFacade.getChannelDetailsUseCase.execute(
+      req.params.channelId,
+    );
     return ApiResponse.success(res, channel);
   };
 

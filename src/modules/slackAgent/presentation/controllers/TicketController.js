@@ -22,17 +22,27 @@ class TicketController {
   };
 
   list = async (req, res) => {
-    const tickets = await this.slackAgentFacade.listTicketsUseCase.execute(req.user.organizationId || req.user.id, req.query);
+    const tickets = await this.slackAgentFacade.listTicketsUseCase.execute(
+      req.user.organizationId || req.user.id,
+      req.query,
+    );
     return ApiResponse.success(res, tickets);
   };
 
   search = async (req, res) => {
-    const tickets = await this.slackAgentFacade.ticketSearchUseCase.execute({ query: req.query.q, organizationId: req.user.organizationId || req.user.id, ...req.query });
+    const tickets = await this.slackAgentFacade.ticketSearchUseCase.execute({
+      query: req.query.q,
+      organizationId: req.user.organizationId || req.user.id,
+      ...req.query,
+    });
     return ApiResponse.success(res, tickets);
   };
 
   update = async (req, res) => {
-    const ticket = await this.slackAgentFacade.updateTicketUseCase.execute({ ticketId: req.params.ticketId, ...req.body });
+    const ticket = await this.slackAgentFacade.updateTicketUseCase.execute({
+      ticketId: req.params.ticketId,
+      ...req.body,
+    });
     return ApiResponse.success(res, ticket, 'Ticket updated successfully');
   };
 

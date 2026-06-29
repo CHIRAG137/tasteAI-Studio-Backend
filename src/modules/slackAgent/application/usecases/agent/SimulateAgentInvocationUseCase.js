@@ -8,11 +8,13 @@ class SimulateAgentInvocationUseCase {
   async execute(command) {
     const { agentId, eventType, messageText } = command;
     const agent = await this.agentRepository.findById(agentId);
-    if (!agent) throw new Error('Agent not found');
+    if (!agent) {
+      throw new Error('Agent not found');
+    }
 
     const config = agent.invocationConfig || {};
     const results = [];
-    const currentChannelIds = agent.assignedChannelIds?.map(id => id.toString()) || [];
+    const currentChannelIds = agent.assignedChannelIds?.map((id) => id.toString()) || [];
 
     if (eventType === 'app_mention') {
       results.push({
@@ -37,7 +39,7 @@ class SimulateAgentInvocationUseCase {
     if (eventType === 'message' && messageText) {
       const triggers = config.keywordTriggers || [];
       const triggeredKeyword = triggers.find(
-        t => t.enabled && messageText.toLowerCase().includes(t.keyword?.toLowerCase()),
+        (t) => t.enabled && messageText.toLowerCase().includes(t.keyword?.toLowerCase()),
       );
 
       results.push({
@@ -56,7 +58,11 @@ class SimulateAgentInvocationUseCase {
       });
     }
 
-    if (eventType === 'reaction_added' || eventType === 'file_shared' || eventType === 'member_joined_channel') {
+    if (
+      eventType === 'reaction_added' ||
+      eventType === 'file_shared' ||
+      eventType === 'member_joined_channel'
+    ) {
       const webhookEvents = config.webhookEvents || {};
       const eventMap = {
         reaction_added: 'reactionAdded',
@@ -77,7 +83,7 @@ class SimulateAgentInvocationUseCase {
       eventType,
       messageText: messageText || null,
       results,
-      overall: results.some(r => r.willRespond) ? 'will_respond' : 'will_not_respond',
+      overall: results.some((r) => r.willRespond) ? 'will_respond' : 'will_not_respond',
     };
   }
 }

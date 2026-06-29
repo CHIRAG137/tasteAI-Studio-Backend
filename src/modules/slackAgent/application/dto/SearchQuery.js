@@ -11,13 +11,30 @@ class GlobalSearchQuery {
     Object.freeze(this);
   }
   validate() {
-    if (!this.organizationId) throw new Error('Organization id is required');
-    if (!this.query || !this.query.trim()) throw new Error('Search query is required');
+    if (!this.organizationId) {
+      throw new Error('Organization id is required');
+    }
+    if (!this.query || !this.query.trim()) {
+      throw new Error('Search query is required');
+    }
   }
 }
 
 class TicketSearchQuery {
-  constructor({ query, organizationId, status, priority, category, assignedToId, tags, labels, limit, offset, sortBy, sortOrder }) {
+  constructor({
+    query,
+    organizationId,
+    status,
+    priority,
+    category,
+    assignedToId,
+    tags,
+    labels,
+    limit,
+    offset,
+    sortBy,
+    sortOrder,
+  }) {
     this.query = query;
     this.organizationId = organizationId;
     this.status = status;
@@ -34,7 +51,9 @@ class TicketSearchQuery {
     Object.freeze(this);
   }
   validate() {
-    if (!this.organizationId) throw new Error('Organization id is required');
+    if (!this.organizationId) {
+      throw new Error('Organization id is required');
+    }
   }
 }
 

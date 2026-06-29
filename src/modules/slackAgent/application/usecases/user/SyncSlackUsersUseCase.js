@@ -10,7 +10,13 @@ class SyncSlackUsersUseCase {
   async execute(command) {
     const workspace = await this.workspaceRepository.findById(command.workspaceId);
     const slackResponse = await this.slackApiClient.listUsers(workspace.accessToken);
-    return this.slackUserRepository.bulkSave((slackResponse.members || []).map(u => ({ ...u, workspaceId: command.workspaceId, organizationId: command.organizationId })));
+    return this.slackUserRepository.bulkSave(
+      (slackResponse.members || []).map((u) => ({
+        ...u,
+        workspaceId: command.workspaceId,
+        organizationId: command.organizationId,
+      })),
+    );
   }
 }
 

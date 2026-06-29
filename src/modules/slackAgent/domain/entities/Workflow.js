@@ -1,7 +1,31 @@
 'use strict';
 
 class Workflow {
-  constructor({ id, organizationId, name, description, trigger, conditions, steps, variables, timeout, maxRetries, isActive, isTemplate, templateId, version, createdById, executedById, status, startedAt, completedAt, error, metadata, createdAt, updatedAt }) {
+  constructor({
+    id,
+    organizationId,
+    name,
+    description,
+    trigger,
+    conditions,
+    steps,
+    variables,
+    timeout,
+    maxRetries,
+    isActive,
+    isTemplate,
+    templateId,
+    version,
+    createdById,
+    executedById,
+    status,
+    startedAt,
+    completedAt,
+    error,
+    metadata,
+    createdAt,
+    updatedAt,
+  }) {
     this.id = id;
     this.organizationId = organizationId;
     this.name = name;
@@ -29,8 +53,12 @@ class Workflow {
   }
 
   validate() {
-    if (!this.organizationId) throw new Error('Organization id is required');
-    if (!this.name || !this.name.trim()) throw new Error('Workflow name is required');
+    if (!this.organizationId) {
+      throw new Error('Organization id is required');
+    }
+    if (!this.name || !this.name.trim()) {
+      throw new Error('Workflow name is required');
+    }
   }
 }
 

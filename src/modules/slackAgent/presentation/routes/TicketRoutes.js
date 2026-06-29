@@ -53,28 +53,44 @@ module.exports = function createTicketRoutes({ ticketController, authMiddleware 
    * @desc    Reopen closed ticket
    * @access  Private
    */
-  router.post('/:ticketId/reopen', authMiddleware.requireAuth, asyncHandler(ticketController.reopen));
+  router.post(
+    '/:ticketId/reopen',
+    authMiddleware.requireAuth,
+    asyncHandler(ticketController.reopen),
+  );
 
   /**
    * @route   POST /tickets/:ticketId/assign
    * @desc    Assign ticket to user
    * @access  Private
    */
-  router.post('/:ticketId/assign', authMiddleware.requireAuth, asyncHandler(ticketController.assign));
+  router.post(
+    '/:ticketId/assign',
+    authMiddleware.requireAuth,
+    asyncHandler(ticketController.assign),
+  );
 
   /**
    * @route   POST /tickets/:ticketId/unassign
    * @desc    Unassign ticket
    * @access  Private
    */
-  router.post('/:ticketId/unassign', authMiddleware.requireAuth, asyncHandler(ticketController.unassign));
+  router.post(
+    '/:ticketId/unassign',
+    authMiddleware.requireAuth,
+    asyncHandler(ticketController.unassign),
+  );
 
   /**
    * @route   POST /tickets/:ticketId/transfer
    * @desc    Transfer ticket to another user
    * @access  Private
    */
-  router.post('/:ticketId/transfer', authMiddleware.requireAuth, asyncHandler(ticketController.transfer));
+  router.post(
+    '/:ticketId/transfer',
+    authMiddleware.requireAuth,
+    asyncHandler(ticketController.transfer),
+  );
 
   /**
    * @route   POST /tickets/:ticketId/merge
@@ -95,28 +111,44 @@ module.exports = function createTicketRoutes({ ticketController, authMiddleware 
    * @desc    Add comment to ticket
    * @access  Private
    */
-  router.post('/:ticketId/comments', authMiddleware.requireAuth, asyncHandler(ticketController.addComment));
+  router.post(
+    '/:ticketId/comments',
+    authMiddleware.requireAuth,
+    asyncHandler(ticketController.addComment),
+  );
 
   /**
    * @route   POST /tickets/:ticketId/attachments
    * @desc    Add attachment to ticket
    * @access  Private
    */
-  router.post('/:ticketId/attachments', authMiddleware.requireAuth, asyncHandler(ticketController.addAttachment));
+  router.post(
+    '/:ticketId/attachments',
+    authMiddleware.requireAuth,
+    asyncHandler(ticketController.addAttachment),
+  );
 
   /**
    * @route   GET /tickets/:ticketId/timeline
    * @desc    Get ticket activity timeline
    * @access  Private
    */
-  router.get('/:ticketId/timeline', authMiddleware.requireAuth, asyncHandler(ticketController.getTimeline));
+  router.get(
+    '/:ticketId/timeline',
+    authMiddleware.requireAuth,
+    asyncHandler(ticketController.getTimeline),
+  );
 
   /**
    * @route   GET /tickets/:ticketId/history
    * @desc    Get ticket change history
    * @access  Private
    */
-  router.get('/:ticketId/history', authMiddleware.requireAuth, asyncHandler(ticketController.getHistory));
+  router.get(
+    '/:ticketId/history',
+    authMiddleware.requireAuth,
+    asyncHandler(ticketController.getHistory),
+  );
 
   /**
    * @route   POST /tickets/:ticketId/watch
@@ -130,7 +162,11 @@ module.exports = function createTicketRoutes({ ticketController, authMiddleware 
    * @desc    Start following ticket
    * @access  Private
    */
-  router.post('/:ticketId/follow', authMiddleware.requireAuth, asyncHandler(ticketController.follow));
+  router.post(
+    '/:ticketId/follow',
+    authMiddleware.requireAuth,
+    asyncHandler(ticketController.follow),
+  );
 
   return router;
 };

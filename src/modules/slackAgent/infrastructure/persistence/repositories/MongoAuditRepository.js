@@ -40,7 +40,14 @@ class MongoAuditRepository {
         actorType: metadata.actorType || 'system',
         action,
         resourceType: metadata.resourceType || action.split('.')[0] || 'unknown',
-        resourceId: metadata.resourceId || metadata.agentId || metadata.webhookId || metadata.ticketId || metadata.serverId || metadata.documentId || metadata.workspaceId,
+        resourceId:
+          metadata.resourceId ||
+          metadata.agentId ||
+          metadata.webhookId ||
+          metadata.ticketId ||
+          metadata.serverId ||
+          metadata.documentId ||
+          metadata.workspaceId,
         metadata,
       });
     } catch (err) {

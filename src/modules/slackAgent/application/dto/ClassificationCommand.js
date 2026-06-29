@@ -10,8 +10,12 @@ class ClassifyTicketCommand {
     Object.freeze(this);
   }
   validate() {
-    if (!this.ticketId) throw new Error('Ticket id is required');
-    if (!this.text) throw new Error('Text is required for classification');
+    if (!this.ticketId) {
+      throw new Error('Ticket id is required');
+    }
+    if (!this.text) {
+      throw new Error('Text is required for classification');
+    }
   }
 }
 
@@ -24,7 +28,9 @@ class DetectIntentCommand {
     Object.freeze(this);
   }
   validate() {
-    if (!this.text) throw new Error('Text is required');
+    if (!this.text) {
+      throw new Error('Text is required');
+    }
   }
 }
 
@@ -37,7 +43,9 @@ class FindSimilarTicketsCommand {
     Object.freeze(this);
   }
   validate() {
-    if (!this.ticketId) throw new Error('Ticket id is required');
+    if (!this.ticketId) {
+      throw new Error('Ticket id is required');
+    }
   }
 }
 

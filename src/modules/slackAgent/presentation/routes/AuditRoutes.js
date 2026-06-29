@@ -18,21 +18,33 @@ module.exports = function createAuditRoutes({ auditController, authMiddleware })
    * @desc    Get audit logs for a specific resource
    * @access  Private
    */
-  router.get('/resource/:resourceType/:resourceId', authMiddleware.requireAuth, asyncHandler(auditController.getByResource));
+  router.get(
+    '/resource/:resourceType/:resourceId',
+    authMiddleware.requireAuth,
+    asyncHandler(auditController.getByResource),
+  );
 
   /**
    * @route   GET /audit-logs/actor/:actorId
    * @desc    Get audit logs by actor
    * @access  Private
    */
-  router.get('/actor/:actorId', authMiddleware.requireAuth, asyncHandler(auditController.getByActor));
+  router.get(
+    '/actor/:actorId',
+    authMiddleware.requireAuth,
+    asyncHandler(auditController.getByActor),
+  );
 
   /**
    * @route   GET /audit-logs/ai-decisions
    * @desc    Get AI decision audit logs
    * @access  Private
    */
-  router.get('/ai-decisions', authMiddleware.requireAuth, asyncHandler(auditController.getAIDecisions));
+  router.get(
+    '/ai-decisions',
+    authMiddleware.requireAuth,
+    asyncHandler(auditController.getAIDecisions),
+  );
 
   /**
    * @route   GET /audit-logs/approvals

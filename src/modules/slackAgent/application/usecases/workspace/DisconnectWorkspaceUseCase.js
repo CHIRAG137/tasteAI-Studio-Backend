@@ -8,7 +8,10 @@ class DisconnectWorkspaceUseCase {
 
   async execute(command) {
     await this.workspaceRepository.delete(command.workspaceId);
-    await this.auditService.log('workspace.disconnected', { workspaceId: command.workspaceId, organizationId: command.organizationId });
+    await this.auditService.log('workspace.disconnected', {
+      workspaceId: command.workspaceId,
+      organizationId: command.organizationId,
+    });
   }
 }
 

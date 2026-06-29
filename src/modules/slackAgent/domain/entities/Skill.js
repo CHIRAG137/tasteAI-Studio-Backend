@@ -1,7 +1,22 @@
 'use strict';
 
 class Skill {
-  constructor({ id, organizationId, name, description, type, version, isEnabled, configuration, permissions, entryPoint, dependencies, metadata, createdAt, updatedAt }) {
+  constructor({
+    id,
+    organizationId,
+    name,
+    description,
+    type,
+    version,
+    isEnabled,
+    configuration,
+    permissions,
+    entryPoint,
+    dependencies,
+    metadata,
+    createdAt,
+    updatedAt,
+  }) {
     this.id = id;
     this.organizationId = organizationId;
     this.name = name;
@@ -20,9 +35,15 @@ class Skill {
   }
 
   validate() {
-    if (!this.organizationId) throw new Error('Organization id is required');
-    if (!this.name || !this.name.trim()) throw new Error('Skill name is required');
-    if (!this.type) throw new Error('Skill type is required');
+    if (!this.organizationId) {
+      throw new Error('Organization id is required');
+    }
+    if (!this.name || !this.name.trim()) {
+      throw new Error('Skill name is required');
+    }
+    if (!this.type) {
+      throw new Error('Skill type is required');
+    }
   }
 }
 

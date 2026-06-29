@@ -1,7 +1,16 @@
 'use strict';
 
 class SendNotificationCommand {
-  constructor({ organizationId, channelType, recipientId, recipientType, title, body, templateId, templateData }) {
+  constructor({
+    organizationId,
+    channelType,
+    recipientId,
+    recipientType,
+    title,
+    body,
+    templateId,
+    templateData,
+  }) {
     this.organizationId = organizationId;
     this.channelType = channelType;
     this.recipientId = recipientId;
@@ -14,9 +23,15 @@ class SendNotificationCommand {
     Object.freeze(this);
   }
   validate() {
-    if (!this.channelType) throw new Error('Channel type is required');
-    if (!this.recipientId) throw new Error('Recipient id is required');
-    if (!this.body) throw new Error('Body is required');
+    if (!this.channelType) {
+      throw new Error('Channel type is required');
+    }
+    if (!this.recipientId) {
+      throw new Error('Recipient id is required');
+    }
+    if (!this.body) {
+      throw new Error('Body is required');
+    }
   }
 }
 
@@ -32,9 +47,15 @@ class SendBulkNotificationCommand {
     Object.freeze(this);
   }
   validate() {
-    if (!this.channelType) throw new Error('Channel type is required');
-    if (!this.recipientIds || !this.recipientIds.length) throw new Error('At least one recipient id is required');
-    if (!this.body) throw new Error('Body is required');
+    if (!this.channelType) {
+      throw new Error('Channel type is required');
+    }
+    if (!this.recipientIds || !this.recipientIds.length) {
+      throw new Error('At least one recipient id is required');
+    }
+    if (!this.body) {
+      throw new Error('Body is required');
+    }
   }
 }
 

@@ -13,7 +13,9 @@ const runValidation = (req, res, next) => {
 
 exports.uploadRules = [
   body('name').notEmpty().trim().withMessage('Knowledge name is required'),
-  body('sourceType').isIn(['pdf', 'url', 'notion', 'google_drive', 'confluence', 'manual', 'api']).withMessage('Invalid source type'),
+  body('sourceType')
+    .isIn(['pdf', 'url', 'notion', 'google_drive', 'confluence', 'manual', 'api'])
+    .withMessage('Invalid source type'),
   runValidation,
 ];
 

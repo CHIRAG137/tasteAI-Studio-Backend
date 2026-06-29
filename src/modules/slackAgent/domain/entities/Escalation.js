@@ -1,7 +1,22 @@
 'use strict';
 
 class Escalation {
-  constructor({ id, organizationId, name, description, trigger, conditions, levels, notifyOnEscalate, notificationConfig, autoResolve, isActive, metadata, createdAt, updatedAt }) {
+  constructor({
+    id,
+    organizationId,
+    name,
+    description,
+    trigger,
+    conditions,
+    levels,
+    notifyOnEscalate,
+    notificationConfig,
+    autoResolve,
+    isActive,
+    metadata,
+    createdAt,
+    updatedAt,
+  }) {
     this.id = id;
     this.organizationId = organizationId;
     this.name = name;
@@ -20,9 +35,15 @@ class Escalation {
   }
 
   validate() {
-    if (!this.organizationId) throw new Error('Organization id is required');
-    if (!this.name || !this.name.trim()) throw new Error('Escalation name is required');
-    if (!this.trigger) throw new Error('Escalation trigger is required');
+    if (!this.organizationId) {
+      throw new Error('Organization id is required');
+    }
+    if (!this.name || !this.name.trim()) {
+      throw new Error('Escalation name is required');
+    }
+    if (!this.trigger) {
+      throw new Error('Escalation trigger is required');
+    }
   }
 }
 

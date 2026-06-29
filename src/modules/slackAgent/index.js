@@ -24,6 +24,8 @@ const CategoryModel = require('./infrastructure/persistence/models/CategoryModel
 const TagModel = require('./infrastructure/persistence/models/TagModel');
 const BusinessHoursModel = require('./infrastructure/persistence/models/BusinessHoursModel');
 const HolidayModel = require('./infrastructure/persistence/models/HolidayModel');
+const KnowledgeNodeModel = require('./infrastructure/persistence/models/KnowledgeNodeModel');
+const KnowledgeEdgeModel = require('./infrastructure/persistence/models/KnowledgeEdgeModel');
 
 const MongoWorkspaceRepository = require('./infrastructure/persistence/repositories/MongoWorkspaceRepository');
 const MongoChannelRepository = require('./infrastructure/persistence/repositories/MongoChannelRepository');
@@ -42,6 +44,8 @@ const MongoEventRepository = require('./infrastructure/persistence/repositories/
 const MongoAuditRepository = require('./infrastructure/persistence/repositories/MongoAuditRepository');
 const MongoNotificationRepository = require('./infrastructure/persistence/repositories/MongoNotificationRepository');
 const MongoMCPRepository = require('./infrastructure/persistence/repositories/MongoMCPRepository');
+const MongoKnowledgeNodeRepository = require('./infrastructure/persistence/repositories/MongoKnowledgeNodeRepository');
+const MongoKnowledgeEdgeRepository = require('./infrastructure/persistence/repositories/MongoKnowledgeEdgeRepository');
 const MongoWebhookRepository = require('./infrastructure/persistence/repositories/MongoWebhookRepository');
 const MongoDepartmentRepository = require('./infrastructure/persistence/repositories/MongoDepartmentRepository');
 const MongoTeamRepository = require('./infrastructure/persistence/repositories/MongoTeamRepository');
@@ -74,6 +78,8 @@ const MongoCategoryRepository_Single = new MongoCategoryRepository();
 const MongoTagRepository_Single = new MongoTagRepository();
 const MongoBusinessHoursRepository_Single = new MongoBusinessHoursRepository();
 const MongoHolidayRepository_Single = new MongoHolidayRepository();
+const MongoKnowledgeNodeRepository_Single = new MongoKnowledgeNodeRepository();
+const MongoKnowledgeEdgeRepository_Single = new MongoKnowledgeEdgeRepository();
 
 const SlackApiClient = require('./infrastructure/services/SlackApiClient');
 const SlackNotificationService = require('./infrastructure/services/SlackNotificationService');
@@ -81,6 +87,7 @@ const OpenAIClassificationClient = require('./infrastructure/services/OpenAIClas
 const SlackEventHandlerService = require('./infrastructure/services/SlackEventHandlerService');
 const SlackAIService = require('./infrastructure/services/SlackAIService');
 const SlackAICronService = require('./infrastructure/services/SlackAICronService');
+const KnowledgeGraphService = require('./infrastructure/services/KnowledgeGraphService');
 
 const InstallWorkspaceUseCase = require('./application/usecases/workspace/InstallWorkspaceUseCase');
 const SyncWorkspaceUseCase = require('./application/usecases/workspace/SyncWorkspaceUseCase');
@@ -152,6 +159,7 @@ const SendNotificationUseCase = require('./application/usecases/notification/Sen
 
 const UpdateSlackAICapabilitiesUseCase = require('./application/usecases/slackai/UpdateSlackAICapabilitiesUseCase');
 const TriggerChannelSummaryUseCase = require('./application/usecases/slackai/TriggerChannelSummaryUseCase');
+const SearchKnowledgeGraphUseCase = require('./application/usecases/knowledgegraph/SearchKnowledgeGraphUseCase');
 
 const UpdateAgentInvocationConfigUseCase = require('./application/usecases/agent/UpdateAgentInvocationConfigUseCase');
 const GetAgentInvocationConfigUseCase = require('./application/usecases/agent/GetAgentInvocationConfigUseCase');
@@ -214,6 +222,7 @@ const MCPController = require('./presentation/controllers/MCPController');
 const WebhookController = require('./presentation/controllers/WebhookController');
 const SlackAIController = require('./presentation/controllers/SlackAIController');
 const AgentInvocationController = require('./presentation/controllers/AgentInvocationController');
+const KnowledgeGraphController = require('./presentation/controllers/KnowledgeGraphController');
 
 const createWorkspaceRoutes = require('./presentation/routes/WorkspaceRoutes');
 const createChannelRoutes = require('./presentation/routes/ChannelRoutes');
@@ -239,6 +248,7 @@ const createMCPRoutes = require('./presentation/routes/MCPRoutes');
 const createWebhookRoutes = require('./presentation/routes/WebhookRoutes');
 const createSlackAIRoutes = require('./presentation/routes/SlackAIRoutes');
 const createAgentInvocationRoutes = require('./presentation/routes/AgentInvocationRoutes');
+const createKnowledgeGraphRoutes = require('./presentation/routes/KnowledgeGraphRoutes');
 
 const { requireAdminRole } = require('./presentation/middleware/SlackAgentAuthMiddleware');
 
@@ -281,6 +291,11 @@ function createSlackAgentModule({ authMiddleware } = {}) {
     slackApiClient,
     classificationClient,
   });
+  const knowledgeGraphService = new KnowledgeGraphService({
+    knowledgeNodeRepository: MongoKnowledgeNodeRepository_Single,
+    knowledgeEdgeRepository: MongoKnowledgeEdgeRepository_Single,
+    classificationClient,
+  });
   const slackAiCronService = new SlackAICronService({
     agentRepository,
     workspaceRepository,
@@ -289,7 +304,9 @@ function createSlackAgentModule({ authMiddleware } = {}) {
     slackApiClient,
     fetchOrgIds: async () => {
       const workspaces = await workspaceRepository.findAll();
-      const orgIds = [...new Set(workspaces.map((w) => w.organizationId?.toString()).filter(Boolean))];
+      const orgIds = [
+        ...new Set(workspaces.map((w) => w.organizationId?.toString()).filter(Boolean)),
+      ];
       return orgIds;
     },
   });
@@ -490,6 +507,7 @@ function createSlackAgentModule({ authMiddleware } = {}) {
     agentRepository,
     channelRepository,
     slackAiService,
+    knowledgeGraphService,
   });
 
   // ── Use Cases: Slack AI ───────────────────────────────────────
@@ -502,6 +520,11 @@ function createSlackAgentModule({ authMiddleware } = {}) {
     agentRepository,
     workspaceRepository,
     channelRepository,
+  });
+
+  // ── Use Cases: Knowledge Graph ───────────────────────────────
+  const searchKnowledgeGraphUseCase = new SearchKnowledgeGraphUseCase({
+    knowledgeGraphService,
   });
 
   // ── Use Cases: Invocation ────────────────────────────────────
@@ -683,6 +706,8 @@ function createSlackAgentModule({ authMiddleware } = {}) {
     listAgentConnectorsUseCase,
     updateSlackAICapabilitiesUseCase,
     triggerChannelSummaryUseCase,
+    searchKnowledgeGraphUseCase,
+    knowledgeGraphService,
     updateAgentInvocationConfigUseCase,
     getAgentInvocationConfigUseCase,
     getDefaultInvocationModesUseCase,
@@ -729,6 +754,7 @@ function createSlackAgentModule({ authMiddleware } = {}) {
   const webhookController = new WebhookController({ slackAgentFacade });
   const slackAIController = new SlackAIController({ slackAgentFacade });
   const agentInvocationController = new AgentInvocationController({ slackAgentFacade });
+  const knowledgeGraphController = new KnowledgeGraphController({ slackAgentFacade });
 
   // ── Routes ───────────────────────────────────────────────────
   router.use('/workspaces', createWorkspaceRoutes({ workspaceController, authMiddleware }));
@@ -758,6 +784,7 @@ function createSlackAgentModule({ authMiddleware } = {}) {
   router.use('/webhooks', createWebhookRoutes({ webhookController, authMiddleware }));
   router.use('/slack-ai', createSlackAIRoutes({ slackAIController, authMiddleware }));
   router.use('/agents', createAgentInvocationRoutes({ agentInvocationController, authMiddleware }));
+  router.use('/knowledge-graph', createKnowledgeGraphRoutes({ knowledgeGraphController, authMiddleware }));
 
   // Start the AI cron scheduler (runs every 60s, checks for due channel summaries)
   slackAiCronService.start();

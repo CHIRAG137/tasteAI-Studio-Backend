@@ -37,7 +37,9 @@ class MongoWorkflowRepository {
 
   async clone(id, overrides = {}) {
     const source = await WorkflowModel.findById(id).lean();
-    if (!source) return null;
+    if (!source) {
+      return null;
+    }
     delete source._id;
     delete source.__v;
     delete source.createdAt;

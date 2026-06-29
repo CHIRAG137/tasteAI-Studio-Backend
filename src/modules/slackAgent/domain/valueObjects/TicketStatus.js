@@ -1,6 +1,17 @@
 'use strict';
 
-const VALID_STATUSES = ['open', 'in_progress', 'waiting_on_customer', 'waiting_on_third_party', 'resolved', 'closed', 'reopened', 'merged', 'spam', 'archived'];
+const VALID_STATUSES = [
+  'open',
+  'in_progress',
+  'waiting_on_customer',
+  'waiting_on_third_party',
+  'resolved',
+  'closed',
+  'reopened',
+  'merged',
+  'spam',
+  'archived',
+];
 
 class TicketStatus {
   constructor(value) {
@@ -11,14 +22,22 @@ class TicketStatus {
     Object.freeze(this);
   }
 
-  get value() { return this._value; }
+  get value() {
+    return this._value;
+  }
 
   equals(other) {
     return other instanceof TicketStatus && this._value === other._value;
   }
 
   isActive() {
-    return ['open', 'in_progress', 'waiting_on_customer', 'waiting_on_third_party', 'reopened'].includes(this._value);
+    return [
+      'open',
+      'in_progress',
+      'waiting_on_customer',
+      'waiting_on_third_party',
+      'reopened',
+    ].includes(this._value);
   }
 
   isResolved() {
@@ -29,9 +48,13 @@ class TicketStatus {
     return this._value === 'closed';
   }
 
-  valueOf() { return this._value; }
+  valueOf() {
+    return this._value;
+  }
 
-  toString() { return this._value; }
+  toString() {
+    return this._value;
+  }
 
   static OPEN = new TicketStatus('open');
   static IN_PROGRESS = new TicketStatus('in_progress');
@@ -43,7 +66,9 @@ class TicketStatus {
   static MERGED = new TicketStatus('merged');
   static SPAM = new TicketStatus('spam');
   static ARCHIVED = new TicketStatus('archived');
-  static values() { return VALID_STATUSES; }
+  static values() {
+    return VALID_STATUSES;
+  }
 }
 
 module.exports = TicketStatus;

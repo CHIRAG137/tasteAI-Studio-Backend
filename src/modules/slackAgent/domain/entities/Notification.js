@@ -1,7 +1,25 @@
 'use strict';
 
 class Notification {
-  constructor({ id, organizationId, channelType, recipientId, recipientType, title, body, templateId, templateData, status, sentAt, readAt, error, retryCount, metadata, createdAt, updatedAt }) {
+  constructor({
+    id,
+    organizationId,
+    channelType,
+    recipientId,
+    recipientType,
+    title,
+    body,
+    templateId,
+    templateData,
+    status,
+    sentAt,
+    readAt,
+    error,
+    retryCount,
+    metadata,
+    createdAt,
+    updatedAt,
+  }) {
     this.id = id;
     this.organizationId = organizationId;
     this.channelType = channelType;
@@ -23,9 +41,15 @@ class Notification {
   }
 
   validate() {
-    if (!this.channelType) throw new Error('Channel type is required');
-    if (!this.recipientId) throw new Error('Recipient id is required');
-    if (!this.body) throw new Error('Notification body is required');
+    if (!this.channelType) {
+      throw new Error('Channel type is required');
+    }
+    if (!this.recipientId) {
+      throw new Error('Recipient id is required');
+    }
+    if (!this.body) {
+      throw new Error('Notification body is required');
+    }
   }
 }
 

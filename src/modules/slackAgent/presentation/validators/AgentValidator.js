@@ -12,13 +12,21 @@ const runValidation = (req, res, next) => {
 };
 
 exports.createRules = [
-  body('name').notEmpty().trim().isLength({ min: 1, max: 100 }).withMessage('Agent name is required (1-100 chars)'),
+  body('name')
+    .notEmpty()
+    .trim()
+    .isLength({ min: 1, max: 100 })
+    .withMessage('Agent name is required (1-100 chars)'),
   runValidation,
 ];
 
 exports.updateRules = [
   param('agentId').notEmpty().withMessage('Agent id is required'),
-  body('name').optional().trim().isLength({ min: 1, max: 100 }).withMessage('Name must be 1-100 chars'),
+  body('name')
+    .optional()
+    .trim()
+    .isLength({ min: 1, max: 100 })
+    .withMessage('Name must be 1-100 chars'),
   runValidation,
 ];
 

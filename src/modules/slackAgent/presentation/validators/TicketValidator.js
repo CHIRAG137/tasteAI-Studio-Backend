@@ -13,8 +13,14 @@ const runValidation = (req, res, next) => {
 
 exports.createRules = [
   body('title').notEmpty().trim().withMessage('Ticket title is required'),
-  body('priority').optional().isIn(['critical', 'high', 'medium', 'low']).withMessage('Invalid priority'),
-  body('source').optional().isIn(['slack', 'api', 'email', 'web', 'portal', 'ai']).withMessage('Invalid source'),
+  body('priority')
+    .optional()
+    .isIn(['critical', 'high', 'medium', 'low'])
+    .withMessage('Invalid priority'),
+  body('source')
+    .optional()
+    .isIn(['slack', 'api', 'email', 'web', 'portal', 'ai'])
+    .withMessage('Invalid source'),
   runValidation,
 ];
 
@@ -26,8 +32,14 @@ exports.ticketIdParam = [
 exports.updateRules = [
   param('ticketId').notEmpty().withMessage('Ticket id is required'),
   body('title').optional().trim().notEmpty().withMessage('Title cannot be empty'),
-  body('priority').optional().isIn(['critical', 'high', 'medium', 'low']).withMessage('Invalid priority'),
-  body('status').optional().isIn(['open', 'in_progress', 'waiting_on_customer', 'resolved', 'closed', 'reopened']).withMessage('Invalid status'),
+  body('priority')
+    .optional()
+    .isIn(['critical', 'high', 'medium', 'low'])
+    .withMessage('Invalid priority'),
+  body('status')
+    .optional()
+    .isIn(['open', 'in_progress', 'waiting_on_customer', 'resolved', 'closed', 'reopened'])
+    .withMessage('Invalid status'),
   runValidation,
 ];
 
@@ -46,7 +58,9 @@ exports.transferRules = [
 
 exports.mergeRules = [
   param('ticketId').notEmpty().withMessage('Target ticket id is required'),
-  body('sourceTicketIds').isArray({ min: 1 }).withMessage('sourceTicketIds must be a non-empty array'),
+  body('sourceTicketIds')
+    .isArray({ min: 1 })
+    .withMessage('sourceTicketIds must be a non-empty array'),
   runValidation,
 ];
 
@@ -71,6 +85,8 @@ exports.attachmentRules = [
 
 exports.changeStatusRules = [
   param('ticketId').notEmpty().withMessage('Ticket id is required'),
-  body('status').isIn(['open', 'in_progress', 'waiting_on_customer', 'resolved', 'closed', 'reopened']).withMessage('Invalid status'),
+  body('status')
+    .isIn(['open', 'in_progress', 'waiting_on_customer', 'resolved', 'closed', 'reopened'])
+    .withMessage('Invalid status'),
   runValidation,
 ];

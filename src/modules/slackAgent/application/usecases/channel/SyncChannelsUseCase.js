@@ -9,9 +9,11 @@ class SyncChannelsUseCase {
 
   async execute(command) {
     const workspace = await this.workspaceRepository.findById(command.workspaceId);
-    if (!workspace || !workspace.accessToken) throw new Error('Workspace not found or not authenticated');
+    if (!workspace || !workspace.accessToken) {
+      throw new Error('Workspace not found or not authenticated');
+    }
     const slackResponse = await this.slackApiClient.listChannels(workspace.accessToken);
-    const channels = (slackResponse.channels || []).map(c => ({
+    const channels = (slackResponse.channels || []).map((c) => ({
       channelId: c.id,
       channelName: c.name,
       channelTopic: c.topic?.value,

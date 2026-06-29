@@ -12,13 +12,6 @@ const { attachIpAddress } = require('../middlewares/ipExtractorMiddleware');
 router.use(attachIpAddress);
 
 /**
- * @route   POST /api/bots/create
- * @desc    Create a new chatbot with optional training files (PDF, TXT, DOC/DOCX, XLS/XLSX, CSV) or scraped content
- * @access  Private (Authenticated user)
- */
-router.post('/create', authMiddleware, upload.array('files'), botController.createBot);
-
-/**
  * @route   POST /api/bots/test-custom-llm
  * @desc    Validate a custom LLM provider, API key, and model before saving
  * @access  Private

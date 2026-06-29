@@ -1,7 +1,25 @@
 'use strict';
 
 class SlackChannel {
-  constructor({ id, workspaceId, organizationId, channelId, channelName, channelTopic, channelPurpose, isMember, isPrivate, isArchived, isMonitored, memberCount, permissions, configuration, lastSyncedAt, createdAt, updatedAt }) {
+  constructor({
+    id,
+    workspaceId,
+    organizationId,
+    channelId,
+    channelName,
+    channelTopic,
+    channelPurpose,
+    isMember,
+    isPrivate,
+    isArchived,
+    isMonitored,
+    memberCount,
+    permissions,
+    configuration,
+    lastSyncedAt,
+    createdAt,
+    updatedAt,
+  }) {
     this.id = id;
     this.workspaceId = workspaceId;
     this.organizationId = organizationId;
@@ -23,9 +41,15 @@ class SlackChannel {
   }
 
   validate() {
-    if (!this.workspaceId) throw new Error('Workspace id is required');
-    if (!this.channelId) throw new Error('Slack channel id is required');
-    if (!this.channelName) throw new Error('Channel name is required');
+    if (!this.workspaceId) {
+      throw new Error('Workspace id is required');
+    }
+    if (!this.channelId) {
+      throw new Error('Slack channel id is required');
+    }
+    if (!this.channelName) {
+      throw new Error('Channel name is required');
+    }
   }
 }
 

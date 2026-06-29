@@ -2,10 +2,10 @@
 
 /**
  * SlackEventHandlerService
- * 
+ *
  * Processes incoming Slack events and routes them to the appropriate agent
  * based on the agent's invocation configuration.
- * 
+ *
  * Invocation methods supported:
  *  - @mention (app_mention event)
  *  - Direct message (message event in IM channel)
@@ -29,7 +29,9 @@ class SlackEventHandlerService {
     const { eventType, rawBody, workspaceId } = event;
     const payload = rawBody?.event || rawBody;
 
-    if (!payload) return { matched: false, reason: 'No event payload' };
+    if (!payload) {
+      return { matched: false, reason: 'No event payload' };
+    }
 
     switch (eventType) {
       case 'app_mention':
@@ -59,7 +61,9 @@ class SlackEventHandlerService {
     const agents = await this.agentRepository.findEnabled(organizationId);
     const matched = [];
 
-    if (!channelId) return { matched: false, reason: 'No channel in payload' };
+    if (!channelId) {
+      return { matched: false, reason: 'No channel in payload' };
+    }
 
     for (const agent of agents) {
       const config = agent.invocationConfig || {};
@@ -115,7 +119,7 @@ class SlackEventHandlerService {
       if (!isDM && config.channelMonitoring?.enabled && channel) {
         const channelDoc = await this._findChannelBySlackId(workspaceId, channel);
         if (channelDoc) {
-          const agentChannelIds = (agent.assignedChannelIds || []).map(id => id.toString());
+          const agentChannelIds = (agent.assignedChannelIds || []).map((id) => id.toString());
           if (agentChannelIds.includes(channelDoc.id)) {
             score = Math.max(score, 0.8);
             method = method || 'channel_monitoring';
@@ -128,7 +132,9 @@ class SlackEventHandlerService {
       const triggers = config.keywordTriggers || [];
       if (triggers.length > 0 && text) {
         for (const trigger of triggers) {
-          if (!trigger.enabled) continue;
+          if (!trigger.enabled) {
+            continue;
+          }
           const keyword = trigger.keyword?.toLowerCase();
           const messageText = text.toLowerCase();
 
@@ -140,7 +146,9 @@ class SlackEventHandlerService {
             case 'regex':
               try {
                 triggered = new RegExp(keyword, 'i').test(text);
-              } catch { triggered = false; }
+              } catch {
+                triggered = false;
+              }
               break;
             case 'contains':
             default:
@@ -160,9 +168,17 @@ class SlackEventHandlerService {
 
       // Routing mode filter
       const routingMode = config.routing?.mode || 'all';
-      if (routingMode === 'disabled') continue;
-      if (routingMode === 'keyword_only' && method !== 'keyword_trigger') continue;
-      if (routingMode === 'ai_filter' && method !== 'keyword_trigger' && method !== 'direct_message') {
+      if (routingMode === 'disabled') {
+        continue;
+      }
+      if (routingMode === 'keyword_only' && method !== 'keyword_trigger') {
+        continue;
+      }
+      if (
+        routingMode === 'ai_filter' &&
+        method !== 'keyword_trigger' &&
+        method !== 'direct_message'
+      ) {
         score = Math.max(score, 0.5);
         details.aiFilter = true;
       }
@@ -196,7 +212,13 @@ class SlackEventHandlerService {
    * Handle slash command events
    */
   async _handleSlashCommand(event, payload) {
-    const { channel_id: channelId, user_id: userId, text, command, trigger_id: triggerId } = payload;
+    const {
+      channel_id: channelId,
+      user_id: userId,
+      text,
+      command,
+      trigger_id: triggerId,
+    } = payload;
     const workspaceId = event.workspaceId;
     const organizationId = event.organizationId;
 
@@ -207,7 +229,7 @@ class SlackEventHandlerService {
       const config = agent.invocationConfig || {};
       const slashCommands = config.slashCommands || [];
       const cmdConfig = slashCommands.find(
-        sc => sc.enabled && (command === sc.command || command === `/${sc.command}`),
+        (sc) => sc.enabled && (command === sc.command || command === `/${sc.command}`),
       );
 
       if (cmdConfig) {
@@ -273,15 +295,17 @@ class SlackEventHandlerService {
     // workspaceId from event payload is a Slack team ID (T12345), not a MongoDB ObjectId.
     // Look up the workspace first to get the MongoDB ID.
     const workspace = await this.workspaceRepository.findByTeamId(workspaceId);
-    if (!workspace) return null;
+    if (!workspace) {
+      return null;
+    }
     return this.channelRepository.findByChannelId(workspace.id, slackChannelId);
   }
 
   _mapEventTypeToKey(eventType) {
     const map = {
-      'reaction_added': 'reactionAdded',
-      'file_shared': 'fileShared',
-      'member_joined_channel': 'memberJoined',
+      reaction_added: 'reactionAdded',
+      file_shared: 'fileShared',
+      member_joined_channel: 'memberJoined',
       'message.channels': 'messageReceived',
       'message.groups': 'messageReceived',
       'message.im': 'messageReceived',

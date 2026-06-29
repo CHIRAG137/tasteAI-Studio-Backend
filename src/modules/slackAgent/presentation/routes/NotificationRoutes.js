@@ -25,7 +25,11 @@ module.exports = function createNotificationRoutes({ notificationController, aut
    * @desc    Mark notification as read
    * @access  Private
    */
-  router.post('/:notificationId/read', authMiddleware.requireAuth, asyncHandler(notificationController.markRead));
+  router.post(
+    '/:notificationId/read',
+    authMiddleware.requireAuth,
+    asyncHandler(notificationController.markRead),
+  );
 
   return router;
 };

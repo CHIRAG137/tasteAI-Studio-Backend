@@ -25,14 +25,22 @@ module.exports = function createEscalationRoutes({ escalationController, authMid
    * @desc    Get escalation rule details
    * @access  Private
    */
-  router.get('/:escalationId', authMiddleware.requireAuth, asyncHandler(escalationController.getById));
+  router.get(
+    '/:escalationId',
+    authMiddleware.requireAuth,
+    asyncHandler(escalationController.getById),
+  );
 
   /**
    * @route   POST /escalations/:escalationId/trigger
    * @desc    Trigger escalation for a ticket
    * @access  Private
    */
-  router.post('/:escalationId/trigger', authMiddleware.requireAuth, asyncHandler(escalationController.trigger));
+  router.post(
+    '/:escalationId/trigger',
+    authMiddleware.requireAuth,
+    asyncHandler(escalationController.trigger),
+  );
 
   return router;
 };
