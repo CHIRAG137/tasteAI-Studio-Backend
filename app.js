@@ -36,7 +36,11 @@ const app = express();
 
 app.use(
   cors({
-    origin: ['http://localhost:8080', 'https://tastebot-studio.onrender.com'],
+    origin: [
+      'http://localhost:8080',
+      'https://tastebot-studio.onrender.com',
+      'https://rs235kfp-8080.inc1.devtunnels.ms',
+    ],
     credentials: true,
     allowedHeaders: [
       'Content-Type',
@@ -148,6 +152,12 @@ const authModule = createServiceIntegrationStrategy('auth').mount(
 SERVICE_REGISTRY.chatbot.createModule = () =>
   require('./src/modules/chatbot').createChatbotModule({
     authMiddleware: authModule.authMiddleware.requireAuth,
+  });
+
+// Inject auth middleware into slackAgent so all routes are protected
+SERVICE_REGISTRY.slackAgent.createModule = () =>
+  require('./src/modules/slackAgent').createSlackAgentModule({
+    authMiddleware: authModule.authMiddleware,
   });
 
 // Mount remaining services

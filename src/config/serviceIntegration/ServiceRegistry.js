@@ -18,7 +18,12 @@ const SERVICE_REGISTRY = {
     envModeKey: 'CHATBOT_MODE',
     envUrlKey: 'CHATBOT_SERVICE_URL',
   },
-  // add the next microservice here — nothing else changes
+  slackAgent: {
+    mountPath: '/api/slack-agent',
+    createModule: () => require('../../modules/slackAgent').createSlackAgentModule(),
+    envModeKey: 'SLACK_AGENT_MODE',
+    envUrlKey: 'SLACK_AGENT_SERVICE_URL',
+  },
 };
 
 module.exports = { SERVICE_REGISTRY };

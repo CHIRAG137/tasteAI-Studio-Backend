@@ -28,4 +28,4 @@ const workflowSchema = new mongoose.Schema(
   },
 );
 
-module.exports = mongoose.model('Workflow', workflowSchema);
+module.exports = mongoose.model('Workflowv2', workflowSchema);

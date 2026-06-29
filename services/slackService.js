@@ -1,5 +1,6 @@
 const slackClient = require('../config/slackClient');
-const SlackIntegration = require('../models/SlackIntegration');
+const SlackWorkspaceModel = require('../src/modules/slackAgent/infrastructure/persistence/models/SlackWorkspaceModel');
+const User = require('../models/User');
 const ChatBot = require('../models/ChatBot');
 const botController = require('../controllers/botController');
 const logger = require('../utils/logger');
@@ -41,7 +42,7 @@ exports.processSlackOAuthCallback = async (code, state) => {
       },
     });
 
-    const { access_token, team, authed_user } = response.data;
+    const { access_token, bot_user_id, team, authed_user, scope } = response.data;
 
     if (!access_token) {
       logger.error('Slack OAuth failed - no access token', {
@@ -50,13 +51,25 @@ exports.processSlackOAuthCallback = async (code, state) => {
       throw new Error('OAuth failed');
     }
 
-    await SlackIntegration.findOneAndUpdate(
-      { userId: decodedState.userId },
+    const user = await User.findById(decodedState.userId);
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    await SlackWorkspaceModel.findOneAndUpdate(
+      { teamId: team.id },
       {
-        slackAccessToken: access_token,
-        slackTeamId: team.id,
-        slackTeamName: team.name,
-        slackAuthedUserId: authed_user.id,
+        organizationId: user._id,
+        teamId: team.id,
+        teamName: team.name,
+        accessToken: access_token,
+        botUserId: bot_user_id,
+        botAccessToken: access_token,
+        scopes: scope ? scope.split(',') : [],
+        authedUserId: authed_user.id,
+        installedById: user._id,
+        installedAt: new Date(),
+        isActive: true,
       },
       { upsert: true, new: true },
     );
@@ -98,11 +111,11 @@ exports.handleSlackEvent = async (body) => {
       return;
     }
 
-    const slackIntegration = await SlackIntegration.findOne({
-      slackTeamId: team_id,
+    const workspace = await SlackWorkspaceModel.findOne({
+      teamId: team_id,
     });
-    if (!slackIntegration) {
-      logger.warn('No Slack integration found for team', { team_id });
+    if (!workspace) {
+      logger.warn('No Slack workspace found for team', { team_id });
       return;
     }
 
@@ -120,7 +133,7 @@ exports.handleSlackEvent = async (body) => {
             },
             {
               headers: {
-                Authorization: `Bearer ${slackIntegration.slackAccessToken}`,
+                Authorization: `Bearer ${workspace.accessToken}`,
               },
             },
           );
